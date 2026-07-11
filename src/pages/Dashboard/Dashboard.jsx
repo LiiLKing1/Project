@@ -115,9 +115,11 @@ const Dashboard = () => {
 
   // Barcha sotuvlarni bir marta yuklash
   useEffect(() => {
-    if (!currentUser) return;
+    if (!currentUser || !storeId) return;
+    
     const fetchAll = async () => {
       try {
+        setLoading(true);
         const salesQuery = query(collection(db, `users/${storeId}/sales`), orderBy('date', 'desc'), limit(500));
         const snap = await getDocs(salesQuery);
         const data = [];
@@ -130,7 +132,7 @@ const Dashboard = () => {
       }
     };
     fetchAll();
-  }, [currentUser]);
+  }, [currentUser, storeId]);
 
   // Tab o'zgarganda statistikani hisoblash
   useEffect(() => {
