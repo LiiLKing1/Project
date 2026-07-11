@@ -4,7 +4,7 @@ import { Calendar, DollarSign, ListOrdered } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useStoreId } from '../../context/useStoreId';
 import { db } from '../../firebase';
-import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
+import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
 
 const formatMoney = (amount) => {
   return new Intl.NumberFormat('uz-UZ').format(amount) + ' UZS';
@@ -117,21 +117,27 @@ const Dashboard = () => {
   useEffect(() => {
     if (!currentUser || !storeId) return;
     
-    const fetchAll = async () => {
-      try {
-        setLoading(true);
-        const salesQuery = query(collection(db, `users/${storeId}/sales`), orderBy('date', 'desc'), limit(500));
-        const snap = await getDocs(salesQuery);
+    let unsubscribe;
+    const fetchAll = () => {
+      setLoading(true);
+      const salesQuery = query(collection(db, `users/${storeId}/sales`), orderBy('date', 'desc'), limit(500));
+      
+      unsubscribe = onSnapshot(salesQuery, (snap) => {
         const data = [];
         snap.forEach(d => data.push({ id: d.id, ...d.data() }));
         setAllSales(data);
-      } catch (e) {
-        console.error(e);
-      } finally {
         setLoading(false);
-      }
+      }, (error) => {
+        console.error("Dashboard onSnapshot xatosi:", error);
+        setLoading(false);
+      });
     };
+    
     fetchAll();
+    
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, [currentUser, storeId]);
 
   // Tab o'zgarganda statistikani hisoblash
