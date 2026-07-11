@@ -4,7 +4,7 @@ import { Calendar, DollarSign, ListOrdered } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useStoreId } from '../../context/useStoreId';
 import { db } from '../../firebase';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
 
 const formatMoney = (amount) => {
   return new Intl.NumberFormat('uz-UZ').format(amount) + ' UZS';
@@ -118,7 +118,8 @@ const Dashboard = () => {
     if (!currentUser) return;
     const fetchAll = async () => {
       try {
-        const snap = await getDocs(collection(db, `users/${storeId}/sales`));
+        const salesQuery = query(collection(db, `users/${storeId}/sales`), orderBy('date', 'desc'), limit(500));
+        const snap = await getDocs(salesQuery);
         const data = [];
         snap.forEach(d => data.push({ id: d.id, ...d.data() }));
         setAllSales(data);

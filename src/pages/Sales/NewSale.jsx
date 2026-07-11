@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Trash2, X } from 'lucide-react';
 import { db } from '../../firebase';
-import { collection, getDocs, addDoc, updateDoc, doc, serverTimestamp, increment } from 'firebase/firestore';
+import { collection, getDocs, addDoc, updateDoc, doc, serverTimestamp, increment, query, limit } from 'firebase/firestore';
 import { useAuth } from '../../context/AuthContext';
 import { useStoreId } from '../../context/useStoreId';
 
@@ -27,7 +27,8 @@ const NewSale = () => {
   useEffect(() => {
     if (!currentUser) return;
     const fetchData = async () => {
-      const prodSnap = await getDocs(collection(db, `users/${storeId}/products`));
+      const prodQuery = query(collection(db, `users/${storeId}/products`), limit(300));
+      const prodSnap = await getDocs(prodQuery);
       const prodData = [];
       prodSnap.forEach(d => prodData.push({ id: d.id, ...d.data() }));
       setProducts(prodData);
@@ -121,7 +122,8 @@ const NewSale = () => {
       setShowModal(false);
       
       // Re-fetch products
-      const snap = await getDocs(collection(db, `users/${storeId}/products`));
+      const prodQuery2 = query(collection(db, `users/${storeId}/products`), limit(300));
+      const snap = await getDocs(prodQuery2);
       const data = [];
       snap.forEach(d => data.push({ id: d.id, ...d.data() }));
       setProducts(data);

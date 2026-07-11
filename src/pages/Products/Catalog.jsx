@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, Plus } from 'lucide-react';
 import { db } from '../../firebase';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, query, limit } from 'firebase/firestore';
 import { useStoreId } from '../../context/useStoreId';
 
 const formatMoney = (amount) => {
@@ -30,7 +30,8 @@ const Catalog = () => {
         setSuppliers(supMap);
 
         // Endi mahsulotlarni olamiz
-        const prodSnapshot = await getDocs(collection(db, `users/${storeId}/products`));
+        const prodQuery = query(collection(db, `users/${storeId}/products`), limit(150));
+        const prodSnapshot = await getDocs(prodQuery);
         const prodData = [];
         prodSnapshot.forEach(doc => {
           prodData.push({ id: doc.id, ...doc.data() });

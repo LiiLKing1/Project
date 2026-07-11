@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import * as XLSX from 'xlsx';
 import { db } from '../../firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, writeBatch, doc, serverTimestamp } from 'firebase/firestore';
 import { useAuth } from '../../context/AuthContext';
 import { useStoreId } from '../../context/useStoreId';
 import { useNavigate } from 'react-router-dom';
@@ -45,13 +45,18 @@ const Import = () => {
       // Biz kutgan standart ustunlar bo'lmasligi mumkin, shuning uchun eng asosiylarini izlaymiz.
       // Misol uchun 0-ustun Name, 1-ustun Miqdor, 2-ustun Narx deb faraz qilamiz yoki nomlari bo'yicha.
       
+      // Batch write setup
+      let batch = writeBatch(db);
+      let count = 0;
+
       for (const row of fileData) {
         // Eng sodda mapping: Agar birinchi ustun nom bo'lsa
         const name = row[0] ? String(row[0]) : 'Nomsiz tovar';
         const quantity = Number(row[1]) || 0;
         const priceUz = Number(row[2]) || 0;
 
-        await addDoc(productsRef, {
+        const docRef = doc(productsRef);
+        batch.set(docRef, {
           name,
           quantity,
           priceUz,
@@ -63,6 +68,17 @@ const Import = () => {
           currencySettings: 'UZS',
           createdAt: serverTimestamp()
         });
+
+        count++;
+        if (count >= 400) {
+          await batch.commit();
+          batch = writeBatch(db);
+          count = 0;
+        }
+      }
+
+      if (count > 0) {
+        await batch.commit();
       }
 
       alert("Muvaffaqiyatli import qilindi!");
