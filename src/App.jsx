@@ -1,122 +1,98 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import React from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import MainLayout from './layout/MainLayout';
+import ProtectedRoute from './components/ProtectedRoute';
+import PermissionRoute from './components/PermissionRoute';
+import PingMeter from './components/PingMeter';
+
+import Login from './pages/Auth/Login';
+import Register from './pages/Auth/Register';
+import Dashboard from './pages/Dashboard/Dashboard';
+
+import ProductsLayout from './pages/Products/ProductsLayout';
+import Catalog from './pages/Products/Catalog';
+import NewProduct from './pages/Products/NewProduct';
+import Orders from './pages/Products/Orders';
+import NewOrder from './pages/Products/NewOrder';
+import Suppliers from './pages/Products/Suppliers';
+import Import from './pages/Products/Import';
+import Inventory from './pages/Products/Inventory';
+import Transfer from './pages/Products/Transfer';
+import Revaluation from './pages/Products/Revaluation';
+import Writeoff from './pages/Products/Writeoff';
+
+import SalesLayout from './pages/Sales/SalesLayout';
+import NewSale from './pages/Sales/NewSale';
+import SalesHistory from './pages/Sales/SalesHistory';
+
+import Customers from './pages/Customers/Customers';
+
+import ManagementLayout from './pages/Management/ManagementLayout';
+import Roles from './pages/Management/Roles';
+import Employees from './pages/Management/Employees';
+import NewEmployee from './pages/Management/NewEmployee';
+
+import Settings from './pages/Settings/Settings';
 
 function App() {
-  const [count, setCount] = useState(0)
-
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+    <BrowserRouter>
+      <PingMeter />
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        
+        <Route path="/" element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
+          <Route index element={<Dashboard />} />
 
-      <div className="ticks"></div>
+          {/* Mahsulotlar */}
+          <Route path="products" element={<PermissionRoute permKey="products"><ProductsLayout /></PermissionRoute>}>
+            <Route index element={<Navigate to="catalog" replace />} />
+            <Route path="catalog" element={<Catalog />} />
+            <Route path="catalog/new" element={<NewProduct />} />
+            <Route path="import" element={<Import />} />
+            <Route path="orders" element={<Orders />} />
+            <Route path="orders/new" element={<NewOrder />} />
+            <Route path="inventory" element={<Inventory />} />
+            <Route path="transfer" element={<Transfer />} />
+            <Route path="revaluation" element={<Revaluation />} />
+            <Route path="writeoff" element={<Writeoff />} />
+            <Route path="suppliers" element={<Suppliers />} />
+            <Route path="*" element={<div style={{padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)'}}>Tez kunda ishga tushadi</div>} />
+          </Route>
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
+          {/* Sotuvlar */}
+          <Route path="sales" element={<PermissionRoute permKey="sales"><SalesLayout /></PermissionRoute>}>
+            <Route index element={<Navigate to="new" replace />} />
+            <Route path="new" element={<NewSale />} />
+            <Route path="history" element={<SalesHistory />} />
+          </Route>
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+          {/* Mijozlar */}
+          <Route path="customers" element={<PermissionRoute permKey="customers"><Customers /></PermissionRoute>} />
+
+          {/* Boshqaruv */}
+          <Route path="management" element={<PermissionRoute permKey="management"><ManagementLayout /></PermissionRoute>}>
+            <Route index element={<Navigate to="employees" replace />} />
+            <Route path="employees" element={<Employees />} />
+            <Route path="employees/new" element={<NewEmployee />} />
+            <Route path="roles" element={<Roles />} />
+          </Route>
+
+          {/* Hisobotlar, Marketing, Moliya - tez kunda */}
+          <Route path="reports" element={<PermissionRoute permKey="reports"><div style={{padding: '2rem'}}><h1 style={{fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1rem'}}>Hisobotlar</h1><p style={{color: 'var(--text-secondary)'}}>Bu bo'lim tez kunda ishga tushadi.</p></div></PermissionRoute>} />
+          <Route path="marketing" element={<PermissionRoute permKey="marketing"><div style={{padding: '2rem'}}><h1 style={{fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1rem'}}>Marketing</h1><p style={{color: 'var(--text-secondary)'}}>Bu bo'lim tez kunda ishga tushadi.</p></div></PermissionRoute>} />
+          <Route path="finance" element={<PermissionRoute permKey="finance"><div style={{padding: '2rem'}}><h1 style={{fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1rem'}}>Moliyalashtirish</h1><p style={{color: 'var(--text-secondary)'}}>Bu bo'lim tez kunda ishga tushadi.</p></div></PermissionRoute>} />
+
+          {/* Sozlamalar */}
+          <Route path="settings" element={<PermissionRoute permKey="settings"><Settings /></PermissionRoute>} />
+        </Route>
+
+        {/* 404 */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </BrowserRouter>
+  );
 }
 
-export default App
+export default App;
