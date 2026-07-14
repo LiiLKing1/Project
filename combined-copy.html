@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8">
+  <title>Dashboard va Mahsulotlar - HTML Copy</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    :root {
+      --primary: #4F46E5; --primary-hover: #4338CA; --primary-light: #EEF2FF;
+      --success: #10B981; --success-hover: #059669; --success-light: #ECFDF5;
+      --warning: #F59E0B; --warning-hover: #D97706; --warning-light: #FFFBEB;
+      --danger: #EF4444; --danger-hover: #DC2626; --danger-light: #FEF2F2;
+      --bg-main: #F3F4F6; --bg-surface: #FFFFFF; --bg-surface-glass: rgba(255, 255, 255, 0.7);
+      --text-main: #111827; --text-secondary: #6B7280; --text-inverse: #FFFFFF;
+      --border-color: #E5E7EB;
+      --radius-sm: 0.25rem; --radius-md: 0.5rem; --radius-lg: 0.75rem; --radius-xl: 1rem; --radius-2xl: 1.5rem;
+      --shadow-glass: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
+      
+      --sidebar-width: 280px;
+      --topbar-height: 70px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter', sans-serif; background-color: var(--bg-main); color: var(--text-main); }
+    
+    .glass-panel { background: var(--bg-surface-glass); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.3); box-shadow: var(--shadow-glass); border-radius: var(--radius-xl); }
+    .h1 { font-size: 1.875rem; font-weight: 700; color: var(--text-main); }
+    .h2 { font-size: 1.5rem; font-weight: 600; color: var(--text-main); }
+    .subtitle { font-size: 0.875rem; color: var(--text-secondary); }
+    .flex-center { display: flex; align-items: center; justify-content: center; }
+    .flex-between { display: flex; align-items: center; justify-content: space-between; }
+    .flex-col { display: flex; flex-direction: column; }
+    button { cursor: pointer; border: none; background: none; transition: all 0.2s ease; font-family: inherit; }
+
+    /* Layout */
+    .app-container { display: flex; height: 100vh; width: 100vw; overflow: hidden; background-color: var(--bg-main); }
+    
+    .sidebar { width: var(--sidebar-width); height: 100%; background-color: var(--bg-surface); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; z-index: 10; }
+    .sidebar-header { height: var(--topbar-height); display: flex; align-items: center; padding: 0 1.5rem; border-bottom: 1px solid var(--border-color); }
+    .logo { display: flex; align-items: center; gap: 0.75rem; font-weight: 700; font-size: 1.25rem; color: var(--text-main); letter-spacing: 0.5px; }
+    .logo-icon { width: 32px; height: 32px; background: linear-gradient(135deg, var(--primary), var(--primary-hover)); color: white; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; font-size: 1.125rem; }
+    
+    .nav-menu { padding: 1.5rem 1rem; display: flex; flex-direction: column; gap: 0.5rem; flex: 1; overflow-y: auto; }
+    .nav-item { display: flex; align-items: center; gap: 0.875rem; padding: 0.75rem 1rem; border-radius: var(--radius-md); color: var(--text-secondary); font-weight: 500; transition: all 0.2s ease; text-decoration: none; cursor: pointer; }
+    .nav-item:hover { background-color: var(--bg-main); color: var(--primary); }
+    .nav-item.active { background-color: var(--primary-light); color: var(--primary); font-weight: 600; }
+
+    .main-content { flex: 1; display: flex; flex-direction: column; height: 100%; overflow: hidden; }
+    
+    .topbar { height: var(--topbar-height); background-color: var(--bg-surface-glass); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; padding: 0 2rem; z-index: 5; }
+    .user-profile { display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem; border-radius: var(--radius-md); }
+    .user-avatar { width: 36px; height: 36px; background-color: var(--primary-light); color: var(--primary); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 600; }
+    .user-info { display: flex; flex-direction: column; }
+    .user-name { font-weight: 600; font-size: 0.875rem; color: var(--text-main); }
+    .user-role { font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; }
+
+    .page-content { flex: 1; overflow-y: auto; padding: 2rem; }
+
+    /* Dashboard specific */
+    .tabs { display: flex; gap: 0.5rem; background-color: var(--bg-surface); padding: 0.25rem; border-radius: var(--radius-md); }
+    .tab-btn { padding: 0.5rem 1rem; border-radius: var(--radius-sm); color: var(--text-secondary); }
+    .tab-btn.active { background-color: var(--primary); color: #fff; font-weight: 600; }
+
+    /* Products specific */
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.625rem 1.25rem; font-weight: 600; font-size: 0.875rem; border-radius: var(--radius-md); }
+    .btn-primary { background-color: var(--primary); color: white; }
+    .btn-primary:hover { background-color: var(--primary-hover); transform: translateY(-1px); }
+    .btn-outline { background-color: transparent; border: 1px solid var(--border-color); color: var(--text-main); }
+    .btn-outline:hover { background-color: var(--bg-main); border-color: var(--text-secondary); }
+
+    input { font-family: inherit; outline: none; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 0.75rem 1rem; font-size: 0.875rem; transition: border-color 0.2s; background-color: var(--bg-surface); color: var(--text-main); }
+    input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-light); }
+
+    table { width: 100%; border-collapse: collapse; text-align: left; }
+    th { padding: 1rem; border-bottom: 2px solid var(--border-color); color: var(--text-secondary); font-weight: 600; }
+    td { padding: 1rem; border-bottom: 1px solid var(--border-color); transition: background-color 0.2s; }
+    tr:hover td { background-color: var(--bg-main); }
+
+    .badge { padding: 0.25rem 0.75rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; }
+    .badge-primary { background-color: var(--primary-light); color: var(--primary); }
+
+    .section { display: none; }
+    .section.active { display: flex; }
+  </style>
+</head>
+<body>
+  
+  <div class="app-container">
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="logo">
+          <div class="logo-icon">B</div>
+          BILLZ ERP
+        </div>
+      </div>
+      <nav class="nav-menu">
+        <a class="nav-item active" id="nav-dashboard" onclick="showSection('dashboard')">
+          <i data-lucide="layout-dashboard" style="width: 20px; height: 20px;"></i>
+          <span>Bosh Sahifa</span>
+        </a>
+        <a class="nav-item" id="nav-products" onclick="showSection('products')">
+          <i data-lucide="tag" style="width: 20px; height: 20px;"></i>
+          <span>Mahsulotlar</span>
+        </a>
+        <a class="nav-item">
+          <i data-lucide="shopping-cart" style="width: 20px; height: 20px;"></i>
+          <span>Sotuvlar</span>
+        </a>
+        <a class="nav-item">
+          <i data-lucide="users" style="width: 20px; height: 20px;"></i>
+          <span>Mijozlar</span>
+        </a>
+        <a class="nav-item">
+          <i data-lucide="megaphone" style="width: 20px; height: 20px;"></i>
+          <span>Marketing</span>
+        </a>
+        <a class="nav-item">
+          <i data-lucide="bar-chart-3" style="width: 20px; height: 20px;"></i>
+          <span>Hisobotlar</span>
+        </a>
+        <a class="nav-item">
+          <i data-lucide="wallet" style="width: 20px; height: 20px;"></i>
+          <span>Moliyalashtirish</span>
+        </a>
+        <a class="nav-item">
+          <i data-lucide="shield-check" style="width: 20px; height: 20px;"></i>
+          <span>Boshqaruv</span>
+        </a>
+        <a class="nav-item">
+          <i data-lucide="settings" style="width: 20px; height: 20px;"></i>
+          <span>Sozlamalar</span>
+        </a>
+      </nav>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <div class="main-content">
+      
+      <!-- TOPBAR -->
+      <div class="topbar">
+        <div class="topbar-left">
+          <h2 class="h3" style="color: var(--text-main); font-weight: 600;">HTML Nusxasi</h2>
+        </div>
+        <div class="topbar-right">
+          <button class="btn btn-ghost" style="padding: 0.5rem;">
+            <i data-lucide="bell" style="width: 20px; height: 20px;"></i>
+          </button>
+          <div class="user-profile">
+            <div class="user-avatar">AD</div>
+            <div class="user-info">
+              <span class="user-name">Admin User</span>
+              <span class="user-role">ADMIN</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PAGE CONTENT -->
+      <div class="page-content">
+        <div class="flex-col" style="max-width: 1200px; margin: 0 auto; width: 100%; height: 100%;">
+          
+          <!-- DASHBOARD SECTION -->
+          <div id="section-dashboard" class="section active flex-col" style="gap: 2rem;">
+            <div class="flex-between">
+              <h1 class="h1">Bosh Sahifa</h1>
+              <div class="tabs">
+                <button class="tab-btn active">Bugun</button>
+                <button class="tab-btn">Hafta</button>
+                <button class="tab-btn">Oy</button>
+                <button class="tab-btn">Yil</button>
+              </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.5rem;">
+              <div class="glass-panel" style="padding: 1.5rem;">
+                <div class="flex-between" style="margin-bottom: 1rem;">
+                  <div style="padding: 0.75rem; background-color: var(--primary-light); color: var(--primary); border-radius: var(--radius-lg);">
+                    <i data-lucide="dollar-sign"></i>
+                  </div>
+                </div>
+                <div class="subtitle">Tushum (bugun)</div>
+                <div class="h2" style="margin-top: 0.5rem;">1 250 000 UZS</div>
+              </div>
+              <div class="glass-panel" style="padding: 1.5rem;">
+                <div class="flex-between" style="margin-bottom: 1rem;">
+                  <div style="padding: 0.75rem; background-color: var(--success-light); color: var(--success); border-radius: var(--radius-lg);">
+                    <i data-lucide="shopping-cart"></i>
+                  </div>
+                </div>
+                <div class="subtitle">Savdolar soni</div>
+                <div class="h2" style="margin-top: 0.5rem;">24 ta</div>
+              </div>
+              <div class="glass-panel" style="padding: 1.5rem;">
+                <div class="flex-between" style="margin-bottom: 1rem;">
+                  <div style="padding: 0.75rem; background-color: var(--warning-light); color: var(--warning); border-radius: var(--radius-lg);">
+                    <i data-lucide="package"></i>
+                  </div>
+                </div>
+                <div class="subtitle">Kam qolgan tovarlar</div>
+                <div class="h2" style="margin-top: 0.5rem; color: var(--warning);">5 ta</div>
+              </div>
+              <div class="glass-panel" style="padding: 1.5rem;">
+                <div class="flex-between" style="margin-bottom: 1rem;">
+                  <div style="padding: 0.75rem; background-color: var(--danger-light); color: var(--danger); border-radius: var(--radius-lg);">
+                    <i data-lucide="users"></i>
+                  </div>
+                </div>
+                <div class="subtitle">Umumiy mijozlar</div>
+                <div class="h2" style="margin-top: 0.5rem;">128 nafar</div>
+              </div>
+            </div>
+
+            <div class="glass-panel flex-col" style="padding: 1.5rem; min-height: 350px;">
+              <h2 class="h2" style="margin-bottom: 1.5rem;">Savdo dinamikasi</h2>
+              <div style="flex: 1; width: 100%; display: flex; align-items: center; justify-content: center; background-color: var(--bg-surface); border-radius: var(--radius-lg); color: var(--text-secondary); border: 1px dashed var(--border-color);">
+                <div style="text-align: center;">
+                  <i data-lucide="trending-up" style="width: 48px; height: 48px; opacity: 0.5; margin-bottom: 1rem;"></i>
+                  <p>Grafik (Chart) vizualizatsiyasi bu yerda chiqadi</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- PRODUCTS SECTION -->
+          <div id="section-products" class="section flex-col" style="gap: 1.5rem;">
+            <div class="flex-between">
+              <h1 class="h1">Mahsulotlar Katalogi</h1>
+              <button class="btn btn-primary"><i data-lucide="plus" style="width: 18px; height: 18px;"></i> Yangi mahsulot</button>
+            </div>
+
+            <div class="glass-panel flex-col" style="padding: 1.5rem; min-height: 400px;">
+              <div class="flex-between" style="margin-bottom: 1.5rem;">
+                <div style="position: relative; width: 350px;">
+                  <i data-lucide="search" style="position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: var(--text-secondary); width: 18px; height: 18px;"></i>
+                  <input type="text" placeholder="Mahsulot nomi yoki shtrix-kodi..." style="width: 100%; padding-left: 2.5rem;" />
+                </div>
+                <button class="btn btn-outline"><i data-lucide="filter" style="width: 18px; height: 18px;"></i> Filtrlash</button>
+              </div>
+
+              <div style="flex: 1; overflow: auto;">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Shtrix-kod</th>
+                      <th>Nomi</th>
+                      <th>Kategoriya</th>
+                      <th>Sotish narxi</th>
+                      <th>Tannarx</th>
+                      <th>Qoldiq</th>
+                      <th>Amallar</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td style="color: var(--text-secondary);">478001234567</td>
+                      <td style="font-weight: 500;">Coca-Cola 1.5L</td>
+                      <td><span class="badge badge-primary">Ichimliklar</span></td>
+                      <td style="font-weight: 600; color: var(--primary);">12 000 UZS</td>
+                      <td>10 500 UZS</td>
+                      <td style="font-weight: 600; color: var(--success);">150 dona</td>
+                      <td style="display: flex; gap: 0.5rem;">
+                        <button class="btn btn-outline" style="padding: 0.5rem;"><i data-lucide="edit" style="width: 16px; height: 16px;"></i></button>
+                        <button class="btn btn-outline" style="padding: 0.5rem; color: var(--danger);"><i data-lucide="trash-2" style="width: 16px; height: 16px;"></i></button>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="color: var(--text-secondary);">478009876543</td>
+                      <td style="font-weight: 500;">Snickers 50g</td>
+                      <td><span class="badge badge-primary">Shirinliklar</span></td>
+                      <td style="font-weight: 600; color: var(--primary);">8 000 UZS</td>
+                      <td>6 500 UZS</td>
+                      <td style="font-weight: 600; color: var(--warning);">5 dona</td>
+                      <td style="display: flex; gap: 0.5rem;">
+                        <button class="btn btn-outline" style="padding: 0.5rem;"><i data-lucide="edit" style="width: 16px; height: 16px;"></i></button>
+                        <button class="btn btn-outline" style="padding: 0.5rem; color: var(--danger);"><i data-lucide="trash-2" style="width: 16px; height: 16px;"></i></button>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="color: var(--text-secondary);">478004561239</td>
+                      <td style="font-weight: 500;">Muzqaymoq Plombir</td>
+                      <td><span class="badge badge-primary">Sut mahsulotlari</span></td>
+                      <td style="font-weight: 600; color: var(--primary);">5 000 UZS</td>
+                      <td>3 800 UZS</td>
+                      <td style="font-weight: 600; color: var(--danger);">0 dona</td>
+                      <td style="display: flex; gap: 0.5rem;">
+                        <button class="btn btn-outline" style="padding: 0.5rem;"><i data-lucide="edit" style="width: 16px; height: 16px;"></i></button>
+                        <button class="btn btn-outline" style="padding: 0.5rem; color: var(--danger);"><i data-lucide="trash-2" style="width: 16px; height: 16px;"></i></button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <script>
+    lucide.createIcons();
+
+    function showSection(sectionId) {
+      // Barcha sectionlarni yashirish
+      document.querySelectorAll('.section').forEach(el => el.classList.remove('active'));
+      // Barcha nav-itemlardan active klasini olib tashlash
+      document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+
+      // Tanlangan sectionni ko'rsatish
+      document.getElementById('section-' + sectionId).classList.add('active');
+      // Tanlangan menyu elementini belgilash
+      document.getElementById('nav-' + sectionId).classList.add('active');
+    }
+  </script>
+</body>
+</html>

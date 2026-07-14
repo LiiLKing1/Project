@@ -1,322 +1,185 @@
 import React, { useState, useEffect } from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Calendar, DollarSign, ListOrdered } from 'lucide-react';
-import { useAuth } from '../../context/AuthContext';
-import { useStoreId } from '../../context/useStoreId';
+import { DollarSign, ShoppingCart, Users, Package, TrendingUp } from 'lucide-react';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { db } from '../../firebase';
-import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
-
-const formatMoney = (amount) => {
-  return new Intl.NumberFormat('uz-UZ').format(amount) + ' UZS';
-};
-
-const getTabRange = (tab) => {
-  const now = new Date();
-  let start, end;
-  if (tab === 'Bugun') {
-    start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    end = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
-  } else if (tab === 'Kecha') {
-    start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
-    end = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  } else if (tab === 'Hafta') {
-    start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6);
-    end = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
-  } else if (tab === 'Oy') {
-    start = new Date(now.getFullYear(), now.getMonth(), 1);
-    end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-  } else if (tab === 'Yil') {
-    start = new Date(now.getFullYear(), 0, 1);
-    end = new Date(now.getFullYear() + 1, 0, 1);
-  }
-  return { start, end };
-};
-
-const buildChartData = (sales, tab) => {
-  const { start, end } = getTabRange(tab);
-  const labels = [];
-  const dataMap = {};
-
-  if (tab === 'Bugun' || tab === 'Kecha') {
-    for (let h = 8; h <= 22; h += 2) {
-      const label = `${h}:00`;
-      labels.push(label);
-      dataMap[label] = 0;
-    }
-    sales.forEach(s => {
-      if (!s.date) return;
-      const d = s.date.toDate ? s.date.toDate() : new Date(s.date);
-      if (d >= start && d < end) {
-        const h = d.getHours();
-        const label = `${h - (h % 2)}:00`;
-        if (dataMap[label] !== undefined) dataMap[label] += s.totalSum;
-      }
-    });
-  } else if (tab === 'Hafta') {
-    const dayNames = ['Yak', 'Dush', 'Sesh', 'Chor', 'Pay', 'Juma', 'Shan'];
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date(); d.setDate(d.getDate() - i);
-      const label = dayNames[d.getDay()];
-      labels.push(label);
-      dataMap[label] = (dataMap[label] || 0);
-    }
-    sales.forEach(s => {
-      if (!s.date) return;
-      const d = s.date.toDate ? s.date.toDate() : new Date(s.date);
-      if (d >= start && d < end) {
-        const label = dayNames[d.getDay()];
-        if (dataMap[label] !== undefined) dataMap[label] += s.totalSum;
-      }
-    });
-  } else if (tab === 'Oy') {
-    for (let d = 1; d <= 31; d += 5) {
-      const label = String(d);
-      labels.push(label);
-      dataMap[label] = 0;
-    }
-    sales.forEach(s => {
-      if (!s.date) return;
-      const d = s.date.toDate ? s.date.toDate() : new Date(s.date);
-      if (d >= start && d < end) {
-        const day = d.getDate();
-        const label = String(day - (day % 5) || 1);
-        if (dataMap[label] !== undefined) dataMap[label] += s.totalSum;
-      }
-    });
-  } else if (tab === 'Yil') {
-    const monthNames = ['Yan', 'Fev', 'Mar', 'Apr', 'May', 'Iyn', 'Iyl', 'Avg', 'Sen', 'Okt', 'Noy', 'Dek'];
-    monthNames.forEach(m => { labels.push(m); dataMap[m] = 0; });
-    sales.forEach(s => {
-      if (!s.date) return;
-      const d = s.date.toDate ? s.date.toDate() : new Date(s.date);
-      if (d >= start && d < end) {
-        const label = monthNames[d.getMonth()];
-        if (dataMap[label] !== undefined) dataMap[label] += s.totalSum;
-      }
-    });
-  }
-
-  return labels.map(time => ({ time, value: dataMap[time] || 0 }));
-};
+import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { useRoles } from '../../context/RolesContext';
 
 const Dashboard = () => {
-  const { currentUser } = useAuth();
-  const storeId = useStoreId();
-  const [activeTab, setActiveTab] = useState('Bugun');
-  const tabs = ['Kecha', 'Bugun', 'Hafta', 'Oy', 'Yil'];
+  const [sales, setSales] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [customers, setCustomers] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [timeFilter, setTimeFilter] = useState('day'); // day, week, month, year
+  const [stats, setStats] = useState({ revenue: 0, profit: 0, customers: 0 });
+  
+  const { userProfile } = useRoles();
+  const storeId = userProfile?.storeOwnerId;
 
-  const [allSales, setAllSales] = useState([]);
-  const [chartData, setChartData] = useState([]);
-  const [totalSum, setTotalSum] = useState(0);
-  const [payments, setPayments] = useState({ cash: 0, debt: 0, card: 0 });
-  const [transactions, setTransactions] = useState({ total: 0, goods: 0, returns: 0 });
-  const [topProducts, setTopProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  // Barcha sotuvlarni bir marta yuklash
   useEffect(() => {
-    if (!currentUser || !storeId) return;
-    
-    let unsubscribe;
-    const fetchAll = () => {
-      setLoading(true);
-      const salesQuery = query(collection(db, `users/${storeId}/sales`), orderBy('date', 'desc'), limit(500));
+    if (!storeId) return;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const unsubSales = onSnapshot(query(collection(db, `users/${storeId}/sales`), orderBy('createdAt', 'desc')), (snapshot) => {
+      const docs = snapshot.docs.map(doc => doc.data());
+      setSales(docs);
       
-      unsubscribe = onSnapshot(salesQuery, (snap) => {
-        const data = [];
-        snap.forEach(d => data.push({ id: d.id, ...d.data() }));
-        setAllSales(data);
-        setLoading(false);
-      }, (error) => {
-        console.error("Dashboard onSnapshot xatosi:", error);
-        setLoading(false);
-      });
-    };
-    
-    fetchAll();
-    
+      const todaySales = docs.filter(sale => new Date(sale.createdAt) >= today);
+      
+      const rev = todaySales.reduce((acc, sale) => acc + sale.total, 0);
+      const prof = todaySales.reduce((acc, sale) => {
+        const cost = sale.items.reduce((c, item) => c + (item.costPrice * item.qty), 0);
+        return acc + (sale.total - cost);
+      }, 0);
+      
+      setStats(prev => ({ ...prev, revenue: rev, profit: prof }));
+      setLoading(false);
+    });
+
+    const unsubCustomers = onSnapshot(collection(db, `users/${storeId}/customers`), (snapshot) => {
+      setStats(prev => ({ ...prev, customers: snapshot.size }));
+    });
+
     return () => {
-      if (unsubscribe) unsubscribe();
+      unsubSales();
+      unsubCustomers();
     };
-  }, [currentUser, storeId]);
+  }, [storeId]);
 
-  // Tab o'zgarganda statistikani hisoblash
-  useEffect(() => {
-    if (allSales.length === 0 && !loading) {
-      // Bo'sh holat
-      setChartData(buildChartData([], activeTab));
-      setTotalSum(0);
-      setPayments({ cash: 0, debt: 0, card: 0 });
-      setTransactions({ total: 0, goods: 0, returns: 0 });
-      setTopProducts([]);
-      return;
-    }
+  const formatMoney = (v) => new Intl.NumberFormat('uz-UZ').format(v || 0) + ' UZS';
 
-    const { start, end } = getTabRange(activeTab);
-    const filtered = allSales.filter(s => {
-      if (!s.date) return false;
-      const d = s.date.toDate ? s.date.toDate() : new Date(s.date);
-      return d >= start && d < end;
+  // Filter sales based on timeFilter
+  const now = new Date();
+  const filteredSales = sales.filter(s => {
+    if (!s.createdAt) return false;
+    const date = new Date(s.createdAt);
+    if (timeFilter === 'day') return date.toDateString() === now.toDateString();
+    if (timeFilter === 'week') return (now - date) / (1000 * 60 * 60 * 24) <= 7;
+    if (timeFilter === 'month') return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+    if (timeFilter === 'year') return date.getFullYear() === now.getFullYear();
+    return true;
+  });
+
+  const periodRevenue = filteredSales.reduce((acc, curr) => acc + (curr.total || 0), 0);
+  const periodSalesCount = filteredSales.length;
+  const lowStockProducts = products.filter(p => p.stock <= (p.minStock || 5)).length;
+  const activeCustomers = customers.length;
+
+  // Group data for chart
+  const getChartData = () => {
+    const dataMap = {};
+    filteredSales.forEach(s => {
+      const d = new Date(s.createdAt);
+      let key = '';
+      if (timeFilter === 'day') {
+        key = `${d.getHours().toString().padStart(2, '0')}:00`;
+      } else if (timeFilter === 'week') {
+        const days = ['Yak', 'Du', 'Se', 'Chor', 'Pay', 'Ju', 'Shan'];
+        key = days[d.getDay()];
+      } else if (timeFilter === 'month') {
+        key = d.getDate().toString();
+      } else if (timeFilter === 'year') {
+        const months = ['Yan', 'Fev', 'Mar', 'Apr', 'May', 'Iyun', 'Iyul', 'Avg', 'Sen', 'Okt', 'Noy', 'Dek'];
+        key = months[d.getMonth()];
+      }
+      dataMap[key] = (dataMap[key] || 0) + (s.total || 0);
     });
 
-    const total = filtered.reduce((acc, s) => acc + (s.totalSum || 0), 0);
-    setTotalSum(total);
+    return Object.keys(dataMap).sort((a, b) => {
+      if (timeFilter === 'day') return parseInt(a) - parseInt(b);
+      if (timeFilter === 'month') return parseInt(a) - parseInt(b);
+      return 0; // for week/year keep relative or sorted if complex
+    }).map(k => ({ name: k, jami: dataMap[k] }));
+  };
 
-    const cash = filtered.filter(s => s.paymentMethod === 'Naqd').reduce((acc, s) => acc + (s.totalSum || 0), 0);
-    const debt = filtered.filter(s => s.paymentMethod === 'Qarz').reduce((acc, s) => acc + (s.totalSum || 0), 0);
-    const card = filtered.filter(s => s.paymentMethod === 'Karta').reduce((acc, s) => acc + (s.totalSum || 0), 0);
-    setPayments({ cash, debt, card });
-
-    setTransactions({ total: filtered.length, goods: filtered.reduce((acc, s) => acc + (s.items?.length || 0), 0), returns: 0 });
-
-    // Top mahsulotlar
-    const prodMap = {};
-    filtered.forEach(s => {
-      s.items?.forEach(item => {
-        if (!prodMap[item.name]) prodMap[item.name] = 0;
-        prodMap[item.name] += item.price * item.qty;
-      });
-    });
-    const topProds = Object.entries(prodMap)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
-      .map(([name, income]) => ({ name, income }));
-    setTopProducts(topProds);
-
-    setChartData(buildChartData(filtered, activeTab));
-  }, [activeTab, allSales, loading]);
+  const chartData = getChartData();
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', paddingBottom: '2rem' }}>
-      
-      {/* Top Filter Bar */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ display: 'flex', backgroundColor: 'var(--bg-surface)', borderRadius: 'var(--radius-lg)', padding: '0.25rem', boxShadow: 'var(--shadow-sm)' }}>
-          {tabs.map(tab => (
-            <button 
-              key={tab}
-              onClick={() => setActiveTab(tab)}
+    <div className="flex-col" style={{ gap: '2rem', height: '100%' }}>
+      <div className="flex-between">
+        <h1 className="h1">Bosh Sahifa</h1>
+        <div style={{ display: 'flex', gap: '0.5rem', backgroundColor: 'var(--bg-surface)', padding: '0.25rem', borderRadius: 'var(--radius-md)' }}>
+          {['day', 'week', 'month', 'year'].map(filter => (
+            <button
+              key={filter}
+              onClick={() => setTimeFilter(filter)}
               style={{
-                padding: '0.5rem 1.5rem',
-                borderRadius: 'var(--radius-md)',
-                backgroundColor: activeTab === tab ? 'var(--primary)' : 'transparent',
-                fontWeight: activeTab === tab ? '600' : '500',
-                color: activeTab === tab ? 'white' : 'var(--text-secondary)',
-                transition: 'all 0.2s'
+                padding: '0.5rem 1rem',
+                borderRadius: 'var(--radius-sm)',
+                backgroundColor: timeFilter === filter ? 'var(--primary)' : 'transparent',
+                color: timeFilter === filter ? '#fff' : 'var(--text-secondary)',
+                fontWeight: timeFilter === filter ? 600 : 400,
+                border: 'none',
+                cursor: 'pointer'
               }}
             >
-              {tab}
+              {filter === 'day' ? 'Bugun' : filter === 'week' ? 'Hafta' : filter === 'month' ? 'Oy' : 'Yil'}
             </button>
           ))}
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1rem', backgroundColor: 'var(--primary-light)', color: 'var(--primary)', borderRadius: 'var(--radius-lg)', fontWeight: '600' }}>
-          <Calendar size={18} />
-          <span>{new Date().toLocaleDateString('uz-UZ')}</span>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.5rem' }}>
+        <div className="glass-panel" style={{ padding: '1.5rem' }}>
+          <div className="flex-between" style={{ marginBottom: '1rem' }}>
+            <div style={{ padding: '0.75rem', backgroundColor: 'var(--primary-light)', color: 'var(--primary)', borderRadius: 'var(--radius-lg)' }}><DollarSign size={24} /></div>
+          </div>
+          <div className="subtitle">Tushum ({timeFilter === 'day' ? 'bugun' : timeFilter === 'week' ? 'hafta' : timeFilter === 'month' ? 'oy' : 'yil'})</div>
+          <div className="h2" style={{ marginTop: '0.5rem' }}>{formatMoney(periodRevenue)}</div>
+        </div>
+
+        <div className="glass-panel" style={{ padding: '1.5rem' }}>
+          <div className="flex-between" style={{ marginBottom: '1rem' }}>
+            <div style={{ padding: '0.75rem', backgroundColor: 'var(--success-light)', color: 'var(--success)', borderRadius: 'var(--radius-lg)' }}><ShoppingCart size={24} /></div>
+          </div>
+          <div className="subtitle">Savdolar soni</div>
+          <div className="h2" style={{ marginTop: '0.5rem' }}>{periodSalesCount} ta</div>
+        </div>
+
+        <div className="glass-panel" style={{ padding: '1.5rem' }}>
+          <div className="flex-between" style={{ marginBottom: '1rem' }}>
+            <div style={{ padding: '0.75rem', backgroundColor: 'var(--warning-light)', color: 'var(--warning)', borderRadius: 'var(--radius-lg)' }}><Package size={24} /></div>
+          </div>
+          <div className="subtitle">Kam qolgan tovarlar</div>
+          <div className="h2" style={{ marginTop: '0.5rem', color: lowStockProducts > 0 ? 'var(--warning)' : 'inherit' }}>{lowStockProducts} ta</div>
+        </div>
+
+        <div className="glass-panel" style={{ padding: '1.5rem' }}>
+          <div className="flex-between" style={{ marginBottom: '1rem' }}>
+            <div style={{ padding: '0.75rem', backgroundColor: 'var(--danger-light)', color: 'var(--danger)', borderRadius: 'var(--radius-lg)' }}><Users size={24} /></div>
+          </div>
+          <div className="subtitle">Umumiy mijozlar</div>
+          <div className="h2" style={{ marginTop: '0.5rem' }}>{activeCustomers} nafar</div>
         </div>
       </div>
 
-      {/* Main Chart + Summary */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '1.5rem' }}>
-        <div style={{ backgroundColor: 'var(--bg-surface)', borderRadius: 'var(--radius-xl)', padding: '1.5rem', boxShadow: 'var(--shadow-sm)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>Sotuvlar - {activeTab}</h2>
-            <span style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>{transactions.total} ta tranzaksiya</span>
-          </div>
-          <div style={{ height: '280px', width: '100%' }}>
-            {loading ? (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-secondary)' }}>Yuklanmoqda...</div>
-            ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-color)" />
-                  <XAxis dataKey="time" axisLine={false} tickLine={false} tick={{fill: 'var(--text-secondary)', fontSize: 12}} dy={10} />
-                  <YAxis axisLine={false} tickLine={false} tick={{fill: 'var(--text-secondary)', fontSize: 12}} tickFormatter={(v) => v >= 1000000 ? (v/1000000).toFixed(1)+'M' : v >= 1000 ? (v/1000)+'K' : v} />
-                  <Tooltip formatter={(value) => [formatMoney(value), "Sotuv"]} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: 'var(--shadow-md)' }} />
-                  <Line type="monotone" dataKey="value" stroke="var(--primary)" strokeWidth={3} dot={false} activeDot={{ r: 6 }} />
-                </LineChart>
-              </ResponsiveContainer>
-            )}
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <div style={{ backgroundColor: 'var(--bg-surface)', borderRadius: 'var(--radius-xl)', padding: '1.5rem', boxShadow: 'var(--shadow-sm)', flex: 1 }}>
-            <div style={{ color: 'var(--text-secondary)', fontWeight: '500', marginBottom: '0.75rem', fontSize: '0.875rem' }}>Umumiy tushum ({activeTab})</div>
-            <div style={{ fontSize: '1.75rem', fontWeight: 'bold', color: 'var(--primary)' }}>{formatMoney(totalSum)}</div>
-            <div style={{ marginTop: '1rem', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-              {transactions.total} ta sotuv amalga oshirildi
-            </div>
-          </div>
-          <div style={{ backgroundColor: 'var(--bg-surface)', borderRadius: 'var(--radius-xl)', padding: '1.5rem', boxShadow: 'var(--shadow-sm)' }}>
-            <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '0.75rem', fontWeight: '500' }}>To'lov usullari:</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              {[
-                { label: '💵 Naqd', value: payments.cash, color: 'var(--success)' },
-                { label: '💳 Karta', value: payments.card, color: 'var(--primary)' },
-                { label: '📋 Nasiya', value: payments.debt, color: 'var(--warning)' },
-              ].map((item, i) => (
-                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem' }}>
-                  <span style={{ color: 'var(--text-secondary)' }}>{item.label}</span>
-                  <span style={{ fontWeight: '600', color: item.color }}>{formatMoney(item.value)}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Bottom Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
-        
-        {/* Transactions */}
-        <div style={{ backgroundColor: 'var(--bg-surface)', borderRadius: 'var(--radius-xl)', padding: '1.5rem', boxShadow: 'var(--shadow-sm)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
-            <div>
-              <h3 style={{ fontSize: '1.125rem', fontWeight: 'bold' }}>Tranzaksiyalar</h3>
-              <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--primary)', marginTop: '0.25rem' }}>{transactions.total} ta</div>
-            </div>
-            <div style={{ padding: '0.5rem', backgroundColor: 'var(--primary-light)', color: 'var(--primary)', borderRadius: 'var(--radius-md)' }}>
-              <ListOrdered size={24} />
-            </div>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            {[
-              { label: 'Tovarlar sotildi', count: transactions.goods },
-              { label: 'Sotuvlar soni', count: transactions.total },
-              { label: 'Qaytarishlar', count: transactions.returns },
-            ].map((item, idx) => (
-              <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0', borderBottom: idx !== 2 ? '1px solid var(--border-color)' : 'none' }}>
-                <div style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>{item.label}</div>
-                <div style={{ fontWeight: '600' }}>{item.count} ta</div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Top Products */}
-        <div style={{ backgroundColor: 'var(--bg-surface)', borderRadius: 'var(--radius-xl)', padding: '1.5rem', boxShadow: 'var(--shadow-sm)' }}>
-          <h3 style={{ fontSize: '1.125rem', fontWeight: 'bold', marginBottom: '1.5rem' }}>Top mahsulotlar</h3>
-          {topProducts.length === 0 ? (
-            <div style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: '2rem 0', fontSize: '0.875rem' }}>
-              {activeTab} da sotuvlar mavjud emas
-            </div>
+      <div className="glass-panel flex-col" style={{ padding: '1.5rem', flex: 1, minHeight: '350px' }}>
+        <h2 className="h2" style={{ marginBottom: '1.5rem' }}>Savdo dinamikasi</h2>
+        <div style={{ flex: 1, width: '100%' }}>
+          {chartData.length > 0 ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={chartData}>
+                <defs>
+                  <linearGradient id="colorJami" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="var(--primary)" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-color)" />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: 'var(--text-secondary)'}} dy={10} />
+                <YAxis axisLine={false} tickLine={false} tick={{fill: 'var(--text-secondary)'}} tickFormatter={v => (v > 0 ? (v/1000).toFixed(0)+'k' : '0')} />
+                <Tooltip formatter={(v) => [formatMoney(v), "Savdo"]} contentStyle={{borderRadius: '8px', border: 'none', boxShadow: 'var(--shadow-md)'}} cursor={{stroke: 'var(--border-color)', strokeWidth: 1, strokeDasharray: '5 5'}} />
+                <Area type="monotone" dataKey="jami" stroke="var(--primary)" strokeWidth={3} fillOpacity={1} fill="url(#colorJami)" />
+              </AreaChart>
+            </ResponsiveContainer>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {topProducts.map((prod, idx) => (
-                <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                    <span style={{ backgroundColor: 'var(--primary-light)', color: 'var(--primary)', width: '24px', height: '24px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '0.75rem' }}>
-                      {idx + 1}
-                    </span>
-                    <span style={{ fontWeight: '500', fontSize: '0.875rem' }}>{prod.name}</span>
-                  </div>
-                  <div style={{ fontWeight: '600', color: 'var(--primary)', fontSize: '0.875rem' }}>{formatMoney(prod.income)}</div>
-                </div>
-              ))}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-secondary)' }}>
+              Ushbu davr uchun savdo ma'lumotlari yo'q
             </div>
           )}
         </div>
-
       </div>
     </div>
   );

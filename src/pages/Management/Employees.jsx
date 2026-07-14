@@ -1,143 +1,294 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Search, Plus, MoreHorizontal, Trash2, KeyRound } from 'lucide-react';
-import { db } from '../../firebase';
-import { collection, getDocs, deleteDoc, doc } from 'firebase/firestore';
-import { useAuth } from '../../context/AuthContext';
-import { useStoreId } from '../../context/useStoreId';
-import { useRoles } from '../../context/RolesContext';
+import { UserPlus, Edit, Trash2 } from 'lucide-react';
+import { db, firebaseConfig } from '../../firebase';
+import { collection, onSnapshot, query, orderBy, doc, setDoc } from 'firebase/firestore';
+import { initializeApp, getApps, getApp } from 'firebase/app';
+import { getAuth, createUserWithEmailAndPassword, signOut } from 'firebase/auth';
+import { saveDoc, editDoc } from '../../utils/firebaseUtils';
+import { useToast } from '../../context/ToastContext';
+import { useRoles, DEFAULT_ROLES } from '../../context/RolesContext';
+import Modal from '../../components/Modal';
+import FormInput from '../../components/FormInput';
 
 const Employees = () => {
-  const navigate = useNavigate();
-  const { currentUser } = useAuth();
-  const storeId = useStoreId();
-  const { roles } = useRoles();
-  const [employees, setEmployees] = useState([]);
+  const [staff, setStaff] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
+  const { addToast } = useToast();
+  const { userProfile } = useRoles();
+  const storeId = userProfile?.storeOwnerId;
+
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [formData, setFormData] = useState({ fullName: '', phone: '', role: 'kassir', loginUsername: '', password: '', isActive: true, permissions: DEFAULT_ROLES['kassir'].permissions });
 
   useEffect(() => {
-    fetchEmployees();
-  }, [currentUser]);
+    if (!storeId) return;
 
-  const fetchEmployees = async () => {
-    if (!currentUser) return;
-    try {
-      const snap = await getDocs(collection(db, `users/${storeId}/employees`));
-      const data = [];
-      snap.forEach(d => data.push({ id: d.id, ...d.data() }));
-      setEmployees(data);
-    } catch (error) {
-      console.error("Xatolik:", error);
-    } finally {
+    const unsub = onSnapshot(query(collection(db, `users/${storeId}/staff`), orderBy('createdAt', 'desc')), (snapshot) => {
+      setStaff(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
       setLoading(false);
+    }, (error) => {
+      addToast(error.message, 'error');
+      setLoading(false);
+    });
+    return () => unsub();
+  }, [addToast, storeId]);
+
+  const generateUsername = (name) => {
+    if (!name) return '';
+    const clean = name.toLowerCase().replace(/[^a-z]/g, '');
+    const rand = Math.floor(Math.random() * 900) + 100;
+    return `${clean}${rand}`;
+  };
+
+  const handleNameChange = (e) => {
+    const newName = e.target.value;
+    if (!editingId && !formData.loginUsername) {
+      setFormData({ ...formData, fullName: newName, loginUsername: generateUsername(newName) });
+    } else {
+      setFormData({ ...formData, fullName: newName });
     }
   };
 
-  const handleDelete = async (empId) => {
-    if (!window.confirm("Xodimni o'chirishni tasdiqlaysizmi?")) return;
+  const createEmployeeAuth = async (email, password) => {
+    const secondaryAppName = 'SecondaryApp' + Date.now();
+    const secondaryApp = initializeApp(firebaseConfig, secondaryAppName);
+    const secondaryAuth = getAuth(secondaryApp);
+    
     try {
-      await deleteDoc(doc(db, `users/${storeId}/employees`, empId));
-      setEmployees(employees.filter(e => e.id !== empId));
-    } catch (error) {
-      console.error("O'chirishda xatolik:", error);
+      const userCredential = await createUserWithEmailAndPassword(secondaryAuth, email, password);
+      await signOut(secondaryAuth);
+      return userCredential.user.uid;
+    } finally {
+      // Secondary app shouldn't interfere with main auth since it's a separate instance
     }
   };
 
-  const filtered = employees.filter(e => 
-    e.name?.toLowerCase().includes(search.toLowerCase()) ||
-    e.phone?.includes(search) ||
-    e.email?.toLowerCase().includes(search.toLowerCase())
-  );
+  const handleSave = async () => {
+    if (!formData.fullName.trim() || !formData.phone.trim() || !formData.loginUsername.trim()) {
+      addToast('Barcha majburiy maydonlarni to\'ldiring', 'error');
+      return;
+    }
+    if (!editingId && formData.password.length < 6) {
+      addToast('Parol kamida 6 ta belgidan iborat bo\'lishi kerak', 'error');
+      return;
+    }
+    if (!storeId) return;
 
-  const getRoleName = (roleKey) => roles[roleKey]?.name || roleKey;
+    const fullEmail = `${formData.loginUsername}@pos.com`;
+
+    try {
+      if (editingId) {
+        await editDoc(doc(db, `users/${storeId}/staff`, editingId), {
+          fullName: formData.fullName,
+          phone: formData.phone,
+          role: formData.role,
+          loginEmail: fullEmail,
+          isActive: formData.isActive,
+          permissions: formData.permissions
+        });
+        
+        // Agar xodim profili mavjud bo'lsa, uni ham yangilaymiz (custom permissions uchun)
+        await setDoc(doc(db, `users/${editingId}/profile/info`), {
+          name: formData.fullName,
+          email: fullEmail,
+          role: formData.role,
+          permissions: formData.permissions
+        }, { merge: true });
+
+        addToast('Xodim yangilandi', 'success');
+      } else {
+        // Create auth user
+        const newUid = await createEmployeeAuth(fullEmail, formData.password);
+        
+        // Save to store's staff
+        const empData = {
+          uid: newUid,
+          fullName: formData.fullName,
+          phone: formData.phone,
+          role: formData.role,
+          loginEmail: fullEmail,
+          isActive: formData.isActive,
+          permissions: formData.permissions
+        };
+        await setDoc(doc(db, `users/${storeId}/staff`, newUid), { ...empData, createdAt: new Date().toISOString() });
+        
+        // Save employee profile for RolesContext
+        await setDoc(doc(db, `users/${newUid}/profile/info`), {
+          name: formData.fullName,
+          email: fullEmail,
+          role: formData.role,
+          permissions: formData.permissions,
+          storeOwnerId: storeId,
+          createdAt: new Date().toISOString()
+        });
+        
+        addToast('Xodim muvaffaqiyatli qo\'shildi va akkaunt yaratildi', 'success');
+      }
+      setIsModalOpen(false);
+    } catch (error) {
+      console.error(error);
+      addToast('Xatolik: ' + error.message, 'error');
+    }
+  };
+
+  const openModal = (emp = null) => {
+    if (emp) {
+      setEditingId(emp.id);
+      const username = emp.loginEmail ? emp.loginEmail.split('@')[0] : '';
+      setFormData({ 
+        fullName: emp.fullName, phone: emp.phone, role: emp.role, loginUsername: username, 
+        password: '', isActive: emp.isActive,
+        permissions: emp.permissions || DEFAULT_ROLES[emp.role]?.permissions || {}
+      });
+    } else {
+      setEditingId(null);
+      setFormData({ fullName: '', phone: '+998', role: 'kassir', loginUsername: '', password: '', isActive: true, permissions: DEFAULT_ROLES['kassir'].permissions });
+    }
+    setIsModalOpen(true);
+  };
+
+  const handleRoleChange = (e) => {
+    const newRole = e.target.value;
+    setFormData({
+      ...formData, 
+      role: newRole,
+      permissions: DEFAULT_ROLES[newRole]?.permissions || {}
+    });
+  };
+
+  const togglePermission = (key) => {
+    setFormData({
+      ...formData,
+      permissions: {
+        ...formData.permissions,
+        [key]: !formData.permissions[key]
+      }
+    });
+  };
+
+  const toggleActive = async (emp) => {
+    if (!storeId) return;
+    try {
+      await editDoc(doc(db, `users/${storeId}/staff`, emp.id), { isActive: !emp.isActive });
+    } catch (error) {
+      addToast(error.message, 'error');
+    }
+  };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>Xodimlar</h1>
-      </div>
-      
-      <div style={{ padding: '0 1.5rem', display: 'flex', gap: '2rem', borderBottom: '1px solid var(--border-color)' }}>
-        <button style={{ padding: '1rem 0', color: 'var(--primary)', borderBottom: '2px solid var(--primary)', fontWeight: '600' }}>
-          Joriy xodimlar ({employees.length})
-        </button>
+    <div className="flex-col" style={{ gap: '1.5rem', height: '100%' }}>
+      <div className="flex-between">
+        <h1 className="h1">Xodimlar va Boshqaruv</h1>
+        <button className="btn btn-primary" onClick={() => openModal()}><UserPlus size={18} /> Yangi xodim</button>
       </div>
 
-      <div style={{ padding: '1.5rem', display: 'flex', gap: '1rem', alignItems: 'center' }}>
-        <div style={{ flex: 1, position: 'relative' }}>
-          <Search size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
-          <input 
-            type="text" 
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Ism, telefon yoki email bo'yicha qidiruv" 
-            style={{ width: '100%', padding: '0.6rem 1rem 0.6rem 2.5rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', outline: 'none', backgroundColor: 'var(--bg-main)' }}
-          />
-        </div>
-        <button 
-          onClick={() => navigate('/management/employees/new')}
-          style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.6rem 1rem', backgroundColor: 'var(--primary)', color: 'white', borderRadius: 'var(--radius-md)', fontWeight: '500' }}
-        >
-          <Plus size={18} />
-          Yangi xodim
-        </button>
-      </div>
-
-      <div style={{ flex: 1, overflow: 'auto' }}>
-        {loading ? (
-          <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>Yuklanmoqda...</div>
-        ) : (
+      <div className="glass-panel" style={{ padding: '1.5rem', flex: 1, overflowY: 'auto' }}>
+        <div style={{ flex: 1, overflowY: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-            <thead style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
-              <tr>
-                <th style={{ padding: '1rem 1.5rem', borderBottom: '1px solid var(--border-color)' }}>F.I.Sh.</th>
-                <th style={{ padding: '1rem 1.5rem', borderBottom: '1px solid var(--border-color)' }}>Email (Login)</th>
-                <th style={{ padding: '1rem 1.5rem', borderBottom: '1px solid var(--border-color)' }}>Telefon</th>
-                <th style={{ padding: '1rem 1.5rem', borderBottom: '1px solid var(--border-color)' }}>Rol</th>
-                <th style={{ padding: '1rem 1.5rem', borderBottom: '1px solid var(--border-color)' }}>Holat</th>
-                <th style={{ padding: '1rem 1.5rem', borderBottom: '1px solid var(--border-color)' }}>Harakat</th>
+            <thead>
+              <tr style={{ borderBottom: '2px solid var(--border-color)', color: 'var(--text-secondary)' }}>
+                <th style={{ padding: '1rem' }}>F.I.O</th>
+                <th style={{ padding: '1rem' }}>Telefon / Login</th>
+                <th style={{ padding: '1rem' }}>Rol</th>
+                <th style={{ padding: '1rem' }}>Holati</th>
+                <th style={{ padding: '1rem' }}>Amallar</th>
               </tr>
             </thead>
             <tbody>
-              {filtered.length === 0 ? (
-                <tr>
-                  <td colSpan="6" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                    {employees.length === 0 ? 'Hozircha xodimlar yo\'q. Yangi xodim qo\'shing.' : 'Qidiruv bo\'yicha topilmadi.'}
+              {staff.length === 0 ? <tr><td colSpan="5" style={{textAlign: 'center', padding: '2rem'}}>Xodimlar yo'q</td></tr> : null}
+              {staff.map(s => (
+                <tr key={s.id} style={{ borderBottom: '1px solid var(--border-color)', opacity: s.isActive ? 1 : 0.6 }}>
+                  <td style={{ padding: '1rem', fontWeight: 500 }}>{s.fullName}</td>
+                  <td style={{ padding: '1rem' }}>
+                    <div style={{ color: 'var(--text-main)' }}>{s.phone}</div>
+                    <div style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>{s.loginEmail || '-'}</div>
+                  </td>
+                  <td style={{ padding: '1rem' }}>
+                    <span style={{ padding: '0.25rem 0.5rem', backgroundColor: s.role === 'admin' ? 'var(--danger-light)' : 'var(--primary-light)', color: s.role === 'admin' ? 'var(--danger)' : 'var(--primary)', borderRadius: 'var(--radius-sm)', fontSize: '0.75rem', fontWeight: 600 }}>
+                      {s.role.toUpperCase()}
+                    </span>
+                  </td>
+                  <td style={{ padding: '1rem' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                      <input type="checkbox" checked={s.isActive} onChange={() => toggleActive(s)} />
+                      <span style={{ fontSize: '0.875rem' }}>Aktiv</span>
+                    </label>
+                  </td>
+                  <td style={{ padding: '1rem', display: 'flex', gap: '0.5rem' }}>
+                    <button className="btn btn-outline" style={{ padding: '0.5rem' }} onClick={() => openModal(s)}><Edit size={16} /></button>
                   </td>
                 </tr>
-              ) : (
-                filtered.map((emp) => (
-                  <tr key={emp.id} style={{ borderBottom: '1px solid var(--border-color)', fontSize: '0.875rem' }}>
-                    <td style={{ padding: '1rem 1.5rem', fontWeight: '500', color: 'var(--primary)' }}>{emp.name}</td>
-                    <td style={{ padding: '1rem 1.5rem', color: 'var(--text-secondary)' }}>{emp.email}</td>
-                    <td style={{ padding: '1rem 1.5rem' }}>{emp.phone || '-'}</td>
-                    <td style={{ padding: '1rem 1.5rem' }}>
-                      <span style={{ backgroundColor: 'var(--primary-light)', color: 'var(--primary)', padding: '0.25rem 0.75rem', borderRadius: 'var(--radius-sm)', fontWeight: '500' }}>
-                        {getRoleName(emp.role)}
-                      </span>
-                    </td>
-                    <td style={{ padding: '1rem 1.5rem' }}>
-                      <span style={{ backgroundColor: 'var(--success-bg)', color: 'var(--success)', padding: '0.25rem 0.5rem', borderRadius: 'var(--radius-sm)', fontWeight: '500' }}>
-                        Faol
-                      </span>
-                    </td>
-                    <td style={{ padding: '1rem 1.5rem', display: 'flex', gap: '0.5rem' }}>
-                      <button 
-                        onClick={() => handleDelete(emp.id)}
-                        style={{ padding: '0.4rem', backgroundColor: 'var(--danger-bg)', color: 'var(--danger)', borderRadius: 'var(--radius-sm)' }}
-                        title="O'chirish"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
+              ))}
             </tbody>
           </table>
-        )}
+        </div>
       </div>
+
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingId ? 'Xodimni tahrirlash' : 'Yangi xodim'}>
+        <FormInput label="F.I.O" value={formData.fullName} onChange={handleNameChange} required />
+        <FormInput label="Telefon raqami" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} required />
+        
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1rem' }}>
+          <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>Rol</label>
+          <select value={formData.role} onChange={handleRoleChange} style={{ padding: '0.75rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-surface)' }}>
+            <option value="admin">Admin (To'liq ruxsat)</option>
+            <option value="kassir">Kassir (Faqat kassa va mijozlar)</option>
+          </select>
+        </div>
+
+        <div style={{ padding: '1rem', backgroundColor: 'var(--bg-main)', borderRadius: 'var(--radius-md)', marginBottom: '1rem', border: '1px solid var(--border-color)' }}>
+          <h3 style={{ fontSize: '0.875rem', fontWeight: 600, marginBottom: '0.75rem', color: 'var(--text-secondary)' }}>Huquqlar (Ruxsatlar)</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+            {Object.keys(DEFAULT_ROLES['admin'].permissions).map(key => (
+              <label key={key} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.875rem' }}>
+                <input 
+                  type="checkbox" 
+                  checked={!!formData.permissions[key]} 
+                  onChange={() => togglePermission(key)} 
+                />
+                <span style={{ textTransform: 'capitalize' }}>{key}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ padding: '1rem', backgroundColor: 'var(--bg-main)', borderRadius: 'var(--radius-md)', marginBottom: '1rem', border: '1px solid var(--border-color)' }}>
+          <h3 style={{ fontSize: '0.875rem', fontWeight: 600, marginBottom: '1rem', color: 'var(--text-secondary)' }}>Tizimga kirish ma'lumotlari</h3>
+          <div style={{ marginBottom: '1rem' }}>
+            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, marginBottom: '0.5rem', color: 'var(--text-main)' }}>Login (Username) <span style={{ color: 'var(--danger)' }}>*</span></label>
+            <div style={{ display: 'flex', alignItems: 'stretch' }}>
+              <input 
+                type="text" 
+                value={formData.loginUsername} 
+                onChange={e => setFormData({...formData, loginUsername: e.target.value.toLowerCase().replace(/[^a-z0-9_.-]/g, '')})} 
+                placeholder="masalan: said" 
+                required 
+                disabled={!!editingId} 
+                style={{ flex: 1, padding: '0.75rem 1rem', borderRadius: '8px 0 0 8px', border: '1px solid var(--border-color)', borderRight: 'none', backgroundColor: 'var(--bg-surface)', outline: 'none' }}
+              />
+              <div style={{ display: 'flex', alignItems: 'center', padding: '0 1rem', backgroundColor: 'var(--bg-main)', border: '1px solid var(--border-color)', borderRadius: '0 8px 8px 0', color: 'var(--text-secondary)', fontWeight: 500 }}>
+                @pos.com
+              </div>
+            </div>
+          </div>
+          {!editingId && (
+            <FormInput 
+              label="Parol (Kamida 6 belgi)" 
+              type="password" 
+              value={formData.password} 
+              onChange={e => setFormData({...formData, password: e.target.value})} 
+              placeholder="••••••••" 
+              required 
+            />
+          )}
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1.5rem' }}>
+          <button className="btn btn-outline" onClick={() => setIsModalOpen(false)}>Bekor qilish</button>
+          <button className="btn btn-primary" onClick={handleSave}>Saqlash</button>
+        </div>
+      </Modal>
     </div>
   );
 };

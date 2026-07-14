@@ -4,12 +4,15 @@ import App from './App.jsx';
 import './index.css';
 import { AuthProvider } from './context/AuthContext';
 import { RolesProvider } from './context/RolesContext';
+import { ToastProvider } from './context/ToastContext';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <AuthProvider>
       <RolesProvider>
-        <App />
+        <ToastProvider>
+          <App />
+        </ToastProvider>
       </RolesProvider>
     </AuthProvider>
   </React.StrictMode>,

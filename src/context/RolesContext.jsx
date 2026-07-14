@@ -6,105 +6,36 @@ import { useAuth } from './AuthContext';
 const RolesContext = createContext();
 export const useRoles = () => useContext(RolesContext);
 
-// Default rollar va ularning huquqlari
 export const DEFAULT_ROLES = {
-  admin: {
-    name: 'Admin',
-    permissions: {
-      dashboard: true,
-      products: true,
-      sales: true,
-      customers: true,
-      reports: true,
-      finance: true,
-      marketing: true,
-      management: true,
-      settings: true,
-    }
-  },
-  kassir: {
-    name: 'Kassir',
-    permissions: {
-      dashboard: true,
-      products: false,
-      sales: true,
-      customers: true,
-      reports: false,
-      finance: false,
-      marketing: false,
-      management: false,
-      settings: false,
-    }
-  },
-  omborchi: {
-    name: 'Omborchi',
-    permissions: {
-      dashboard: true,
-      products: true,
-      sales: false,
-      customers: false,
-      reports: false,
-      finance: false,
-      marketing: false,
-      management: false,
-      settings: false,
-    }
-  },
-  menejer: {
-    name: 'Menejer',
-    permissions: {
-      dashboard: true,
-      products: true,
-      sales: true,
-      customers: true,
-      reports: true,
-      finance: false,
-      marketing: true,
-      management: false,
-      settings: false,
-    }
-  },
-  yetkazuvchi: {
-    name: 'Yetkazib beruvchi',
-    permissions: {
-      dashboard: false,
-      products: true,
-      sales: false,
-      customers: false,
-      reports: false,
-      finance: false,
-      marketing: false,
-      management: false,
-      settings: false,
-    }
-  }
-};
-
-export const PERMISSION_LABELS = {
-  dashboard: "Dashboard (Bosh sahifa)",
-  products: "Mahsulotlar bo'limi",
-  sales: "Sotuvlar bo'limi",
-  customers: "Mijozlar bo'limi",
-  reports: "Hisobotlar",
-  finance: "Moliyalashtirish",
-  marketing: "Marketing",
-  management: "Boshqaruv (Xodimlar/Rollar)",
-  settings: "Sozlamalar",
+  admin: { name: 'Admin', permissions: { dashboard: true, products: true, sales: true, customers: true, marketing: true, reports: true, finance: true, management: true, settings: true } },
+  kassir: { name: 'Kassir', permissions: { dashboard: true, products: false, sales: true, customers: true, marketing: false, reports: false, finance: false, management: false, settings: false } },
 };
 
 export const RolesProvider = ({ children }) => {
   const { currentUser } = useAuth();
-  const [userProfile, setUserProfile] = useState(null);
-  const [roles, setRoles] = useState(DEFAULT_ROLES);
-  const [loadingRoles, setLoadingRoles] = useState(true);
+  const [userProfile, setUserProfile] = useState(() => {
+    const saved = localStorage.getItem('userProfile');
+    return saved ? JSON.parse(saved) : null;
+  });
+  const [roles, setRoles] = useState(() => {
+    const saved = localStorage.getItem('roles');
+    return saved ? JSON.parse(saved) : DEFAULT_ROLES;
+  });
+  const [hasOnboarded, setHasOnboarded] = useState(() => {
+    const saved = localStorage.getItem('hasOnboarded');
+    return saved ? JSON.parse(saved) : false;
+  });
+  const [loadingRoles, setLoadingRoles] = useState(() => !localStorage.getItem('userProfile'));
 
   useEffect(() => {
-    if (!currentUser) {
+    if (currentUser) {
+      loadUserProfile();
+    } else {
       setUserProfile(null);
+      setRoles(DEFAULT_ROLES);
+      setHasOnboarded(false);
       setLoadingRoles(false);
-      return;
     }
-    loadUserProfile();
   }, [currentUser]);
 
   const loadUserProfile = async () => {
@@ -114,65 +45,100 @@ export const RolesProvider = ({ children }) => {
 
       if (adminProfileSnap.exists()) {
         const profileData = adminProfileSnap.data();
+        profileData.storeOwnerId = profileData.storeOwnerId || currentUser.uid;
         setUserProfile(profileData);
-
-        // Bu xodim bo'lsa, uning storeOwner admining rollarini yuklash kerak
+        localStorage.setItem('userProfile', JSON.stringify(profileData));
+        
         const storeOwnerId = profileData.storeOwnerId || currentUser.uid;
+        
+        // Check onboarding state
+        const storeInfoRef = doc(db, `users/${storeOwnerId}/settings/storeInfo`);
+        const storeInfoSnap = await getDoc(storeInfoRef);
+        const onboarded = storeInfoSnap.exists();
+        setHasOnboarded(onboarded);
+        localStorage.setItem('hasOnboarded', JSON.stringify(onboarded));
+
         const rolesRef = doc(db, `users/${storeOwnerId}/settings/roles`);
         const rolesSnap = await getDoc(rolesRef);
+        
         if (rolesSnap.exists()) {
-          setRoles({ ...DEFAULT_ROLES, ...rolesSnap.data() });
+          const dbRoles = rolesSnap.data();
+          const mergedRoles = { ...DEFAULT_ROLES };
+          
+          Object.keys(dbRoles).forEach(roleKey => {
+            if (mergedRoles[roleKey] && typeof dbRoles[roleKey] === 'object') {
+              mergedRoles[roleKey] = {
+                ...mergedRoles[roleKey],
+                ...dbRoles[roleKey],
+                permissions: {
+                  ...mergedRoles[roleKey].permissions,
+                  ...(dbRoles[roleKey].permissions || {})
+                }
+              };
+            }
+          });
+          
+          setRoles(mergedRoles);
+          localStorage.setItem('roles', JSON.stringify(mergedRoles));
         } else if (!profileData.storeOwnerId) {
-          // Bu admin, birinchi marta kirgan: default rollarni saqlash
           await setDoc(rolesRef, DEFAULT_ROLES);
         }
       } else {
-        // Birinchi marta kirgan admin
         const newAdminProfile = {
-          name: currentUser.displayName || currentUser.email?.split('@')[0] || 'Foydalanuvchi',
+          name: currentUser.displayName || currentUser.email?.split('@')[0] || 'Admin',
           email: currentUser.email,
           role: 'admin',
+          storeOwnerId: currentUser.uid,
           createdAt: new Date().toISOString()
         };
         await setDoc(adminProfileRef, newAdminProfile);
         setUserProfile(newAdminProfile);
-
-        // Default rollarni saqlash
+        localStorage.setItem('userProfile', JSON.stringify(newAdminProfile));
+        
         const rolesRef = doc(db, `users/${currentUser.uid}/settings/roles`);
         await setDoc(rolesRef, DEFAULT_ROLES);
+        
+        setHasOnboarded(false); // Newly created user hasn't onboarded
+        localStorage.setItem('hasOnboarded', JSON.stringify(false));
       }
     } catch (error) {
-      console.error("Profil yuklashda xatolik:", error);
-      setUserProfile((prev) => prev || { role: 'admin', name: currentUser?.email || 'Admin' });
+      console.error("Profil yuklash xatosi:", error);
+      const fallbackProfile = { role: 'admin', name: currentUser?.email || 'Admin', storeOwnerId: currentUser.uid };
+      setUserProfile(fallbackProfile);
     } finally {
       setLoadingRoles(false);
     }
   };
 
   const hasPermission = (permKey) => {
-    if (!userProfile) return false;
-    // Admin va storeOwnerId bo'lmaganlar hamma narsaga kirishi mumkin
-    if (userProfile.role === 'admin' && !userProfile.storeOwnerId) return true;
-    const role = userProfile.role;
-    const currentRole = roles[role];
-    if (!currentRole) return false;
-    return currentRole.permissions[permKey] === true;
-  };
-
-  const updateRoles = async (newRoles) => {
-    if (!currentUser) return;
-    try {
-      const storeOwnerId = userProfile?.storeOwnerId || currentUser.uid;
-      const rolesRef = doc(db, `users/${storeOwnerId}/settings/roles`);
-      await setDoc(rolesRef, newRoles);
-      setRoles(newRoles);
-    } catch (error) {
-      console.error("Rollarni yangilashda xatolik:", error);
+    // Agar tizimga kirmagan bo'lsak (MVP test rejimi) hamma bo'lim ochiq bo'ladi
+    if (!userProfile) {
+      if (!currentUser) return true;
+      return false;
     }
+    
+    const normalizedRole = (userProfile.role || (userProfile.storeOwnerId ? 'kassir' : 'admin')).toLowerCase();
+    
+    // Asosiy admin egasi uchun barcha ruxsatlar ochiq
+    if (normalizedRole === 'admin' && !userProfile.storeOwnerId) return true;
+    
+    // Maxsus belgilangan huquqlar birinchi tekshiriladi
+    if (userProfile.permissions && userProfile.permissions[permKey] !== undefined) {
+      return userProfile.permissions[permKey] === true;
+    }
+
+    const currentRole = roles[normalizedRole] || DEFAULT_ROLES[normalizedRole];
+    if (!currentRole) return false;
+    
+    // Agar ruxsat aniq ko'rsatilmagan bo'lsa (masalan bazada yo'q), default roldan qidiramiz
+    const perm = currentRole.permissions?.[permKey];
+    if (perm !== undefined) return perm === true;
+    
+    return DEFAULT_ROLES[normalizedRole]?.permissions?.[permKey] === true;
   };
 
   return (
-    <RolesContext.Provider value={{ userProfile, roles, loadingRoles, hasPermission, updateRoles, loadUserProfile }}>
+    <RolesContext.Provider value={{ userProfile, roles, loadingRoles, hasPermission, hasOnboarded }}>
       {children}
     </RolesContext.Provider>
   );
