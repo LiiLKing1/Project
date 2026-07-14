@@ -4,13 +4,13 @@ import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 
 const Receipt = ({ sale, storeId }) => {
-  const [storeName, setStoreName] = useState("Asosiy Filial");
+  const [storeName, setStoreName] = useState("");
 
   useEffect(() => {
     if (storeId) {
       getDoc(doc(db, `users/${storeId}/settings/storeInfo`)).then(snap => {
-        if (snap.exists() && snap.data().name) {
-          setStoreName(snap.data().name);
+        if (snap.exists() && snap.data().storeName) {
+          setStoreName(snap.data().storeName);
         }
       }).catch(err => console.error("Error fetching store info:", err));
     }
@@ -23,7 +23,7 @@ const Receipt = ({ sale, storeId }) => {
   return (
     <div style={{ padding: '2rem', backgroundColor: '#fff', color: '#000', borderRadius: '8px', width: '100%', maxWidth: '350px', margin: '0 auto', boxShadow: 'var(--shadow-sm)', fontFamily: 'monospace' }}>
       <div style={{ textAlign: 'center', marginBottom: '1rem', borderBottom: '1px dashed #ccc', paddingBottom: '1rem' }}>
-        <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', margin: 0 }}>Do'kon: {storeName}</h2>
+        <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', margin: 0 }}>{storeName ? `Do'kon: ${storeName}` : ''}</h2>
         <div style={{ fontSize: '0.875rem', marginTop: '0.25rem' }}>Chek: {sale.saleNumber}</div>
         <div style={{ fontSize: '0.875rem' }}>Sana: {new Date(sale.createdAt).toLocaleString('uz-UZ', { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
       </div>
