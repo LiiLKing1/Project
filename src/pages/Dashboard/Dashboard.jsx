@@ -99,7 +99,25 @@ const Dashboard = () => {
     }).map(k => ({ name: k, jami: dataMap[k] }));
   };
 
+  const getTopProducts = () => {
+    const productCounts = {};
+    filteredSales.forEach(sale => {
+      sale.items?.forEach(item => {
+        if (!productCounts[item.id]) {
+          productCounts[item.id] = { name: item.name, qty: 0, revenue: 0 };
+        }
+        productCounts[item.id].qty += item.qty;
+        productCounts[item.id].revenue += (item.qty * item.price);
+      });
+    });
+    
+    return Object.values(productCounts)
+      .sort((a, b) => b.qty - a.qty)
+      .slice(0, 5); // top 5
+  };
+
   const chartData = getChartData();
+  const topProducts = getTopProducts();
 
   return (
     <div className="flex-col" style={{ gap: '2rem', height: '100%' }}>
@@ -160,30 +178,57 @@ const Dashboard = () => {
         </div>
       </div>
 
-      <div className="glass-panel flex-col" style={{ padding: '1.5rem', flex: 1, minHeight: '350px' }}>
-        <h2 className="h2" style={{ marginBottom: '1.5rem' }}>Savdo dinamikasi</h2>
-        <div style={{ flex: 1, width: '100%' }}>
-          {chartData.length > 0 ? (
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartData}>
-                <defs>
-                  <linearGradient id="colorJami" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="var(--primary)" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-color)" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: 'var(--text-secondary)'}} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{fill: 'var(--text-secondary)'}} tickFormatter={v => (v > 0 ? (v/1000).toFixed(0)+'k' : '0')} />
-                <Tooltip formatter={(v) => [formatMoney(v), "Savdo"]} contentStyle={{borderRadius: '8px', border: 'none', boxShadow: 'var(--shadow-md)'}} cursor={{stroke: 'var(--border-color)', strokeWidth: 1, strokeDasharray: '5 5'}} />
-                <Area type="monotone" dataKey="jami" stroke="var(--primary)" strokeWidth={3} fillOpacity={1} fill="url(#colorJami)" />
-              </AreaChart>
-            </ResponsiveContainer>
-          ) : (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-secondary)' }}>
-              Ushbu davr uchun savdo ma'lumotlari yo'q
-            </div>
-          )}
+      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1.5rem', flex: 1, minHeight: '350px' }}>
+        <div className="glass-panel flex-col" style={{ padding: '1.5rem', height: '100%' }}>
+          <h2 className="h2" style={{ marginBottom: '1.5rem' }}>Savdo dinamikasi</h2>
+          <div style={{ flex: 1, width: '100%' }}>
+            {chartData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={chartData}>
+                  <defs>
+                    <linearGradient id="colorJami" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="var(--primary)" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-color)" />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: 'var(--text-secondary)'}} dy={10} />
+                  <YAxis axisLine={false} tickLine={false} tick={{fill: 'var(--text-secondary)'}} tickFormatter={v => (v > 0 ? (v/1000).toFixed(0)+'k' : '0')} />
+                  <Tooltip formatter={(v) => [formatMoney(v), "Savdo"]} contentStyle={{borderRadius: '8px', border: 'none', boxShadow: 'var(--shadow-md)'}} cursor={{stroke: 'var(--border-color)', strokeWidth: 1, strokeDasharray: '5 5'}} />
+                  <Area type="monotone" dataKey="jami" stroke="var(--primary)" strokeWidth={3} fillOpacity={1} fill="url(#colorJami)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-secondary)' }}>
+                Ushbu davr uchun savdo ma'lumotlari yo'q
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="glass-panel flex-col" style={{ padding: '1.5rem', height: '100%' }}>
+          <h2 className="h2" style={{ marginBottom: '1.5rem', fontSize: '1.125rem' }}>Eng ko'p sotilgan tovarlar</h2>
+          <div style={{ flex: 1, overflowY: 'auto' }}>
+            {topProducts.length > 0 ? (
+              <div className="flex-col" style={{ gap: '1rem' }}>
+                {topProducts.map((p, i) => (
+                  <div key={i} className="flex-between" style={{ paddingBottom: '0.75rem', borderBottom: '1px solid var(--border-color)' }}>
+                    <div>
+                      <div style={{ fontWeight: 500, color: 'var(--text-main)' }}>{p.name}</div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{p.qty} dona</div>
+                    </div>
+                    <div style={{ fontWeight: 600, color: 'var(--success)' }}>
+                      {formatMoney(p.revenue)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+                Ma'lumot topilmadi
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

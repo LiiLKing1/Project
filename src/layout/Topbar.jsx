@@ -1,16 +1,29 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Bell, User, LogOut } from 'lucide-react';
 import { useRoles } from '../context/RolesContext';
 import { useAuth } from '../context/AuthContext';
+import { db } from '../firebase';
+import { doc, onSnapshot } from 'firebase/firestore';
 import './layout.css';
 
 const Topbar = () => {
   const { userProfile } = useRoles();
   const { logout } = useAuth();
+  const [storeName, setStoreName] = useState(userProfile?.storeName || "Asosiy Filial");
+
+  useEffect(() => {
+    if (userProfile?.storeOwnerId) {
+      const unsub = onSnapshot(doc(db, `users/${userProfile.storeOwnerId}/settings/storeInfo`), (docSnap) => {
+        if (docSnap.exists() && docSnap.data().storeName) {
+          setStoreName(docSnap.data().storeName);
+        }
+      });
+      return () => unsub();
+    }
+  }, [userProfile?.storeOwnerId]);
 
   const displayName = userProfile?.name || 'Admin Foydalanuvchi';
   const displayRole = userProfile?.role || 'Admin';
-  const storeName = userProfile?.storeName || 'Asosiy Filial';
   const initials = displayName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
 
   return (
