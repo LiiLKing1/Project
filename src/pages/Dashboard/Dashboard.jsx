@@ -42,9 +42,14 @@ const Dashboard = () => {
       setStats(prev => ({ ...prev, customers: snapshot.size }));
     });
 
+    const unsubProducts = onSnapshot(collection(db, `users/${storeId}/products`), (snapshot) => {
+      setProducts(snapshot.docs.map(doc => doc.data()));
+    });
+
     return () => {
       unsubSales();
       unsubCustomers();
+      unsubProducts();
     };
   }, [storeId]);
 
@@ -65,7 +70,7 @@ const Dashboard = () => {
   const periodRevenue = filteredSales.reduce((acc, curr) => acc + (curr.total || 0), 0);
   const periodSalesCount = filteredSales.length;
   const lowStockProducts = products.filter(p => p.stock <= (p.minStock || 5)).length;
-  const activeCustomers = customers.length;
+  const activeCustomers = stats.customers;
 
   // Group data for chart
   const getChartData = () => {
