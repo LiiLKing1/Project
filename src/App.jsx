@@ -8,11 +8,20 @@ import Dashboard from './pages/Dashboard/Dashboard';
 import POS from './pages/Sales/POS';
 import Catalog from './pages/Products/Catalog';
 import Customers from './pages/Customers/Customers';
+import Debts from './pages/Customers/Debts';
 import Marketing from './pages/Marketing/Marketing';
 import Reports from './pages/Reports/Reports';
 import Finance from './pages/Finance/Finance';
 import Employees from './pages/Management/Employees';
+import Payroll from './pages/Management/Payroll';
 import Settings from './pages/Settings/Settings';
+import Loyalty from './pages/Settings/Loyalty';
+import Trash from './pages/Settings/Trash';
+import AuditLogs from './pages/Settings/AuditLogs';
+import Backup from './pages/Settings/Backup';
+import IntegrityCheck from './pages/Settings/IntegrityCheck';
+import Suppliers from './pages/Orders/Suppliers';
+import Orders from './pages/Orders/Orders';
 
 import Login from './pages/Auth/Login';
 import Onboarding from './pages/Auth/Onboarding';
@@ -37,6 +46,11 @@ function App() {
 
           {/* Customers / Mijozlar */}
           <Route path="customers" element={<PermissionRoute permKey="customers"><Customers /></PermissionRoute>} />
+          <Route path="customers/debts" element={<PermissionRoute permKey="customers"><Debts /></PermissionRoute>} />
+
+          {/* Orders & Suppliers */}
+          <Route path="orders" element={<PermissionRoute permKey="products"><Orders /></PermissionRoute>} />
+          <Route path="orders/suppliers" element={<PermissionRoute permKey="products"><Suppliers /></PermissionRoute>} />
 
           {/* Marketing */}
           <Route path="marketing" element={<PermissionRoute permKey="marketing"><Marketing /></PermissionRoute>} />
@@ -49,9 +63,15 @@ function App() {
 
           {/* Management / Boshqaruv */}
           <Route path="management" element={<PermissionRoute permKey="management"><Employees /></PermissionRoute>} />
+          <Route path="management/payroll" element={<PermissionRoute permKey="management"><Payroll /></PermissionRoute>} />
 
           {/* Settings */}
           <Route path="settings" element={<PermissionRoute permKey="settings"><Settings /></PermissionRoute>} />
+          <Route path="settings/loyalty" element={<PermissionRoute permKey="settings"><Loyalty /></PermissionRoute>} />
+          <Route path="settings/trash" element={<PermissionRoute permKey="settings"><Trash /></PermissionRoute>} />
+          <Route path="settings/audit" element={<PermissionRoute permKey="settings"><AuditLogs /></PermissionRoute>} />
+          <Route path="settings/backup" element={<PermissionRoute permKey="settings"><Backup /></PermissionRoute>} />
+          <Route path="settings/integrity" element={<PermissionRoute permKey="settings"><IntegrityCheck /></PermissionRoute>} />
         </Route>
       </Routes>
     </BrowserRouter>

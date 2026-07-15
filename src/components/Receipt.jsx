@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
+import CurrencyDisplay from './CurrencyDisplay';
 
 const Receipt = ({ sale, storeId }) => {
   const [storeName, setStoreName] = useState("");
@@ -50,8 +51,8 @@ const Receipt = ({ sale, storeId }) => {
           <tbody>
             {sale.items?.map((item, i) => (
               <tr key={i}>
-                <td style={{ paddingBottom: '0.5rem' }}>{item.name} <br/><small>{item.qty} x {new Intl.NumberFormat('uz-UZ').format(item.price)}</small></td>
-                <td style={{ textAlign: 'right', verticalAlign: 'top' }}>{new Intl.NumberFormat('uz-UZ').format(item.price * item.qty)}</td>
+                <td style={{ paddingBottom: '0.5rem' }}>{item.name} <br/><small>{item.qty} x <CurrencyDisplay amount={item.price} /></small></td>
+                <td style={{ textAlign: 'right', verticalAlign: 'top' }}><CurrencyDisplay amount={item.price * item.qty} /></td>
               </tr>
             ))}
           </tbody>
@@ -60,7 +61,7 @@ const Receipt = ({ sale, storeId }) => {
 
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.125rem', fontWeight: 'bold', marginBottom: '1.5rem' }}>
         <span>JAMI TO'LOV:</span>
-        <span>{new Intl.NumberFormat('uz-UZ').format(sale.total)} UZS</span>
+        <span><CurrencyDisplay amount={sale.finalTotal || 0} /></span>
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'center' }}>

@@ -1,14 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, Filter, Edit, Trash2 } from 'lucide-react';
+import { Search, Plus, Filter, Edit, Trash2, Download, Upload, CheckCircle2, AlertTriangle, XCircle, FileSpreadsheet } from 'lucide-react';
 import { db } from '../../firebase';
-import { collection, onSnapshot, doc, query, orderBy } from 'firebase/firestore';
-import { saveDoc, editDoc, removeDoc } from '../../utils/firebaseUtils';
+import { collection, onSnapshot, doc, query, orderBy, writeBatch } from 'firebase/firestore';
+import * as XLSX from 'xlsx';
+import { saveDoc, editDoc, softDeleteDoc, generateDiff } from '../../utils/firebaseUtils';
 import { useToast } from '../../context/ToastContext';
 import { useRoles } from '../../context/RolesContext';
+import { useSettings } from '../../context/SettingsContext';
+import { useWarehouse } from '../../context/WarehouseContext';
 import Modal from '../../components/Modal';
 import Drawer from '../../components/Drawer';
 import FormInput from '../../components/FormInput';
+import CurrencyDisplay from '../../components/CurrencyDisplay';
 import { motion, AnimatePresence } from 'framer-motion';
+import TransferDrawer from './TransferDrawer';
 
 const Catalog = () => {
   const [products, setProducts] = useState([]);
@@ -17,7 +22,10 @@ const Catalog = () => {
   const [loading, setLoading] = useState(false);
   const { addToast } = useToast();
   const { userProfile } = useRoles();
+  const { settings } = useSettings();
+  const { selectedWarehouseId } = useWarehouse();
   const storeId = userProfile?.storeOwnerId;
+  const curr = settings?.currency || 'UZS';
 
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -29,6 +37,15 @@ const Catalog = () => {
   });
   const [formErrors, setFormErrors] = useState({});
 
+  // Import states
+  const [isImportOpen, setIsImportOpen] = useState(false);
+  const [importData, setImportData] = useState([]);
+  const [importStats, setImportStats] = useState({ total: 0, new: 0, update: 0, error: 0 });
+  const [isImporting, setIsImporting] = useState(false);
+  
+  // Transfer state
+  const [isTransferOpen, setIsTransferOpen] = useState(false);
+
   const handleAddCategory = async () => {
     if (!newCatName.trim()) {
       addToast("Kategoriya nomini kiriting", "error");
@@ -37,8 +54,9 @@ const Catalog = () => {
     if (!storeId) return;
 
     try {
+      const auditData = { storeId, userProfile, resource: 'categories', details: newCatName.trim() };
       const newCat = { name: newCatName.trim(), createdAt: new Date().toISOString() };
-      const docRef = await saveDoc(collection(db, `users/${storeId}/categories`), newCat);
+      const docRef = await saveDoc(collection(db, `users/${storeId}/categories`), newCat, auditData);
       if (docRef && docRef.id) {
         setFormData({...formData, categoryId: docRef.id});
         addToast("Kategoriya qo'shildi", "success");
@@ -85,7 +103,7 @@ const Catalog = () => {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isCatModalOpen, isModalOpen]);
+  }, [isCatModalOpen, isModalOpen, isImportOpen]);
 
   const validate = () => {
     const errors = {};
@@ -122,17 +140,32 @@ const Catalog = () => {
       barcode: finalBarcode,
       costPrice: Number(formData.costPrice),
       sellPrice: Number(formData.sellPrice),
-      stock: Number(formData.stock || 0),
+      stockByWarehouse: editingId ? undefined : { [selectedWarehouseId]: Number(formData.stock || 0) }, // Use undefined so merge doesn't overwrite if not explicitly handling
       minStock: Number(formData.minStock || 5),
       status: 'active'
     };
+    
+    // If creating new, we must provide the initial stock ByWarehouse.
+    if (!editingId) {
+      payload.stockByWarehouse = { [selectedWarehouseId]: Number(formData.stock || 0) };
+    } else {
+      // Don't overwrite other warehouses on edit. Just update this warehouse.
+      // Easiest is to only allow editing stock from transfer/inventory, but for now we can omit it from simple edit.
+      delete payload.stockByWarehouse; 
+    }
 
     try {
       if (editingId) {
-        await editDoc(doc(db, `users/${storeId}/products`, editingId), payload);
+        const originalProduct = products.find(p => p.id === editingId);
+        const diffStr = generateDiff(originalProduct, payload);
+        const auditDetails = diffStr ? `${formData.name} (O'zgarishlar: ${diffStr})` : formData.name;
+        const auditData = { storeId, userProfile, resource: 'products', details: auditDetails };
+        
+        await editDoc(doc(db, `users/${storeId}/products`, editingId), payload, auditData);
         addToast('Mahsulot muvaffaqiyatli yangilandi', 'success');
       } else {
-        await saveDoc(collection(db, `users/${storeId}/products`), payload);
+        const auditData = { storeId, userProfile, resource: 'products', details: formData.name };
+        await saveDoc(collection(db, `users/${storeId}/products`), payload, auditData);
         addToast('Mahsulot muvaffaqiyatli qo\'shildi', 'success');
       }
       setIsModalOpen(false);
@@ -143,9 +176,10 @@ const Catalog = () => {
 
   const handleDelete = async (product) => {
     if (!storeId) return;
-    if (window.confirm(`${product.name} ni o'chirishni xohlaysizmi? (Eskilar tarix uchun arxivlanishi tavsiya etiladi)`)) {
+    if (window.confirm(`${product.name} ni o'chirishni xohlaysizmi? (Arxivga tushadi)`)) {
       try {
-        await editDoc(doc(db, `users/${storeId}/products`, product.id), { status: 'archived' });
+        const auditData = { storeId, userProfile, resource: 'products', details: product.name };
+        await softDeleteDoc(doc(db, `users/${storeId}/products`, product.id), auditData);
         addToast('Mahsulot arxivlandi', 'info');
       } catch (error) {
         addToast(error.message, 'error');
@@ -160,7 +194,7 @@ const Catalog = () => {
       setFormData({
         name: product.name, barcode: product.barcode, categoryId: product.categoryId,
         unit: product.unit, costPrice: product.costPrice, sellPrice: product.sellPrice,
-        stock: product.stock, minStock: product.minStock
+        stock: product.stockByWarehouse?.[selectedWarehouseId] || 0, minStock: product.minStock
       });
     } else {
       setEditingId(null);
@@ -169,6 +203,189 @@ const Catalog = () => {
       });
     }
     setIsModalOpen(true);
+  };
+
+  const handleExport = () => {
+    const dataToExport = filteredProducts.map(p => ({
+      'Shtrix-kod': p.barcode,
+      'Nomi': p.name,
+      'Kategoriya': categories.find(c => c.id === p.categoryId)?.name || 'Boshqa',
+      'O\'lchov birligi': p.unit,
+      'Tannarx': p.costPrice,
+      'Sotish narxi': p.sellPrice,
+      'Qoldiq': p.stockByWarehouse?.[selectedWarehouseId] || 0,
+      'Minimal qoldiq': p.minStock
+    }));
+    
+    const ws = XLSX.utils.json_to_sheet(dataToExport);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Mahsulotlar");
+    const dateStr = new Date().toISOString().split('T')[0];
+    XLSX.writeFile(wb, `mahsulotlar_${dateStr}.xlsx`);
+  };
+
+  const handleDownloadTemplate = () => {
+    const template = [{
+      'Shtrix-kod': '1234567890123',
+      'Nomi': 'Yangi mahsulot',
+      'Kategoriya': 'Ichimliklar',
+      'O\'lchov birligi': 'dona',
+      'Tannarx': 5000,
+      'Sotish narxi': 7000,
+      'Qoldiq': 100,
+      'Minimal qoldiq': 5
+    }];
+    const ws = XLSX.utils.json_to_sheet(template);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Shablon");
+    XLSX.writeFile(wb, `shablon_mahsulotlar.xlsx`);
+  };
+
+  const handleFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const bstr = evt.target.result;
+      const wb = XLSX.read(bstr, { type: 'binary' });
+      const wsname = wb.SheetNames[0];
+      const ws = wb.Sheets[wsname];
+      const data = XLSX.utils.sheet_to_json(ws);
+      
+      let newCount = 0;
+      let updateCount = 0;
+      let errCount = 0;
+      const parsedData = data.map((row) => {
+        let status = 'success';
+        let reason = '';
+        
+        const barcode = row['Shtrix-kod'] ? String(row['Shtrix-kod']) : '';
+        const name = row['Nomi'] ? String(row['Nomi']) : '';
+        const categoryName = row['Kategoriya'] ? String(row['Kategoriya']) : 'Boshqa';
+        const costPrice = Number(row['Tannarx']);
+        const sellPrice = Number(row['Sotish narxi']);
+        
+        // Validation
+        if (!name.trim()) { status = 'error'; reason = 'Nomi kiritilmagan'; }
+        else if (isNaN(costPrice) || costPrice < 0) { status = 'error'; reason = 'Tannarx noto\'g\'ri'; }
+        else if (isNaN(sellPrice) || sellPrice < 0) { status = 'error'; reason = 'Sotish narxi noto\'g\'ri'; }
+        
+        let isUpdate = false;
+        if (status !== 'error') {
+          if (barcode) {
+            isUpdate = products.some(p => p.barcode === barcode);
+          }
+          if (isUpdate) {
+            // Check if stock changes (for now just add to new or warning)
+            status = 'warning'; reason = 'Shtrix-kod mavjud, yangilanadi';
+            updateCount++;
+          } else {
+            newCount++;
+          }
+        } else {
+          errCount++;
+        }
+        
+        return {
+          originalRow: row,
+          parsed: {
+            barcode, name, categoryName, 
+            unit: row['O\'lchov birligi'] || 'dona', 
+            costPrice: costPrice || 0, 
+            sellPrice: sellPrice || 0, 
+            stock: Number(row['Qoldiq']) || 0, 
+            minStock: Number(row['Minimal qoldiq']) || 5
+          },
+          status, reason
+        };
+      });
+      
+      setImportData(parsedData);
+      setImportStats({ total: data.length, new: newCount, update: updateCount, error: errCount });
+    };
+    reader.readAsBinaryString(file);
+    e.target.value = null;
+  };
+
+  const handleConfirmImport = async () => {
+    if (!storeId || isImporting) return;
+    setIsImporting(true);
+    
+    try {
+      const batch = writeBatch(db);
+      const validRows = importData.filter(d => d.status !== 'error');
+      
+      const categoryMap = {};
+      categories.forEach(c => { categoryMap[c.name.toLowerCase().trim()] = c.id; });
+      
+      for (const row of validRows) {
+        const { parsed, status } = row;
+        
+        let catId = categoryMap[parsed.categoryName.toLowerCase().trim()];
+        if (!catId) {
+          const newCatRef = doc(collection(db, `users/${storeId}/categories`));
+          batch.set(newCatRef, { name: parsed.categoryName, createdAt: new Date().toISOString() });
+          catId = newCatRef.id;
+          categoryMap[parsed.categoryName.toLowerCase().trim()] = catId;
+        }
+        
+        let barcode = parsed.barcode;
+        if (!barcode) {
+          barcode = '200' + Math.floor(Math.random() * 10000000000).toString().padStart(10, '0');
+        }
+        
+        const payload = {
+          name: parsed.name,
+          barcode: barcode,
+          categoryId: catId,
+          unit: parsed.unit,
+          costPrice: parsed.costPrice,
+          sellPrice: parsed.sellPrice,
+          minStock: parsed.minStock,
+          status: 'active'
+        };
+        
+        if (status === 'warning') {
+          const existingProd = products.find(p => p.barcode === barcode);
+          if (existingProd) {
+            batch.update(doc(db, `users/${storeId}/products`, existingProd.id), {
+               ...payload, 
+               [`stockByWarehouse.${selectedWarehouseId}`]: parsed.stock,
+               updatedAt: new Date().toISOString()
+            });
+          }
+        } else {
+          const newProdRef = doc(collection(db, `users/${storeId}/products`));
+          batch.set(newProdRef, {
+             ...payload, 
+             stockByWarehouse: { [selectedWarehouseId]: parsed.stock },
+             createdAt: new Date().toISOString()
+          });
+        }
+      }
+      
+      await batch.commit();
+      addToast(`${validRows.length} ta mahsulot muvaffaqiyatli import qilindi!`, 'success');
+      
+      if (importStats.error > 0) {
+        const errorRows = importData.filter(d => d.status === 'error').map(d => ({
+          ...d.originalRow,
+          'Xatolik Sababi': d.reason
+        }));
+        const ws = XLSX.utils.json_to_sheet(errorRows);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Xatolar");
+        XLSX.writeFile(wb, `import_xatolar_${new Date().toISOString().split('T')[0]}.xlsx`);
+      }
+      
+      setIsImportOpen(false);
+      setImportData([]);
+    } catch (err) {
+      addToast(err.message, 'error');
+    } finally {
+      setIsImporting(false);
+    }
   };
 
   const formatMoney = (v) => new Intl.NumberFormat('uz-UZ').format(v) + ' UZS';
@@ -188,7 +405,12 @@ const Catalog = () => {
     <div className="flex-col" style={{ gap: '1.5rem', height: '100%' }}>
       <div className="flex-between">
         <h1 className="h1">Mahsulotlar Katalogi</h1>
-        <button className="btn btn-primary" onClick={() => openModal()}><Plus size={18} /> Yangi mahsulot</button>
+        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <button className="btn btn-outline" style={{ backgroundColor: 'var(--bg-surface)' }} onClick={() => setIsTransferOpen(true)}><FileSpreadsheet size={18} /> Stok ko'chirish</button>
+          <button className="btn btn-outline" style={{ backgroundColor: 'var(--bg-surface)' }} onClick={handleExport}><Download size={18} /> Excel'ga eksport</button>
+          <button className="btn btn-outline" style={{ backgroundColor: 'var(--bg-surface)' }} onClick={() => {setIsImportOpen(true); setImportData([]);}}><Upload size={18} /> Excel'dan yuklash</button>
+          <button className="btn btn-primary" onClick={() => openModal()}><Plus size={18} /> Yangi mahsulot</button>
+        </div>
       </div>
 
       <div className="glass-panel" style={{ padding: '1.5rem', flex: 1, display: 'flex', flexDirection: 'column' }}>
@@ -207,7 +429,8 @@ const Catalog = () => {
         </div>
 
         <div style={{ flex: 1, overflow: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+          <div className="table-responsive">
+<table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
               <thead>
                 <tr style={{ borderBottom: '2px solid var(--border-color)', color: 'var(--text-secondary)' }}>
                   <th style={{ padding: '1rem' }}>Shtrix-kod</th>
@@ -229,10 +452,10 @@ const Catalog = () => {
                       <td style={{ padding: '1rem', color: 'var(--text-secondary)' }}>{p.barcode}</td>
                       <td style={{ padding: '1rem', fontWeight: '500' }}>{p.name}</td>
                       <td style={{ padding: '1rem' }}><span style={{ padding: '0.25rem 0.75rem', backgroundColor: 'var(--primary-light)', color: 'var(--primary)', borderRadius: '999px', fontSize: '0.75rem', fontWeight: '600' }}>{cat ? cat.name : 'Boshqa'}</span></td>
-                      <td style={{ padding: '1rem', fontWeight: '600', color: 'var(--primary)' }}>{formatMoney(p.sellPrice)}</td>
-                      <td style={{ padding: '1rem' }}>{formatMoney(p.costPrice)}</td>
-                      <td style={{ padding: '1rem', fontWeight: '600', color: getStockColor(p.stock, p.minStock) }}>
-                        {p.stock} {p.unit}
+                      <td style={{ padding: '1rem', fontWeight: '600', color: 'var(--primary)' }}><CurrencyDisplay amount={p.sellPrice} /></td>
+                      <td style={{ padding: '1rem' }}><CurrencyDisplay amount={p.costPrice} /></td>
+                      <td style={{ padding: '1rem', fontWeight: '600', color: getStockColor(p.stockByWarehouse?.[selectedWarehouseId] || 0, p.minStock) }}>
+                        {p.stockByWarehouse?.[selectedWarehouseId] || 0} {p.unit}
                       </td>
                       <td style={{ padding: '1rem', display: 'flex', gap: '0.5rem' }}>
                         <button className="btn btn-outline" style={{ padding: '0.5rem' }} onClick={() => openModal(p)}><Edit size={16} /></button>
@@ -243,6 +466,7 @@ const Catalog = () => {
                 })}
               </tbody>
             </table>
+</div>
         </div>
       </div>
 
@@ -274,21 +498,25 @@ const Catalog = () => {
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-          <FormInput label="Tannarx (UZS)" type="number" value={formData.costPrice} onChange={e => setFormData({...formData, costPrice: e.target.value})} error={formErrors.costPrice} required />
-          <FormInput label="Sotish narxi (UZS)" type="number" value={formData.sellPrice} onChange={e => setFormData({...formData, sellPrice: e.target.value})} error={formErrors.sellPrice} required />
+          <FormInput label={`Tannarx (${curr})`} type="number" value={formData.costPrice} onChange={e => setFormData({...formData, costPrice: e.target.value})} error={formErrors.costPrice} required />
+          <FormInput label={`Sotish narxi (${curr})`} type="number" value={formData.sellPrice} onChange={e => setFormData({...formData, sellPrice: e.target.value})} error={formErrors.sellPrice} required />
         </div>
         
         {formData.costPrice && formData.sellPrice && (
-          <div style={{ fontSize: '0.875rem', fontWeight: 500, color: Number(formData.sellPrice) >= Number(formData.costPrice) ? 'var(--success)' : 'var(--danger)', marginBottom: '1rem', marginTop: '-0.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.875rem', fontWeight: 500, color: Number(formData.sellPrice) >= Number(formData.costPrice) ? 'var(--success)' : 'var(--danger)', marginBottom: '1rem', marginTop: '-0.5rem' }}>
             {Number(formData.sellPrice) >= Number(formData.costPrice) ? 'Foyda: +' : 'Zarar: '}
-            {formatMoney(Math.abs(Number(formData.sellPrice) - Number(formData.costPrice)))} 
+            <CurrencyDisplay amount={Math.abs(Number(formData.sellPrice) - Number(formData.costPrice))} />
             {' '}
             ({(((Number(formData.sellPrice) - Number(formData.costPrice)) / Number(formData.costPrice)) * 100).toFixed(1)}%)
           </div>
         )}
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-          <FormInput label="Boshlang'ich qoldiq" type="number" value={formData.stock} onChange={e => setFormData({...formData, stock: e.target.value})} />
+          {!editingId ? (
+             <FormInput label="Boshlang'ich qoldiq" type="number" value={formData.stock} onChange={e => setFormData({...formData, stock: e.target.value})} />
+          ) : (
+             <FormInput label="Qoldiq (Faqat ma'lumot uchun)" type="number" value={formData.stock} disabled />
+          )}
           <FormInput label="Minimal qoldiq" type="number" value={formData.minStock} onChange={e => setFormData({...formData, minStock: e.target.value})} placeholder="5" />
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>Birlik</label>
@@ -306,6 +534,83 @@ const Catalog = () => {
           <button className="btn btn-primary" onClick={handleSave}>Saqlash</button>
         </div>
       </Drawer>
+
+      {/* Excel Import Drawer */}
+      <Drawer isOpen={isImportOpen} onClose={() => setIsImportOpen(false)} title="Excel'dan mahsulotlarni yuklash">
+        <div className="flex-col" style={{ gap: '1.5rem' }}>
+          <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', backgroundColor: 'var(--primary-light)' }}>
+            <h3 style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--primary)' }}>1. Shablonni yuklab oling</h3>
+            <p style={{ fontSize: '0.875rem', margin: 0, color: 'var(--text-secondary)' }}>
+              To'g'ri formatdagi Excel faylni yuklash uchun quyidagi namunaviy shablonni ko'chirib oling va ichini to'ldiring.
+            </p>
+            <button className="btn btn-primary" style={{ alignSelf: 'flex-start' }} onClick={handleDownloadTemplate}>
+              <Download size={18} /> Namuna shablonni yuklab olish
+            </button>
+          </div>
+
+          <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <h3 style={{ fontSize: '1rem', fontWeight: 600 }}>2. Faylni yuklang</h3>
+            <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem', border: '2px dashed var(--border-color)', borderRadius: 'var(--radius-md)', cursor: 'pointer', transition: 'border-color 0.2s' }}>
+              <FileSpreadsheet size={32} style={{ marginBottom: '1rem', color: 'var(--text-secondary)' }} />
+              <span style={{ fontWeight: 500 }}>Faylni tanlash (.xlsx, .xls)</span>
+              <input type="file" accept=".xlsx, .xls" onChange={handleFileUpload} style={{ display: 'none' }} />
+            </label>
+          </div>
+
+          {importData.length > 0 && (
+            <div className="glass-panel" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <h3 style={{ fontSize: '1rem', fontWeight: 600 }}>Oldindan ko'rish (Preview)</h3>
+              <div style={{ display: 'flex', gap: '1rem', fontSize: '0.875rem', padding: '0.75rem', backgroundColor: 'var(--bg-surface)', borderRadius: 'var(--radius-sm)' }}>
+                <span>Jami: <b>{importStats.total}</b></span>
+                <span style={{ color: 'var(--success)' }}>Yangi: <b>{importStats.new}</b></span>
+                <span style={{ color: 'var(--warning)' }}>Yangilanadi: <b>{importStats.update}</b></span>
+                <span style={{ color: 'var(--danger)' }}>Xato: <b>{importStats.error}</b></span>
+              </div>
+              
+              <div style={{ maxHeight: '300px', overflowY: 'auto', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)' }}>
+                <div className="table-responsive">
+<table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+                  <thead style={{ position: 'sticky', top: 0, backgroundColor: 'var(--bg-main)', zIndex: 1 }}>
+                    <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
+                      <th style={{ padding: '0.5rem', textAlign: 'center' }}>Holat</th>
+                      <th style={{ padding: '0.5rem', textAlign: 'left' }}>Shtrix-kod</th>
+                      <th style={{ padding: '0.5rem', textAlign: 'left' }}>Nomi</th>
+                      <th style={{ padding: '0.5rem', textAlign: 'left' }}>Sabab</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {importData.map((row, i) => (
+                      <tr key={i} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                        <td style={{ padding: '0.5rem', textAlign: 'center' }}>
+                          {row.status === 'success' && <CheckCircle2 size={16} color="var(--success)" />}
+                          {row.status === 'warning' && <AlertTriangle size={16} color="var(--warning)" />}
+                          {row.status === 'error' && <XCircle size={16} color="var(--danger)" />}
+                        </td>
+                        <td style={{ padding: '0.5rem' }}>{row.parsed.barcode}</td>
+                        <td style={{ padding: '0.5rem' }}>{row.parsed.name}</td>
+                        <td style={{ padding: '0.5rem', color: row.status === 'error' ? 'var(--danger)' : 'var(--text-secondary)' }}>
+                          {row.reason}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+</div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem' }}>
+                <button className="btn btn-outline" onClick={() => setImportData([])}>Tozalash</button>
+                <button className="btn btn-primary" onClick={handleConfirmImport} disabled={isImporting || (importStats.new === 0 && importStats.update === 0)}>
+                  {isImporting ? 'Yuklanmoqda...' : 'Importni tasdiqlash'}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </Drawer>
+      
+      <TransferDrawer isOpen={isTransferOpen} onClose={() => setIsTransferOpen(false)} />
+
       <AnimatePresence>
         {isCatModalOpen && (
           <motion.div

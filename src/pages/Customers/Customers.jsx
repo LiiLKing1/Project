@@ -2,12 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { UserPlus, Search, Edit, Trash2, CreditCard } from 'lucide-react';
 import { db } from '../../firebase';
 import { collection, onSnapshot, doc, query, orderBy, where, getDocs } from 'firebase/firestore';
-import { saveDoc, editDoc, removeDoc } from '../../utils/firebaseUtils';
+import { saveDoc, editDoc, softDeleteDoc, generateDiff } from '../../utils/firebaseUtils';
 import { useToast } from '../../context/ToastContext';
 import { useRoles } from '../../context/RolesContext';
+import { useSettings } from '../../context/SettingsContext';
 import Modal from '../../components/Modal';
 import Drawer from '../../components/Drawer';
 import FormInput from '../../components/FormInput';
+import CurrencyDisplay from '../../components/CurrencyDisplay';
 
 const Customers = () => {
   const [customers, setCustomers] = useState([]);
@@ -15,16 +17,14 @@ const Customers = () => {
   const [loading, setLoading] = useState(false);
   const { addToast } = useToast();
   const { userProfile } = useRoles();
+  const { settings } = useSettings();
   const storeId = userProfile?.storeOwnerId;
+  const curr = settings?.currency || 'UZS';
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
-  const [formData, setFormData] = useState({ fullName: '', phone: '+998', birthDate: '', gender: '', note: '' });
+  const [formData, setFormData] = useState({ fullName: '', phone: '+998', birthDate: '', gender: '', note: '', currentDebt: '', isVip: false, bonusBalance: '' });
   const [formErrors, setFormErrors] = useState({});
-
-  const [isDebtModalOpen, setIsDebtModalOpen] = useState(false);
-  const [debtCustomer, setDebtCustomer] = useState(null);
-  const [debtPayment, setDebtPayment] = useState('');
 
   useEffect(() => {
     if (!storeId) return;
@@ -43,16 +43,14 @@ const Customers = () => {
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
-        if (isDebtModalOpen) {
-          setIsDebtModalOpen(false);
-        } else if (isModalOpen) {
+        if (isModalOpen) {
           setIsModalOpen(false);
         }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isDebtModalOpen, isModalOpen]);
+  }, [isModalOpen]);
 
   const validate = async () => {
     const errors = {};
@@ -80,10 +78,11 @@ const Customers = () => {
 
     const payload = {
       ...formData,
+      currentDebt: formData.currentDebt ? Number(formData.currentDebt) : 0,
+      bonusBalance: formData.bonusBalance ? Number(formData.bonusBalance) : (editingId ? undefined : 0),
+      isVip: formData.isVip,
       phone: formData.phone.replace(/\s+/g, ''),
       totalPurchases: editingId ? undefined : 0,
-      bonusPoints: editingId ? undefined : 0,
-      currentDebt: editingId ? undefined : 0,
       visits: editingId ? undefined : 0,
     };
     // Clean undefined
@@ -91,10 +90,16 @@ const Customers = () => {
 
     try {
       if (editingId) {
-        await editDoc(doc(db, `users/${storeId}/customers`, editingId), payload);
+        const originalCustomer = customers.find(c => c.id === editingId);
+        const diffStr = generateDiff(originalCustomer, payload);
+        const auditDetails = diffStr ? `${formData.fullName} (O'zgarishlar: ${diffStr})` : formData.fullName;
+        const auditData = { storeId, userProfile, resource: 'customers', details: auditDetails };
+        
+        await editDoc(doc(db, `users/${storeId}/customers`, editingId), payload, auditData);
         addToast('Mijoz muvaffaqiyatli yangilandi', 'success');
       } else {
-        await saveDoc(collection(db, `users/${storeId}/customers`), payload);
+        const auditData = { storeId, userProfile, resource: 'customers', details: formData.fullName };
+        await saveDoc(collection(db, `users/${storeId}/customers`), payload, auditData);
         addToast('Mijoz muvaffaqiyatli qo\'shildi', 'success');
       }
       setIsModalOpen(false);
@@ -103,44 +108,13 @@ const Customers = () => {
     }
   };
 
-  const handleDebtPayment = async () => {
-    if (!debtPayment || Number(debtPayment) <= 0) {
-      addToast('Noto\'g\'ri summa kiritildi', 'error');
-      return;
-    }
-    if (Number(debtPayment) > debtCustomer.currentDebt) {
-      addToast('To\'lov summasi qarzdan oshib ketmasligi kerak', 'error');
-      return;
-    }
+  const handleDelete = async (customer) => {
     if (!storeId) return;
-
-    try {
-      // Create payment log
-      await saveDoc(collection(db, `users/${storeId}/customerDebts`), {
-        customerId: debtCustomer.id,
-        type: 'payment',
-        amount: Number(debtPayment),
-        date: new Date().toISOString()
-      });
-
-      // Update customer balance
-      await editDoc(doc(db, `users/${storeId}/customers`, debtCustomer.id), {
-        currentDebt: debtCustomer.currentDebt - Number(debtPayment)
-      });
-
-      addToast('Qarz muvaffaqiyatli yopildi', 'success');
-      setIsDebtModalOpen(false);
-    } catch (error) {
-      addToast(error.message, 'error');
-    }
-  };
-
-  const handleDelete = async (id) => {
-    if (!storeId) return;
-    if (window.confirm('Haqiqatan ham bu mijozni o\'chirmoqchimisiz?')) {
+    if (window.confirm('Haqiqatan ham bu mijozni o\'chirmoqchimisiz? (Arxivga tushadi)')) {
       try {
-        await removeDoc(doc(db, `users/${storeId}/customers`, id));
-        addToast('Mijoz o\'chirildi', 'success');
+        const auditData = { storeId, userProfile, resource: 'customers', details: customer.fullName };
+        await softDeleteDoc(doc(db, `users/${storeId}/customers`, customer.id), auditData);
+        addToast('Mijoz arxivlandi', 'success');
       } catch (error) {
         addToast(error.message, 'error');
       }
@@ -151,21 +125,32 @@ const Customers = () => {
     setFormErrors({});
     if (customer) {
       setEditingId(customer.id);
-      setFormData({ fullName: customer.fullName, phone: customer.phone, birthDate: customer.birthDate || '', gender: customer.gender || '', note: customer.note || '' });
+      setFormData({ 
+        fullName: customer.fullName, 
+        phone: customer.phone, 
+        birthDate: customer.birthDate || '', 
+        gender: customer.gender || '', 
+        note: customer.note || '', 
+        currentDebt: customer.currentDebt || '',
+        isVip: customer.isVip || false,
+        bonusBalance: customer.bonusBalance !== undefined ? customer.bonusBalance : ''
+      });
     } else {
       setEditingId(null);
-      setFormData({ fullName: '', phone: '+998', birthDate: '', gender: '', note: '' });
+      setFormData({ fullName: '', phone: '+998', birthDate: '', gender: '', note: '', currentDebt: '', isVip: false, bonusBalance: '' });
     }
     setIsModalOpen(true);
   };
 
-  const formatMoney = (v) => new Intl.NumberFormat('uz-UZ').format(v || 0) + ' UZS';
+
 
   const cleanPhoneSearch = search.replace(/\s+/g, '').toLowerCase();
   const cleanNameSearch = search.trim().toLowerCase();
   const filteredCustomers = customers.filter(c => 
-    (c?.fullName || '').toLowerCase().includes(cleanNameSearch) || 
-    (c?.phone || '').includes(cleanPhoneSearch)
+    c.status !== 'archived' && (
+      (c?.fullName || '').toLowerCase().includes(cleanNameSearch) || 
+      (c?.phone || '').includes(cleanPhoneSearch)
+    )
   );
 
   return (
@@ -188,42 +173,42 @@ const Customers = () => {
         </div>
 
         <div style={{ flex: 1, overflow: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+          <div className="table-responsive">
+<table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
               <thead>
                 <tr style={{ borderBottom: '2px solid var(--border-color)', color: 'var(--text-secondary)' }}>
                   <th style={{ padding: '1rem' }}>F.I.O</th>
                   <th style={{ padding: '1rem' }}>Telefon</th>
                   <th style={{ padding: '1rem' }}>Umumiy xarid</th>
-                  <th style={{ padding: '1rem' }}>Tashriflar soni</th>
+                  <th style={{ padding: '1rem' }}>Bonus</th>
                   <th style={{ padding: '1rem' }}>Qarzdorlik</th>
                   <th style={{ padding: '1rem' }}>Amallar</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredCustomers.length === 0 ? (
-                  <tr><td colSpan="6" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>Mijozlar topilmadi</td></tr>
+                  <tr><td colSpan="7" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>Mijozlar topilmadi</td></tr>
                 ) : filteredCustomers.map(c => (
                   <tr key={c.id} style={{ borderBottom: '1px solid var(--border-color)', transition: 'background-color 0.2s' }} onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--bg-main)'} onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}>
-                    <td style={{ padding: '1rem', fontWeight: '500' }}>{c.fullName}</td>
+                    <td style={{ padding: '1rem', fontWeight: '500' }}>
+                      {c.fullName}
+                      {c.isVip && <span style={{ marginLeft: '0.5rem', fontSize: '0.7rem', padding: '0.15rem 0.4rem', backgroundColor: '#fbbf24', color: '#000', borderRadius: '1rem', fontWeight: 600 }}>VIP</span>}
+                    </td>
                     <td style={{ padding: '1rem', color: 'var(--text-secondary)' }}>{c.phone}</td>
-                    <td style={{ padding: '1rem', fontWeight: '600' }}>{formatMoney(c.totalPurchases)}</td>
-                    <td style={{ padding: '1rem' }}>{c.visits || 0} marta</td>
+                    <td style={{ padding: '1rem', fontWeight: '600' }}><CurrencyDisplay amount={c.totalPurchases} /></td>
+                    <td style={{ padding: '1rem', fontWeight: '600', color: 'var(--primary)' }}><CurrencyDisplay amount={c.bonusBalance} /></td>
                     <td style={{ padding: '1rem', fontWeight: '600', color: c.currentDebt > 0 ? 'var(--danger)' : 'var(--text-main)' }}>
-                      {c.currentDebt > 0 ? (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          {formatMoney(c.currentDebt)}
-                          <button className="btn btn-outline" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }} onClick={() => { setDebtCustomer(c); setDebtPayment(''); setIsDebtModalOpen(true); }}>Yopish</button>
-                        </div>
-                      ) : 'Yo\'q'}
+                      {c.currentDebt > 0 ? <CurrencyDisplay amount={c.currentDebt} /> : 'Yo\'q'}
                     </td>
                     <td style={{ padding: '1rem', display: 'flex', gap: '0.5rem' }}>
                       <button className="btn btn-outline" style={{ padding: '0.5rem', color: 'var(--primary)' }} onClick={() => openModal(c)}><Edit size={16} /></button>
-                      <button className="btn btn-outline" style={{ padding: '0.5rem', color: 'var(--danger)' }} onClick={() => handleDelete(c.id)}><Trash2 size={16} /></button>
+                      <button className="btn btn-outline" style={{ padding: '0.5rem', color: 'var(--danger)' }} onClick={() => handleDelete(c)}><Trash2 size={16} /></button>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
+</div>
         </div>
       </div>
 
@@ -244,6 +229,20 @@ const Customers = () => {
           </div>
         </div>
 
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+          {editingId && (
+            <FormInput label={`Joriy qarz (${curr})`} type="number" value={formData.currentDebt} onChange={e => setFormData({...formData, currentDebt: e.target.value})} placeholder="0" />
+          )}
+          {editingId && (
+            <FormInput label={`Bonus balansi (${curr})`} type="number" value={formData.bonusBalance} onChange={e => setFormData({...formData, bonusBalance: e.target.value})} placeholder="0" />
+          )}
+        </div>
+
+        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', marginTop: '0.5rem', padding: '0.5rem', backgroundColor: 'var(--bg-main)', borderRadius: 'var(--radius-md)' }}>
+          <input type="checkbox" checked={formData.isVip} onChange={e => setFormData({...formData, isVip: e.target.checked})} style={{ transform: 'scale(1.2)' }} />
+          <span style={{ fontWeight: 600, color: 'var(--warning)' }}>VIP mijoz (Bonuslar ko'paytmasi ishlaydi)</span>
+        </label>
+
         <FormInput label="Izoh" value={formData.note} onChange={e => setFormData({...formData, note: e.target.value})} />
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1.5rem' }}>
@@ -251,22 +250,6 @@ const Customers = () => {
           <button className="btn btn-primary" onClick={handleSave}>Saqlash</button>
         </div>
       </Drawer>
-
-      {/* Qarz Yopish Modali */}
-      <Modal isOpen={isDebtModalOpen} onClose={() => setIsDebtModalOpen(false)} title="Qarzni yopish">
-        {debtCustomer && (
-          <div className="flex-col" style={{ gap: '1rem' }}>
-            <div style={{ padding: '1rem', backgroundColor: 'var(--danger-light)', color: 'var(--danger)', borderRadius: 'var(--radius-md)', fontWeight: 600 }}>
-              Joriy qarz: {formatMoney(debtCustomer.currentDebt)}
-            </div>
-            <FormInput label="To'lov summasi (UZS)" type="number" value={debtPayment} onChange={e => setDebtPayment(e.target.value)} placeholder="0" />
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem' }}>
-              <button className="btn btn-outline" onClick={() => setIsDebtModalOpen(false)}>Bekor qilish</button>
-              <button className="btn btn-success" onClick={handleDebtPayment}><CreditCard size={18} /> Qabul qilish</button>
-            </div>
-          </div>
-        )}
-      </Modal>
     </div>
   );
 };

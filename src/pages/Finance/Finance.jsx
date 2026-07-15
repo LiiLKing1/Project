@@ -5,6 +5,8 @@ import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { saveDoc } from '../../utils/firebaseUtils';
 import { useToast } from '../../context/ToastContext';
 import { useRoles } from '../../context/RolesContext';
+import { useSettings } from '../../context/SettingsContext';
+import CurrencyDisplay from '../../components/CurrencyDisplay';
 import Modal from '../../components/Modal';
 import FormInput from '../../components/FormInput';
 
@@ -13,7 +15,9 @@ const Finance = () => {
   const [loading, setLoading] = useState(false);
   const { addToast } = useToast();
   const { userProfile } = useRoles();
+  const { settings } = useSettings();
   const storeId = userProfile?.storeOwnerId;
+  const curr = settings?.currency || 'UZS';
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({ category: 'ijara', amount: '', note: '', date: new Date().toISOString().split('T')[0] });
@@ -52,7 +56,7 @@ const Finance = () => {
     }
   };
 
-  const formatMoney = (v) => new Intl.NumberFormat('uz-UZ').format(v || 0) + ' UZS';
+
 
   const categories = [
     { id: 'ijara', name: 'Ijara to\'lovi' },
@@ -78,8 +82,8 @@ const Finance = () => {
             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
               <div style={{ padding: '1rem', backgroundColor: 'var(--danger-light)', color: 'var(--danger)', borderRadius: 'var(--radius-lg)' }}><ArrowDownRight size={24} /></div>
               <div>
-                <div className="subtitle">Umumiy xarajatlar</div>
-                <div className="h2">{formatMoney(totalExpenses)}</div>
+                <div className="subtitle">Jami Xarajatlar (Tanlangan davr)</div>
+                <div className="h2"><CurrencyDisplay amount={totalExpenses} /></div>
               </div>
             </div>
           </div>
@@ -91,7 +95,8 @@ const Finance = () => {
             <h2 className="h2">Xarajatlar tarixi</h2>
           </div>
           <div style={{ padding: '1.5rem', overflowY: 'auto', flex: 1 }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+            <div className="table-responsive">
+<table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
               <thead>
                 <tr style={{ borderBottom: '2px solid var(--border-color)', color: 'var(--text-secondary)' }}>
                   <th style={{ padding: '1rem' }}>Sana</th>
@@ -109,12 +114,13 @@ const Finance = () => {
                     <td style={{ padding: '1rem', color: 'var(--text-secondary)' }}>{e.date}</td>
                     <td style={{ padding: '1rem', fontWeight: 500 }}>{categories.find(c => c.id === e.category)?.name || e.category}</td>
                     <td style={{ padding: '1rem', color: 'var(--text-secondary)' }}>{e.note || '-'}</td>
-                    <td style={{ padding: '1rem', fontWeight: 600, color: 'var(--danger)' }}>{formatMoney(e.amount)}</td>
+                    <td style={{ padding: '1rem', fontWeight: 600, color: 'var(--danger)' }}><CurrencyDisplay amount={e.amount} /></td>
                     <td style={{ padding: '1rem', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>{e.createdBy}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
+</div>
           </div>
         </div>
       </div>
@@ -130,7 +136,7 @@ const Finance = () => {
           <FormInput label="Sana" type="date" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} required />
         </div>
         
-        <FormInput label="Summa (UZS)" type="number" value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} required placeholder="Masalan: 500000" />
+        <FormInput label={`Summa (${curr})`} type="number" value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} required placeholder="Masalan: 500000" />
         <FormInput label="Izoh" value={formData.note} onChange={e => setFormData({...formData, note: e.target.value})} />
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1.5rem' }}>

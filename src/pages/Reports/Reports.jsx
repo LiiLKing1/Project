@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { BarChart3, Download, Calendar, DollarSign, ShoppingBag } from 'lucide-react';
+import { BarChart3, Download, Calendar, DollarSign, ShoppingBag, Trash2 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { db } from '../../firebase';
-import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, runTransaction, doc, getDocs, where } from 'firebase/firestore';
 import { useRoles } from '../../context/RolesContext';
+import { useToast } from '../../context/ToastContext';
 import Modal from '../../components/Modal';
 import Receipt from '../../components/Receipt';
-import { Eye } from 'lucide-react';
+import CurrencyDisplay from '../../components/CurrencyDisplay';
+import { Eye, Edit2 } from 'lucide-react';
 
 const Reports = () => {
   const [salesData, setSalesData] = useState([]);
@@ -14,7 +16,11 @@ const Reports = () => {
   const [loading, setLoading] = useState(false);
   const [selectedSale, setSelectedSale] = useState(null);
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const { userProfile } = useRoles();
+  const { addToast } = useToast();
   const storeId = userProfile?.storeOwnerId;
 
   useEffect(() => {
@@ -55,7 +61,7 @@ const Reports = () => {
       const saleDate = new Date(sale.createdAt).toDateString();
       const dayData = result.find(r => r.dateStr === saleDate);
       if (dayData) {
-        dayData.savdo += sale.total || 0;
+        dayData.savdo += sale.finalTotal || 0;
       }
     });
 
@@ -64,11 +70,114 @@ const Reports = () => {
 
   const chartData = getChartData();
 
-  const totalRevenue = salesData.reduce((acc, curr) => acc + curr.total, 0);
+  const totalRevenue = salesData.reduce((acc, curr) => acc + (curr.finalTotal || 0), 0);
   const totalProfit = salesData.reduce((acc, curr) => {
-    const cost = curr.items.reduce((c, item) => c + (item.costPrice * item.qty), 0);
-    return acc + (curr.total - cost);
+    const cost = curr.items?.reduce((c, item) => c + (item.costPrice * item.qty), 0) || 0;
+    return acc + ((curr.finalTotal || 0) - cost);
   }, 0);
+
+  const handleDeleteSale = async (saleToProcess = selectedSale) => {
+    if (!saleToProcess || !storeId) return false;
+    setIsDeleting(true);
+    try {
+      // 1. Fetch debts related to this sale BEFORE transaction
+      const debtAmount = saleToProcess.paymentBreakdown?.find(p => p.method === 'debt')?.amount || 0;
+      let debtDocsToDelete = [];
+      if (debtAmount > 0 && saleToProcess.customerId) {
+        const debtsQuery = query(collection(db, `users/${storeId}/customerDebts`), where('relatedSaleId', '==', saleToProcess.id));
+        const debtsSnap = await getDocs(debtsQuery);
+        debtDocsToDelete = debtsSnap.docs.map(d => d.ref);
+      }
+
+      await runTransaction(db, async (transaction) => {
+        // --- READS ---
+        let productRefs = [];
+        let productSnaps = [];
+        if (saleToProcess.items && saleToProcess.items.length > 0) {
+          productRefs = saleToProcess.items.map(item => ({ ref: doc(db, `users/${storeId}/products`, item.productId), qty: item.qty }));
+          productSnaps = await Promise.all(productRefs.map(p => transaction.get(p.ref)));
+        }
+
+        let custRef = null;
+        let custSnap = null;
+        if (saleToProcess.customerId) {
+          custRef = doc(db, `users/${storeId}/customers`, saleToProcess.customerId);
+          custSnap = await transaction.get(custRef);
+        }
+
+        // --- WRITES ---
+        for (let i = 0; i < productSnaps.length; i++) {
+          const snap = productSnaps[i];
+          const pData = productRefs[i];
+          if (snap.exists()) {
+            transaction.update(pData.ref, { stock: snap.data().stock + pData.qty });
+          }
+        }
+
+        if (custSnap && custSnap.exists()) {
+          const currentCust = custSnap.data();
+          const updates = {};
+          
+          if (currentCust.totalPurchases !== undefined) {
+            updates.totalPurchases = Math.max(0, currentCust.totalPurchases - saleToProcess.finalTotal);
+          }
+          if (currentCust.visits !== undefined) {
+            updates.visits = Math.max(0, currentCust.visits - 1);
+          }
+          if (debtAmount > 0 && currentCust.currentDebt !== undefined) {
+            updates.currentDebt = Math.max(0, currentCust.currentDebt - debtAmount);
+          }
+          
+          const bonusUsed = saleToProcess.paymentBreakdown?.find(p => p.method === 'bonus')?.amount || 0;
+          const bonusEarned = saleToProcess.bonusEarned || 0;
+          if (bonusUsed > 0 || bonusEarned > 0) {
+            updates.bonusBalance = (currentCust.bonusBalance || 0) + bonusUsed - bonusEarned;
+          }
+
+          if (Object.keys(updates).length > 0) {
+            transaction.update(custRef, updates);
+          }
+        }
+
+        debtDocsToDelete.forEach(ref => {
+          transaction.delete(ref);
+        });
+
+        transaction.delete(doc(db, `users/${storeId}/sales`, saleToProcess.id));
+      });
+
+      return true;
+    } catch (error) {
+      addToast(error.message, 'error');
+      return false;
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const confirmDelete = async () => {
+    const success = await handleDeleteSale(selectedSale);
+    if (success) {
+      addToast('Sotuv muvaffaqiyatli bekor qilindi', 'success');
+      setIsDeleteModalOpen(false);
+      setSelectedSale(null);
+    }
+  };
+
+  const handleEditSale = async () => {
+    if (!selectedSale) return;
+    const success = await handleDeleteSale(selectedSale);
+    if (success) {
+      // Save sale to localStorage and redirect to POS
+      localStorage.setItem('editSaleData', JSON.stringify(selectedSale));
+      setIsEditModalOpen(false);
+      setSelectedSale(null);
+      addToast('Tahrirlash uchun kassaga yo\'naltirilmoqda...', 'info');
+      setTimeout(() => {
+        window.location.href = '/sales';
+      }, 500);
+    }
+  };
 
   return (
     <div className="flex-col" style={{ gap: '1.5rem', height: '100%' }}>
@@ -88,14 +197,14 @@ const Reports = () => {
           <div style={{ padding: '1rem', borderRadius: 'var(--radius-lg)', backgroundColor: 'var(--primary-light)', color: 'var(--primary)' }}><DollarSign size={24} /></div>
           <div>
             <div className="subtitle">Jami tushum</div>
-            <div className="h2" style={{ marginTop: '0.25rem' }}>{formatMoney(totalRevenue)}</div>
+            <div className="h2" style={{ marginTop: '0.25rem' }}><CurrencyDisplay amount={totalRevenue} /></div>
           </div>
         </div>
         <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <div style={{ padding: '1rem', borderRadius: 'var(--radius-lg)', backgroundColor: 'var(--success-light)', color: 'var(--success)' }}><BarChart3 size={24} /></div>
           <div>
             <div className="subtitle">Sof foyda</div>
-            <div className="h2" style={{ marginTop: '0.25rem' }}>{formatMoney(totalProfit)}</div>
+            <div className="h2" style={{ marginTop: '0.25rem' }}><CurrencyDisplay amount={totalProfit} /></div>
           </div>
         </div>
         <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -125,7 +234,8 @@ const Reports = () => {
       <div className="glass-panel flex-col" style={{ flex: 1, padding: '1.5rem' }}>
         <h2 className="h2" style={{ marginBottom: '1.5rem' }}>Sotuvlar tarixi</h2>
         <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+          <div className="table-responsive">
+<table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
             <thead>
               <tr style={{ borderBottom: '2px solid var(--border-color)', color: 'var(--text-secondary)' }}>
                 <th style={{ padding: '1rem' }}>Sana</th>
@@ -162,24 +272,47 @@ const Reports = () => {
                       {sale.paymentType === 'cash' ? 'Naqd' : sale.paymentType === 'card' ? 'Karta' : sale.paymentType === 'debt' ? 'Nasiya' : 'Aralash'}
                     </span>
                   </td>
-                  <td style={{ padding: '1rem', fontWeight: 600, color: 'var(--primary)' }}>{formatMoney(sale.total)}</td>
+                  <td style={{ padding: '1rem', fontWeight: 600, color: 'var(--primary)' }}><CurrencyDisplay amount={sale.finalTotal} /></td>
                   <td style={{ padding: '1rem' }}>
-                    <button 
-                      className="btn btn-outline" 
-                      style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
-                      onClick={() => {
-                        const custName = sale.customerId ? (customers.find(c => c.id === sale.customerId)?.fullName) : 'Umumiy mijoz';
-                        setSelectedSale({ ...sale, customerName: custName });
-                        setIsReceiptModalOpen(true);
-                      }}
-                    >
-                      <Eye size={14} /> Ko'rish
-                    </button>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <button 
+                        className="btn btn-outline" 
+                        style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                        onClick={() => {
+                          const custName = sale.customerId ? (customers.find(c => c.id === sale.customerId)?.fullName) : 'Umumiy mijoz';
+                          setSelectedSale({ ...sale, customerName: custName });
+                          setIsReceiptModalOpen(true);
+                        }}
+                      >
+                        <Eye size={14} /> Ko'rish
+                      </button>
+                      <button 
+                        className="btn btn-ghost" 
+                        style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.25rem', color: 'var(--primary)' }}
+                        onClick={() => {
+                          setSelectedSale(sale);
+                          setIsEditModalOpen(true);
+                        }}
+                      >
+                        <Edit2 size={14} /> Tahrirlash
+                      </button>
+                      <button 
+                        className="btn btn-ghost" 
+                        style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.25rem', color: 'var(--danger)' }}
+                        onClick={() => {
+                          setSelectedSale(sale);
+                          setIsDeleteModalOpen(true);
+                        }}
+                      >
+                        <Trash2 size={14} /> Bekor qilish
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+</div>
         </div>
       </div>
 
@@ -190,6 +323,48 @@ const Reports = () => {
             <div style={{ display: 'flex', gap: '1rem', width: '100%', maxWidth: '350px' }}>
               <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => setIsReceiptModalOpen(false)}>Yopish</button>
               <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => window.print()}>Chop etish</button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      <Modal isOpen={isDeleteModalOpen} onClose={() => !isDeleting && setIsDeleteModalOpen(false)} title="Sotuvni bekor qilish">
+        {selectedSale && (
+          <div className="flex-col" style={{ gap: '1.5rem' }}>
+            <div style={{ padding: '1rem', backgroundColor: 'var(--danger-light)', color: 'var(--danger)', borderRadius: 'var(--radius-md)' }}>
+              <strong>Diqqat!</strong> Siz ushbu sotuvni (Chek: {selectedSale.saleNumber}) bekor qilmoqchisiz. 
+              Buning natijasida:
+              <ul style={{ marginLeft: '1.5rem', marginTop: '0.5rem' }}>
+                <li>Ushbu chekdagi barcha tovarlar ombor qoldig'iga qaytariladi.</li>
+                <li>Sotuv va foyda tarixidan o'chiriladi.</li>
+                <li>Agar nasiyaga berilgan bo'lsa, mijozning qarzidan shu summa olib tashlanadi.</li>
+              </ul>
+              Haqiqatan ham bekor qilasizmi?
+            </div>
+            
+            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+              <button className="btn btn-ghost" disabled={isDeleting} onClick={() => setIsDeleteModalOpen(false)}>Yopish</button>
+              <button className="btn btn-primary" style={{ backgroundColor: 'var(--danger)' }} disabled={isDeleting} onClick={confirmDelete}>
+                {isDeleting ? 'Bajarilmoqda...' : 'Tasdiqlash, bekor qilish'}
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      <Modal isOpen={isEditModalOpen} onClose={() => !isDeleting && setIsEditModalOpen(false)} title="Sotuvni tahrirlash">
+        {selectedSale && (
+          <div className="flex-col" style={{ gap: '1.5rem' }}>
+            <div style={{ padding: '1rem', backgroundColor: 'var(--warning-light)', color: 'var(--warning)', borderRadius: 'var(--radius-md)' }}>
+              <strong>E'tibor bering!</strong> Tahrirlash uchun ushbu sotuv (Chek: {selectedSale.saleNumber}) avval <strong>bekor qilinadi</strong> (tovarlar omborga qaytadi, tushumdan o'chadi) va kassa (Sotuv oynasi) bo'limiga yuboriladi. 
+              U yerda chek ma'lumotlarini tahrirlab, qaytadan "To'lash" tugmasini bosasiz.
+            </div>
+            
+            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+              <button className="btn btn-ghost" disabled={isDeleting} onClick={() => setIsEditModalOpen(false)}>Yopish</button>
+              <button className="btn btn-primary" disabled={isDeleting} onClick={handleEditSale}>
+                {isDeleting ? 'Bajarilmoqda...' : 'Tahrirlashga o\'tish'}
+              </button>
             </div>
           </div>
         )}

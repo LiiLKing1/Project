@@ -5,6 +5,7 @@ import { collection, onSnapshot, query, orderBy, doc } from 'firebase/firestore'
 import { saveDoc, editDoc } from '../../utils/firebaseUtils';
 import { useToast } from '../../context/ToastContext';
 import { useRoles } from '../../context/RolesContext';
+import { useSettings } from '../../context/SettingsContext';
 import Modal from '../../components/Modal';
 import FormInput from '../../components/FormInput';
 
@@ -13,7 +14,9 @@ const Marketing = () => {
   const [loading, setLoading] = useState(false);
   const { addToast } = useToast();
   const { userProfile } = useRoles();
+  const { settings } = useSettings();
   const storeId = userProfile?.storeOwnerId;
+  const curr = settings?.currency || 'UZS';
 
   const [isPromoModalOpen, setIsPromoModalOpen] = useState(false);
   const [formData, setFormData] = useState({ name: '', type: 'discount', targetProductIds: '', discountValue: '', discountType: 'percent', isActive: true });
@@ -80,7 +83,7 @@ const Marketing = () => {
               <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', backgroundColor: p.isActive ? 'var(--bg-surface)' : 'var(--bg-main)' }}>
                 <div>
                   <div style={{ fontWeight: 600, color: p.isActive ? 'var(--text-main)' : 'var(--text-secondary)' }}>{p.name}</div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{p.discountType === 'percent' ? p.discountValue + '%' : p.discountValue + ' UZS'} chegirma</div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{p.discountType === 'percent' ? p.discountValue + '%' : p.discountValue + ` ${curr}`} chegirma</div>
                 </div>
                 <div>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
@@ -140,7 +143,7 @@ const Marketing = () => {
             <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>Qiymat turi</label>
             <select value={formData.discountType} onChange={e => setFormData({...formData, discountType: e.target.value})} style={{ padding: '0.75rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-surface)' }}>
               <option value="percent">Foiz (%)</option>
-              <option value="amount">Summa (UZS)</option>
+              <option value="amount">Summa ({curr})</option>
             </select>
           </div>
         </div>

@@ -1,0 +1,133 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+  
+    // Funksiyalar: Foydalanuvchi do'kon egasi ekanligini yoki xodim ekanligini tekshirish
+    function isStoreOwner(storeId) {
+      return request.auth != null && request.auth.uid == storeId;
+    }
+    
+    function isEmployee(storeId) {
+      return request.auth != null && 
+             exists(/databases/$(database)/documents/users/$(storeId)/employees/$(request.auth.uid));
+    }
+
+    function getEmployeeRole(storeId) {
+      return get(/databases/$(database)/documents/users/$(storeId)/employees/$(request.auth.uid)).data.role;
+    }
+
+    // Har qanday kirish uchun asosiy tekshiruv
+    function hasAccess(storeId) {
+      return isStoreOwner(storeId) || isEmployee(storeId);
+    }
+
+    // Role tekshiruvlari
+    function isAdmin(storeId) {
+      return isStoreOwner(storeId) || (isEmployee(storeId) && getEmployeeRole(storeId) == 'admin');
+    }
+    
+    function isManager(storeId) {
+      return isEmployee(storeId) && getEmployeeRole(storeId) == 'manager';
+    }
+    
+    function isCashier(storeId) {
+      return isEmployee(storeId) && getEmployeeRole(storeId) == 'cashier';
+    }
+
+    // Barcha ma'lumotlar storeId ostida bo'ladi
+    match /users/{storeId} {
+      
+      // Store hujjati - faqat admin yoki manager
+      allow read: if hasAccess(storeId);
+      allow write: if isAdmin(storeId);
+
+      // Employees (Xodimlar) - kassir ko'ra olmaydi, admin qo'shadi, manager ko'rishi mumkin
+      match /employees/{employeeId} {
+        allow read: if isAdmin(storeId) || isManager(storeId) || request.auth.uid == employeeId;
+        allow write: if isAdmin(storeId);
+      }
+
+      // Products (Mahsulotlar) - barcha o'qiydi, admin/manager yozadi
+      match /products/{productId} {
+        allow read: if hasAccess(storeId);
+        // Kassirlar sotuv paytida qoldiqni o'zgartirishi kerak (update)
+        allow create: if isAdmin(storeId) || isManager(storeId);
+        allow delete: if isAdmin(storeId);
+        allow update: if hasAccess(storeId); 
+      }
+      
+      // Customers (Mijozlar) - kassir mijoz qo'sha oladi va sotuvda update qiladi
+      match /customers/{customerId} {
+        allow read, create, update: if hasAccess(storeId);
+        allow delete: if isAdmin(storeId);
+      }
+      
+      // Sales (Sotuvlar) - hamma ko'radi, hamma qo'shadi, o'chirish/taxrirlash faqat admin
+      match /sales/{saleId} {
+        allow read, create: if hasAccess(storeId);
+        allow update, delete: if isAdmin(storeId);
+      }
+      
+      // Audit Logs
+      match /auditLogs/{logId} {
+        allow read, create: if hasAccess(storeId);
+        allow update, delete: if false; // Jurnalni o'zgartirib bo'lmaydi
+      }
+
+      // Categories
+      match /categories/{categoryId} {
+        allow read, create, update: if hasAccess(storeId);
+        allow delete: if isAdmin(storeId);
+      }
+      
+      // Yangi modullar qoidalari
+      
+      // Customer Debts (Mijoz qarzlari)
+      match /customerDebts/{debtId} {
+        // Kassir qarz qo'sha oladi, yopa oladi (update), lekin qarzni o'chira (bekor qila) olmaydi
+        allow read, create: if hasAccess(storeId);
+        
+        // Update: Kassir statusni "paid" qila oladi, lekin "cancelled" qilolmasligi kerak
+        // Lekin buni qoidalarda qat'iy tekshirish murakkab bo'lsa, UI'dan to'silgani maqul
+        allow update: if hasAccess(storeId) && (
+          // Agar cashier bo'lsa, status="cancelled" qilishga ruxsat yo'q
+          !(isCashier(storeId) && request.resource.data.status == 'cancelled')
+        );
+        
+        allow delete: if isAdmin(storeId);
+        
+        // Payments subcollection
+        match /payments/{paymentId} {
+          allow read, create: if hasAccess(storeId);
+          allow update, delete: if isAdmin(storeId);
+        }
+      }
+      
+      // Suppliers (Yetkazib beruvchilar)
+      match /suppliers/{supplierId} {
+        allow read: if hasAccess(storeId);
+        // Kassir ham yangi yetkazib beruvchi qo'sha olishi mumkin (buyurtma berish uchun)
+        allow create: if hasAccess(storeId);
+        allow update: if isAdmin(storeId) || isManager(storeId);
+        allow delete: if isAdmin(storeId);
+      }
+      
+      // Purchase Orders (Buyurtmalar)
+      match /purchaseOrders/{orderId} {
+        allow read, create: if hasAccess(storeId);
+        // Qabul qilish (update) hamma uchun yopiq emas, lekin o'chirish faqat admin
+        allow update: if hasAccess(storeId);
+        allow delete: if isAdmin(storeId);
+      }
+      
+      // Settings (Sozlamalar, Loyalty va h.k.)
+      match /settings/{settingId} {
+        // Hamma o'qiy oladi (masalan, sotuvda bonus hisoblash uchun kerak)
+        allow read: if hasAccess(storeId);
+        // Faqat admin va manager tahrirlay oladi
+        allow write: if isAdmin(storeId) || isManager(storeId);
+      }
+    }
+  }
+}

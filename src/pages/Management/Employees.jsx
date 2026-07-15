@@ -4,7 +4,7 @@ import { db, firebaseConfig } from '../../firebase';
 import { collection, onSnapshot, query, orderBy, doc, setDoc } from 'firebase/firestore';
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, createUserWithEmailAndPassword, signOut } from 'firebase/auth';
-import { saveDoc, editDoc } from '../../utils/firebaseUtils';
+import { saveDoc, editDoc, logAudit, generateDiff } from '../../utils/firebaseUtils';
 import { useToast } from '../../context/ToastContext';
 import { useRoles, DEFAULT_ROLES } from '../../context/RolesContext';
 import Modal from '../../components/Modal';
@@ -19,7 +19,11 @@ const Employees = () => {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
-  const [formData, setFormData] = useState({ fullName: '', phone: '', role: 'kassir', loginUsername: '', password: '', isActive: true, permissions: DEFAULT_ROLES['kassir'].permissions });
+  const [formData, setFormData] = useState({ 
+    fullName: '', phone: '', role: 'kassir', loginUsername: '', password: '', isActive: true, 
+    permissions: DEFAULT_ROLES['kassir'].permissions,
+    salaryType: 'fixed', fixedSalary: '', percentageRate: ''
+  });
 
   useEffect(() => {
     if (!storeId) return;
@@ -79,14 +83,22 @@ const Employees = () => {
 
     try {
       if (editingId) {
-        await editDoc(doc(db, `users/${storeId}/staff`, editingId), {
+        const payload = {
           fullName: formData.fullName,
           phone: formData.phone,
           role: formData.role,
           loginEmail: fullEmail,
           isActive: formData.isActive,
-          permissions: formData.permissions
-        });
+          permissions: formData.permissions,
+          salaryType: formData.salaryType,
+          fixedSalary: Number(formData.fixedSalary || 0),
+          percentageRate: Number(formData.percentageRate || 0)
+        };
+        const originalEmp = staff.find(s => s.id === editingId);
+        const diffStr = generateDiff(originalEmp, payload);
+        const auditDetails = diffStr ? `${formData.fullName} (O'zgarishlar: ${diffStr})` : formData.fullName;
+
+        await editDoc(doc(db, `users/${storeId}/staff`, editingId), payload);
         
         // Agar xodim profili mavjud bo'lsa, uni ham yangilaymiz (custom permissions uchun)
         await setDoc(doc(db, `users/${editingId}/profile/info`), {
@@ -96,6 +108,7 @@ const Employees = () => {
           permissions: formData.permissions
         }, { merge: true });
 
+        await logAudit(storeId, userProfile, 'UPDATE', 'staff', auditDetails);
         addToast('Xodim yangilandi', 'success');
       } else {
         // Create auth user
@@ -109,7 +122,10 @@ const Employees = () => {
           role: formData.role,
           loginEmail: fullEmail,
           isActive: formData.isActive,
-          permissions: formData.permissions
+          permissions: formData.permissions,
+          salaryType: formData.salaryType,
+          fixedSalary: Number(formData.fixedSalary || 0),
+          percentageRate: Number(formData.percentageRate || 0)
         };
         await setDoc(doc(db, `users/${storeId}/staff`, newUid), { ...empData, createdAt: new Date().toISOString() });
         
@@ -123,6 +139,7 @@ const Employees = () => {
           createdAt: new Date().toISOString()
         });
         
+        await logAudit(storeId, userProfile, 'CREATE', 'staff', formData.fullName);
         addToast('Xodim muvaffaqiyatli qo\'shildi va akkaunt yaratildi', 'success');
       }
       setIsModalOpen(false);
@@ -139,11 +156,18 @@ const Employees = () => {
       setFormData({ 
         fullName: emp.fullName, phone: emp.phone, role: emp.role, loginUsername: username, 
         password: '', isActive: emp.isActive,
-        permissions: emp.permissions || DEFAULT_ROLES[emp.role]?.permissions || {}
+        permissions: emp.permissions || DEFAULT_ROLES[emp.role]?.permissions || {},
+        salaryType: emp.salaryType || 'fixed',
+        fixedSalary: emp.fixedSalary || '',
+        percentageRate: emp.percentageRate || ''
       });
     } else {
       setEditingId(null);
-      setFormData({ fullName: '', phone: '+998', role: 'kassir', loginUsername: '', password: '', isActive: true, permissions: DEFAULT_ROLES['kassir'].permissions });
+      setFormData({ 
+        fullName: '', phone: '+998', role: 'kassir', loginUsername: '', password: '', isActive: true, 
+        permissions: DEFAULT_ROLES['kassir'].permissions,
+        salaryType: 'fixed', fixedSalary: '', percentageRate: ''
+      });
     }
     setIsModalOpen(true);
   };
@@ -171,6 +195,7 @@ const Employees = () => {
     if (!storeId) return;
     try {
       await editDoc(doc(db, `users/${storeId}/staff`, emp.id), { isActive: !emp.isActive });
+      await logAudit(storeId, userProfile, 'UPDATE', 'staff', `${emp.fullName} holati ${!emp.isActive ? 'Aktiv' : 'Nofaol'} qilindi`);
     } catch (error) {
       addToast(error.message, 'error');
     }
@@ -185,7 +210,8 @@ const Employees = () => {
 
       <div className="glass-panel" style={{ padding: '1.5rem', flex: 1, overflowY: 'auto' }}>
         <div style={{ flex: 1, overflowY: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+          <div className="table-responsive">
+<table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
             <thead>
               <tr style={{ borderBottom: '2px solid var(--border-color)', color: 'var(--text-secondary)' }}>
                 <th style={{ padding: '1rem' }}>F.I.O</th>
@@ -222,6 +248,7 @@ const Employees = () => {
               ))}
             </tbody>
           </table>
+</div>
         </div>
       </div>
 
@@ -235,6 +262,28 @@ const Employees = () => {
             <option value="admin">Admin (To'liq ruxsat)</option>
             <option value="kassir">Kassir (Faqat kassa va mijozlar)</option>
           </select>
+        </div>
+
+        <div style={{ padding: '1rem', backgroundColor: 'var(--bg-main)', borderRadius: 'var(--radius-md)', marginBottom: '1rem', border: '1px solid var(--border-color)' }}>
+          <h3 style={{ fontSize: '0.875rem', fontWeight: 600, marginBottom: '0.75rem', color: 'var(--text-secondary)' }}>Ish haqi (KPI)</h3>
+          
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1rem' }}>
+            <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>Oylik turi</label>
+            <select value={formData.salaryType} onChange={e => setFormData({...formData, salaryType: e.target.value})} style={{ padding: '0.75rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-surface)' }}>
+              <option value="fixed">Belgilangan oylik (Fixed)</option>
+              <option value="percentage">Sotuvdan foiz (Percentage)</option>
+              <option value="mixed">Aralash (Belgilangan + Foiz)</option>
+            </select>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            {(formData.salaryType === 'fixed' || formData.salaryType === 'mixed') && (
+              <FormInput label="Belgilangan oylik summasi" type="number" value={formData.fixedSalary} onChange={e => setFormData({...formData, fixedSalary: e.target.value})} placeholder="Masalan: 3000000" />
+            )}
+            {(formData.salaryType === 'percentage' || formData.salaryType === 'mixed') && (
+              <FormInput label="Sotuvdan foiz (%)" type="number" value={formData.percentageRate} onChange={e => setFormData({...formData, percentageRate: e.target.value})} placeholder="Masalan: 3" />
+            )}
+          </div>
         </div>
 
         <div style={{ padding: '1rem', backgroundColor: 'var(--bg-main)', borderRadius: 'var(--radius-md)', marginBottom: '1rem', border: '1px solid var(--border-color)' }}>

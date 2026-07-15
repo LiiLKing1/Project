@@ -1,47 +1,92 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, Minus, Trash2, CreditCard, Banknote, User, FileText, ChevronDown } from 'lucide-react';
+import { Search, Plus, Minus, Trash2, CreditCard, Banknote, User, FileText, ChevronDown, Percent, Calendar } from 'lucide-react';
 import { db } from '../../firebase';
-import { collection, onSnapshot, query, where, runTransaction, doc, addDoc, orderBy } from 'firebase/firestore';
+import { collection, onSnapshot, query, where, runTransaction, doc, orderBy, getDoc } from 'firebase/firestore';
 import { useToast } from '../../context/ToastContext';
 import { useRoles } from '../../context/RolesContext';
+import { useSettings } from '../../context/SettingsContext';
+import { useWarehouse } from '../../context/WarehouseContext';
 import Modal from '../../components/Modal';
+import Drawer from '../../components/Drawer';
 import FormInput from '../../components/FormInput';
 import Receipt from '../../components/Receipt';
+import CurrencyDisplay from '../../components/CurrencyDisplay';
 
 const POS = () => {
-  const [products, setProducts] = useState([]);
+  const [allProducts, setAllProducts] = useState([]);
   const [customers, setCustomers] = useState([]);
+  const [loyaltySettings, setLoyaltySettings] = useState({ bonusPercent: 0, minPurchaseForBonus: 0, vipMultiplier: 1 });
   const [cart, setCart] = useState([]);
   const [search, setSearch] = useState('');
+  
+  // Customer selection
   const [customerSearch, setCustomerSearch] = useState('');
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   
   const { addToast } = useToast();
   const { userProfile } = useRoles();
+  const { settings } = useSettings();
+  const { selectedWarehouseId } = useWarehouse();
+  const storeId = userProfile?.storeOwnerId;
+  const curr = settings?.currency || 'UZS';
+  
+  const products = React.useMemo(() => {
+    return allProducts.map(p => {
+      let currentStock = 0;
+      if (p.stockByWarehouse && p.stockByWarehouse[selectedWarehouseId] !== undefined) {
+        currentStock = p.stockByWarehouse[selectedWarehouseId] || 0;
+      } else if (p.stock !== undefined) {
+        currentStock = p.stock; // fallback to old stock structure
+      }
+      return {
+        ...p,
+        stock: currentStock
+      };
+    });
+  }, [allProducts, selectedWarehouseId]);
 
-  // Payment Modal
-  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  // Payment Drawer State
+  const [isPaymentDrawerOpen, setIsPaymentDrawerOpen] = useState(false);
   const [paymentType, setPaymentType] = useState('cash'); // cash, card, mixed, debt
+  
+  // Discount state
+  const [discountType, setDiscountType] = useState('amount'); // percent, amount
+  const [discountValue, setDiscountValue] = useState('');
+  
+  // Mixed payment amounts
+  const [mixedCash, setMixedCash] = useState('');
+  const [mixedCard, setMixedCard] = useState('');
+  const [mixedDebt, setMixedDebt] = useState('');
+  
+  // Single payment cash (for calculating change)
   const [cashAmount, setCashAmount] = useState('');
-  const [cardAmount, setCardAmount] = useState('');
+  
+  const [dueDate, setDueDate] = useState('');
+  const [useBonus, setUseBonus] = useState(false);
+  
   const [isProcessing, setIsProcessing] = useState(false);
 
   // Receipt Modal
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
   const [lastSale, setLastSale] = useState(null);
 
-  const storeId = userProfile?.storeOwnerId;
-
   useEffect(() => {
     if (!storeId) return;
 
     const unsubProducts = onSnapshot(query(collection(db, `users/${storeId}/products`), where('status', '==', 'active')), (snapshot) => {
-      setProducts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setAllProducts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
 
     const unsubCustomers = onSnapshot(query(collection(db, `users/${storeId}/customers`), orderBy('createdAt', 'desc')), (snapshot) => {
       setCustomers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+    
+    // Fetch Loyalty Settings
+    getDoc(doc(db, `users/${storeId}/settings/loyalty`)).then(snap => {
+      if (snap.exists()) {
+        setLoyaltySettings(snap.data());
+      }
     });
 
     return () => {
@@ -49,6 +94,40 @@ const POS = () => {
       unsubCustomers();
     };
   }, [storeId]);
+
+  // Handle Edit Sale Data
+  useEffect(() => {
+    const editDataStr = localStorage.getItem('editSaleData');
+    if (editDataStr && products.length > 0) {
+      try {
+        const editData = JSON.parse(editDataStr);
+        
+        // Map items to cart with stock info
+        const newCart = editData.items.map(item => {
+           const p = products.find(p => p.id === item.productId);
+           return { ...item, id: item.productId, sellPrice: item.price, stock: p ? p.stock : 1000 };
+        });
+        setCart(newCart);
+        
+        // Set Customer
+        if (editData.customerId && customers.length > 0) {
+           const cust = customers.find(c => c.id === editData.customerId);
+           if (cust) setSelectedCustomer(cust);
+        }
+        
+        // Set Discount
+        if (editData.discount && editData.discount.value > 0) {
+           setDiscountType(editData.discount.type);
+           setDiscountValue(editData.discount.value);
+        }
+
+        localStorage.removeItem('editSaleData');
+        addToast("Sotuv ma'lumotlari tahrirlash uchun yuklandi", "info");
+      } catch(e) {
+        console.error(e);
+      }
+    }
+  }, [products, customers, addToast]);
 
   const addToCart = (product) => {
     if (product.stock <= 0) {
@@ -79,8 +158,34 @@ const POS = () => {
   };
 
   const removeFromCart = (id) => setCart(prev => prev.filter(p => p.id !== id));
-  const total = cart.reduce((acc, item) => acc + (item.sellPrice * item.qty), 0);
-  const formatMoney = (v) => new Intl.NumberFormat('uz-UZ').format(v || 0) + ' UZS';
+  
+  // Totals calculations
+  const subtotal = cart.reduce((acc, item) => acc + (item.sellPrice * item.qty), 0);
+  
+  let discountAmount = 0;
+  if (discountValue) {
+    if (discountType === 'percent') {
+      discountAmount = subtotal * (Number(discountValue) / 100);
+    } else {
+      discountAmount = Number(discountValue);
+    }
+  }
+  
+  let finalTotal = Math.max(0, subtotal - discountAmount);
+  
+  // Apply bonus if checked
+  let usedBonusAmount = 0;
+  if (useBonus && selectedCustomer && selectedCustomer.bonusBalance > 0) {
+    usedBonusAmount = Math.min(finalTotal, selectedCustomer.bonusBalance);
+    finalTotal -= usedBonusAmount;
+  }
+  
+  // Check if mixed payment matches
+  const mCash = Number(mixedCash) || 0;
+  const mCard = Number(mixedCard) || 0;
+  const mDebt = Number(mixedDebt) || 0;
+  const mixedTotal = mCash + mCard + mDebt;
+  const mixedDiff = finalTotal - mixedTotal;
 
   const filteredProducts = products.filter(p => 
     p.name.toLowerCase().includes(search.toLowerCase()) || p.barcode.includes(search)
@@ -93,21 +198,26 @@ const POS = () => {
   ).slice(0, 5) : [];
 
   const handleCheckout = async () => {
-    if (paymentType === 'debt' && !selectedCustomer) {
-      addToast('Nasiyaga sotish uchun mijoz tanlanishi shart', 'error');
-      return;
+    const isDebtInvolved = paymentType === 'debt' || (paymentType === 'mixed' && mDebt > 0);
+    
+    if (isDebtInvolved) {
+      if (!selectedCustomer) {
+        addToast('Nasiyaga sotish uchun mijoz tanlanishi shart', 'error');
+        return;
+      }
+      if (!dueDate) {
+        addToast('Qaytarish muddati kiritilishi shart', 'error');
+        return;
+      }
     }
-
-    const cash = Number(cashAmount) || 0;
-    const card = Number(cardAmount) || 0;
 
     if (cart.some(item => !item.qty || item.qty < 1)) {
       addToast('Barcha mahsulotlar soni kamida 1 bo\'lishi kerak', 'error');
       return;
     }
 
-    if (paymentType === 'mixed' && (cash + card) < total) {
-      addToast('To\'lov summasi yetarli emas', 'error');
+    if (paymentType === 'mixed' && mixedDiff !== 0) {
+      addToast('Aralash to\'lovda kiritilgan summalar yig\'indisi yakuniy summaga teng emas', 'error');
       return;
     }
 
@@ -129,8 +239,9 @@ const POS = () => {
         for (let i = 0; i < productSnaps.length; i++) {
           const snap = productSnaps[i];
           const item = productRefs[i];
-          if (!snap.exists() || snap.data().stock < item.qty) {
-            throw new Error(`Xatolik: ${item.name} qoldig'i yetarli emas.`);
+          const currentStock = snap.data().stockByWarehouse?.[selectedWarehouseId] || 0;
+          if (!snap.exists() || currentStock < item.qty) {
+            throw new Error(`Xatolik: ${item.name} qoldig'i (Filialda) yetarli emas.`);
           }
         }
 
@@ -138,7 +249,49 @@ const POS = () => {
         for (let i = 0; i < productSnaps.length; i++) {
           const snap = productSnaps[i];
           const item = productRefs[i];
-          transaction.update(item.ref, { stock: snap.data().stock - item.qty });
+          const currentStock = snap.data().stockByWarehouse?.[selectedWarehouseId] || 0;
+          transaction.update(item.ref, { [`stockByWarehouse.${selectedWarehouseId}`]: currentStock - item.qty });
+        }
+
+        // Calculate actual cash and card received
+        let finalCashReceived = 0;
+        let finalCardReceived = 0;
+        let finalDebtAmount = 0;
+        
+        let paymentBreakdown = [];
+        
+        if (paymentType === 'cash') {
+          finalCashReceived = finalTotal;
+          paymentBreakdown.push({ method: 'cash', amount: finalTotal });
+        } else if (paymentType === 'card') {
+          finalCardReceived = finalTotal;
+          paymentBreakdown.push({ method: 'card', amount: finalTotal });
+        } else if (paymentType === 'debt') {
+          finalDebtAmount = finalTotal;
+          paymentBreakdown.push({ method: 'debt', amount: finalTotal });
+        } else if (paymentType === 'mixed') {
+          finalCashReceived = mCash;
+          finalCardReceived = mCard;
+          finalDebtAmount = mDebt;
+          if (mCash > 0) paymentBreakdown.push({ method: 'cash', amount: mCash });
+          if (mCard > 0) paymentBreakdown.push({ method: 'card', amount: mCard });
+          if (mDebt > 0) paymentBreakdown.push({ method: 'debt', amount: mDebt });
+        }
+        
+        if (usedBonusAmount > 0) {
+          paymentBreakdown.push({ method: 'bonus', amount: usedBonusAmount });
+        }
+
+        // Loyalty calculation
+        let bonusEarned = 0;
+        if (selectedCustomer && custSnap.exists() && loyaltySettings.bonusPercent > 0) {
+          // Bonus is calculated on the amount actually paid by customer (excluding used bonus and maybe debt)
+          // Based on requirements: "Har bir yakunlangan sotuvda: bonusEarned = finalTotal * (bonusPercent/100) * vipMultiplier"
+          // Let's use finalTotal (which is after discount and after bonus deduction)
+          if (finalTotal >= (loyaltySettings.minPurchaseForBonus || 0)) {
+            const multiplier = custSnap.data().isVip ? (loyaltySettings.vipMultiplier || 1) : 1;
+            bonusEarned = finalTotal * (loyaltySettings.bonusPercent / 100) * multiplier;
+          }
         }
 
         // 3. Create Sale Document
@@ -146,10 +299,14 @@ const POS = () => {
         const saleData = {
           saleNumber: 'CH-' + Date.now().toString().slice(-6),
           items: cart.map(i => ({ productId: i.id, name: i.name, qty: i.qty, price: i.sellPrice, costPrice: i.costPrice })),
-          total: total,
+          subtotal: subtotal,
+          discount: { type: discountType, value: discountAmount },
+          finalTotal: finalTotal,
           paymentType: paymentType,
-          cashReceived: paymentType === 'cash' ? cash || total : cash,
-          cardAmount: paymentType === 'card' ? total : card,
+          paymentBreakdown: paymentBreakdown,
+          cashReceived: finalCashReceived,
+          cardAmount: finalCardReceived,
+          bonusEarned: bonusEarned,
           customerId: selectedCustomer?.id || null,
           cashierId: userProfile?.name || 'Kassir',
           status: 'completed',
@@ -158,24 +315,60 @@ const POS = () => {
         transaction.set(saleRef, saleData);
         finalSaleData = { id: saleRef.id, ...saleData };
 
-        // 4. Update Customer if necessary
+        // 4. Create Debt Document if needed
+        if (finalDebtAmount > 0 && selectedCustomer) {
+          const debtRef = doc(collection(db, `users/${storeId}/customerDebts`));
+          transaction.set(debtRef, { 
+            customerId: selectedCustomer.id, 
+            relatedSaleId: saleRef.id,
+            amount: finalDebtAmount, 
+            remainingAmount: finalDebtAmount,
+            dueDate: dueDate,
+            note: 'Nasiya savdo ' + saleData.saleNumber,
+            status: 'active',
+            createdAt: new Date().toISOString(),
+            createdBy: userProfile?.name || 'Kassir'
+          });
+        }
+
+        // 5. Update Customer
         if (selectedCustomer && custSnap.exists()) {
-          const updates = { totalPurchases: (custSnap.data().totalPurchases || 0) + total, visits: (custSnap.data().visits || 0) + 1 };
-          if (paymentType === 'debt') {
-            updates.currentDebt = (custSnap.data().currentDebt || 0) + total;
-            const debtRef = doc(collection(db, `users/${storeId}/customerDebts`));
-            transaction.set(debtRef, { customerId: selectedCustomer.id, type: 'debt', amount: total, date: new Date().toISOString() });
+          const currentCust = custSnap.data();
+          const updates = { 
+            totalPurchases: (currentCust.totalPurchases || 0) + finalTotal, 
+            visits: (currentCust.visits || 0) + 1 
+          };
+          
+          if (finalDebtAmount > 0) {
+            updates.currentDebt = (currentCust.currentDebt || 0) + finalDebtAmount;
           }
+          
+          if (usedBonusAmount > 0) {
+            updates.bonusBalance = (currentCust.bonusBalance || 0) - usedBonusAmount;
+          }
+          if (bonusEarned > 0) {
+            updates.bonusBalance = (updates.bonusBalance !== undefined ? updates.bonusBalance : (currentCust.bonusBalance || 0)) + bonusEarned;
+          }
+          
           transaction.update(custRef, updates);
         }
       });
 
       addToast('Sotuv muvaffaqiyatli amalga oshirildi', 'success');
       setLastSale({ ...finalSaleData, customerName: selectedCustomer?.fullName });
+      
+      // Reset POS state
       setCart([]);
       setSelectedCustomer(null);
       setCustomerSearch('');
-      setIsPaymentModalOpen(false);
+      setIsPaymentDrawerOpen(false);
+      setDiscountValue('');
+      setUseBonus(false);
+      setMixedCash('');
+      setMixedCard('');
+      setMixedDebt('');
+      setCashAmount('');
+      
       setIsReceiptModalOpen(true);
     } catch (error) {
       addToast(error.message, 'error');
@@ -184,20 +377,24 @@ const POS = () => {
     }
   };
 
-  const openPaymentModal = (type) => {
-    setPaymentType(type);
-    setCashAmount('');
-    setCardAmount('');
-    setIsPaymentModalOpen(true);
+  const openPaymentDrawer = () => {
+    setIsPaymentDrawerOpen(true);
+    
+    // Set default due date to +30 days
+    const d = new Date();
+    d.setDate(d.getDate() + 30);
+    setDueDate(d.toISOString().split('T')[0]);
   };
+  
+  const canDiscount = userProfile?.role === 'admin' || userProfile?.role === 'manager';
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: '2rem', height: '100%' }}>
+    <div className="pos-layout">
       {/* Products Section */}
       <div className="flex-col" style={{ gap: '1.5rem', overflow: 'hidden' }}>
         <div className="flex-between">
           <h1 className="h1">Sotuv Oynasi</h1>
-          <div style={{ position: 'relative', width: '350px' }}>
+          <div style={{ position: 'relative', width: '100%', maxWidth: '350px' }}>
             <Search size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
             <input 
               type="text" 
@@ -214,10 +411,12 @@ const POS = () => {
           {filteredProducts.map(p => (
             <div key={p.id} className="glass-panel" onClick={() => addToCart(p)} style={{ padding: '1rem', cursor: p.stock > 0 ? 'pointer' : 'not-allowed', opacity: p.stock > 0 ? 1 : 0.5, transition: 'transform 0.1s' }} onMouseDown={e => p.stock > 0 && (e.currentTarget.style.transform = 'scale(0.98)')} onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'}>
               <div style={{ fontWeight: '600', marginBottom: '0.5rem', fontSize: '1rem' }}>{p.name}</div>
-              <div style={{ color: 'var(--primary)', fontWeight: '700', fontSize: '1.125rem' }}>{formatMoney(p.sellPrice)}</div>
+              <div style={{ color: 'var(--primary)', fontWeight: '700', fontSize: '1.125rem' }}><CurrencyDisplay amount={p.sellPrice} /></div>
               <div className="flex-between" style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
                 <span>{p.barcode}</span>
-                <span style={{ fontWeight: 600, color: p.stock <= p.minStock ? 'var(--danger)' : 'var(--success)' }}>Qoldiq: {p.stock}</span>
+                <span style={{ fontWeight: 600, color: p.stock <= p.minStock ? 'var(--danger)' : 'var(--success)' }}>
+                  Qoldiq: {p.stock}
+                </span>
               </div>
             </div>
           ))}
@@ -234,6 +433,11 @@ const POS = () => {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem 1rem', backgroundColor: 'var(--primary-light)', borderRadius: 'var(--radius-md)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--primary)', fontWeight: 600 }}>
                   <User size={18} /> {selectedCustomer.fullName}
+                  {selectedCustomer.bonusBalance > 0 && (
+                    <span style={{ marginLeft: '0.5rem', fontSize: '0.75rem', padding: '0.2rem 0.5rem', backgroundColor: '#fbbf24', color: '#000', borderRadius: '1rem' }}>
+                      Bonus: <CurrencyDisplay amount={selectedCustomer.bonusBalance} />
+                    </span>
+                  )}
                 </div>
                 <button onClick={() => setSelectedCustomer(null)} style={{ color: 'var(--danger)' }}>✕</button>
               </div>
@@ -283,7 +487,7 @@ const POS = () => {
                 <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '1rem', borderBottom: '1px solid var(--border-color)' }}>
                   <div>
                     <div style={{ fontWeight: '500' }}>{item.name}</div>
-                    <div style={{ color: 'var(--primary)', fontWeight: '600', fontSize: '0.875rem' }}>{formatMoney(item.sellPrice * item.qty)}</div>
+                    <div style={{ color: 'var(--primary)', fontWeight: '600', fontSize: '0.875rem' }}><CurrencyDisplay amount={item.sellPrice * item.qty} /></div>
                   </div>
                   <div className="flex-center" style={{ gap: '0.5rem' }}>
                     <button className="btn btn-outline" style={{ padding: '0.25rem' }} onClick={() => updateQty(item.id, -1, item.stock)}><Minus size={16} /></button>
@@ -319,69 +523,143 @@ const POS = () => {
         <div style={{ padding: '1.5rem', borderTop: '1px solid var(--border-color)', backgroundColor: 'var(--bg-main)' }}>
           <div className="flex-between" style={{ marginBottom: '1.5rem' }}>
             <span style={{ fontSize: '1.25rem', color: 'var(--text-secondary)', fontWeight: 500 }}>Jami summa:</span>
-            <span className="h1" style={{ color: 'var(--primary)', fontSize: '2rem' }}>{formatMoney(total)}</span>
+            <span className="h1" style={{ color: 'var(--primary)', fontSize: '2rem' }}><CurrencyDisplay amount={subtotal} /></span>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
-            <button className="btn btn-success" disabled={cart.length === 0} onClick={() => openPaymentModal('cash')} style={{ padding: '1rem', fontSize: '1rem' }}>
-              <Banknote size={20} /> Naqd
-            </button>
-            <button className="btn btn-primary" disabled={cart.length === 0} onClick={() => openPaymentModal('card')} style={{ padding: '1rem', fontSize: '1rem' }}>
-              <CreditCard size={20} /> Karta
-            </button>
-          </div>
-          <button className="btn btn-outline" disabled={cart.length === 0} onClick={() => openPaymentModal('mixed')} style={{ width: '100%', padding: '1rem', fontSize: '1rem' }}>
-             Aralash to'lov / Nasiya
+          <button className="btn btn-primary" disabled={cart.length === 0} onClick={openPaymentDrawer} style={{ width: '100%', padding: '1rem', fontSize: '1.125rem' }}>
+             To'lash
           </button>
         </div>
       </div>
 
-      <Modal isOpen={isPaymentModalOpen} onClose={() => !isProcessing && setIsPaymentModalOpen(false)} title="To'lovni qabul qilish">
+      <Drawer position="right" isOpen={isPaymentDrawerOpen} onClose={() => !isProcessing && setIsPaymentDrawerOpen(false)} title="To'lovni qabul qilish">
         <div className="flex-col" style={{ gap: '1.5rem' }}>
-          <div style={{ padding: '1.5rem', backgroundColor: 'var(--primary-light)', borderRadius: 'var(--radius-lg)', textAlign: 'center' }}>
-            <div style={{ color: 'var(--primary)', fontWeight: 600, fontSize: '1.25rem', marginBottom: '0.5rem' }}>To'lanishi kerak</div>
-            <div className="h1" style={{ color: 'var(--primary)' }}>{formatMoney(total)}</div>
+          
+          {/* Summary */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
+            <span>Jami {cart.reduce((a,c)=>a+c.qty, 0)} dona mahsulot</span>
+            <span>Oraliq summa: <CurrencyDisplay amount={subtotal} /></span>
           </div>
 
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            {['cash', 'card', 'mixed', 'debt'].map(type => (
-              <button key={type} onClick={() => setPaymentType(type)} className="btn" style={{ flex: 1, backgroundColor: paymentType === type ? 'var(--primary)' : 'var(--bg-main)', color: paymentType === type ? 'white' : 'var(--text-secondary)' }}>
-                {type === 'cash' ? 'Naqd' : type === 'card' ? 'Karta' : type === 'mixed' ? 'Aralash' : 'Nasiya'}
+          {/* Discount Block */}
+          <div style={{ padding: '1rem', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+              <span style={{ fontWeight: 600 }}>Chegirma</span>
+              {!canDiscount && <span style={{ fontSize: '0.75rem', color: 'var(--warning)' }}>(Faqat admin ruxsati bilan)</span>}
+            </div>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', backgroundColor: 'var(--bg-main)', borderRadius: 'var(--radius-md)', padding: '2px', border: '1px solid var(--border-color)' }}>
+                <button 
+                  disabled={!canDiscount}
+                  onClick={() => setDiscountType('percent')}
+                  style={{ padding: '0.25rem 0.75rem', borderRadius: '4px', backgroundColor: discountType === 'percent' ? 'var(--primary)' : 'transparent', color: discountType === 'percent' ? 'white' : 'inherit' }}
+                >%</button>
+                <button 
+                  disabled={!canDiscount}
+                  onClick={() => setDiscountType('amount')}
+                  style={{ padding: '0.25rem 0.75rem', borderRadius: '4px', backgroundColor: discountType === 'amount' ? 'var(--primary)' : 'transparent', color: discountType === 'amount' ? 'white' : 'inherit' }}
+                >{curr}</button>
+              </div>
+              <input 
+                type="number" 
+                disabled={!canDiscount}
+                value={discountValue}
+                onChange={e => setDiscountValue(e.target.value)}
+                placeholder="Qiymat kiritish"
+                style={{ flex: 1, padding: '0.5rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}
+              />
+            </div>
+          </div>
+
+          {/* Final Total */}
+          <div style={{ padding: '1.5rem', backgroundColor: 'var(--primary-light)', borderRadius: 'var(--radius-lg)', textAlign: 'center' }}>
+            <div style={{ color: 'var(--primary)', fontWeight: 600, fontSize: '1.25rem', marginBottom: '0.5rem' }}>Yakuniy summa</div>
+            <div className="h1" style={{ color: 'var(--primary)' }}><CurrencyDisplay amount={finalTotal} /></div>
+          </div>
+
+          {/* Bonus Option */}
+          {selectedCustomer && selectedCustomer.bonusBalance > 0 && (
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '1rem', backgroundColor: '#fef3c7', borderRadius: 'var(--radius-md)', cursor: 'pointer' }}>
+              <input type="checkbox" checked={useBonus} onChange={e => setUseBonus(e.target.checked)} style={{ transform: 'scale(1.2)' }} />
+              <span style={{ fontWeight: 600, color: '#92400e' }}>
+                Bonusdan ishlatish (Mavjud: <CurrencyDisplay amount={selectedCustomer.bonusBalance} />)
+              </span>
+            </label>
+          )}
+
+          {/* Payment Methods Tabs */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+            {[
+              { id: 'cash', label: 'Naqd', icon: <Banknote size={16}/> },
+              { id: 'card', label: 'Karta', icon: <CreditCard size={16}/> },
+              { id: 'mixed', label: 'Aralash', icon: <FileText size={16}/> },
+              { id: 'debt', label: 'To\'liq Nasiya', icon: <Calendar size={16}/> }
+            ].map(type => (
+              <button 
+                key={type.id} 
+                onClick={() => setPaymentType(type.id)} 
+                className="btn" 
+                style={{ 
+                  flex: 1, 
+                  backgroundColor: paymentType === type.id ? 'var(--primary)' : 'var(--bg-main)', 
+                  color: paymentType === type.id ? 'white' : 'var(--text-secondary)',
+                  display: 'flex', gap: '0.5rem'
+                }}
+              >
+                {type.icon} {type.label}
               </button>
             ))}
           </div>
 
+          {/* Inputs based on type */}
           {paymentType === 'cash' && (
-            <FormInput label="Qabul qilingan summa (UZS)" type="number" value={cashAmount} onChange={e => setCashAmount(e.target.value)} placeholder={total} />
+            <FormInput label={`Qabul qilingan summa (${curr})`} type="number" value={cashAmount} onChange={e => setCashAmount(e.target.value)} placeholder={finalTotal} />
           )}
           
           {paymentType === 'mixed' && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-              <FormInput label="Naqd (UZS)" type="number" value={cashAmount} onChange={e => setCashAmount(e.target.value)} placeholder="0" />
-              <FormInput label="Karta (UZS)" type="number" value={cardAmount} onChange={e => setCardAmount(e.target.value)} placeholder="0" />
+            <div style={{ padding: '1rem', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <FormInput label={`Naqd (${curr})`} type="number" value={mixedCash} onChange={e => setMixedCash(e.target.value)} placeholder="0" />
+              <FormInput label={`Karta (${curr})`} type="number" value={mixedCard} onChange={e => setMixedCard(e.target.value)} placeholder="0" />
+              <FormInput label={`Nasiya (${curr})`} type="number" value={mixedDebt} onChange={e => setMixedDebt(e.target.value)} placeholder="0" />
+              
+              {mixedDiff !== 0 && (
+                <div style={{ color: mixedDiff > 0 ? 'var(--danger)' : 'var(--success)', fontWeight: 600, fontSize: '0.875rem' }}>
+                  {mixedDiff > 0 ? <>Yetishmayapti: <CurrencyDisplay amount={mixedDiff} /></> : <>Ortiqcha: <CurrencyDisplay amount={Math.abs(mixedDiff)} /></>}
+                </div>
+              )}
             </div>
           )}
 
-          {paymentType === 'debt' && !selectedCustomer && (
-            <div style={{ color: 'var(--danger)', fontSize: '0.875rem', fontWeight: 500, padding: '1rem', backgroundColor: 'var(--danger-light)', borderRadius: 'var(--radius-md)' }}>
-              Nasiyaga sotish uchun kassa oynasidan mijozni tanlashingiz shart!
-            </div>
+          {/* Debt requirement logic */}
+          {(paymentType === 'debt' || (paymentType === 'mixed' && mDebt > 0)) && (
+            <>
+              {!selectedCustomer && (
+                <div style={{ color: 'var(--danger)', fontSize: '0.875rem', fontWeight: 500, padding: '1rem', backgroundColor: 'var(--danger-light)', borderRadius: 'var(--radius-md)' }}>
+                  Nasiyaga sotish uchun kassa oynasidan mijozni tanlashingiz shart!
+                </div>
+              )}
+              <FormInput label="Qaytarish muddati *" type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} required />
+            </>
           )}
 
-          {paymentType === 'cash' && Number(cashAmount) > total && (
+          {paymentType === 'cash' && Number(cashAmount) > finalTotal && (
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '1rem', border: '1px dashed var(--success)', borderRadius: 'var(--radius-md)' }}>
               <span style={{ fontWeight: 600 }}>Qaytim:</span>
-              <span style={{ fontWeight: 700, color: 'var(--success)' }}>{formatMoney(Number(cashAmount) - total)}</span>
+              <span style={{ fontWeight: 700, color: 'var(--success)' }}><CurrencyDisplay amount={Number(cashAmount) - finalTotal} /></span>
             </div>
           )}
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem' }}>
-            <button className="btn btn-outline" onClick={() => setIsPaymentModalOpen(false)} disabled={isProcessing}>Bekor qilish</button>
-            <button className="btn btn-success" onClick={handleCheckout} disabled={isProcessing || (paymentType === 'debt' && !selectedCustomer)}>
-              {isProcessing ? 'Bajarilmoqda...' : <><FileText size={18} /> To'lash</>}
+          <div style={{ marginTop: 'auto', paddingTop: '1rem' }}>
+            <button 
+              className="btn btn-success" 
+              style={{ width: '100%', padding: '1rem', fontSize: '1.125rem' }} 
+              onClick={handleCheckout} 
+              disabled={isProcessing || ((paymentType === 'debt' || (paymentType === 'mixed' && mDebt > 0)) && !selectedCustomer) || (paymentType === 'mixed' && mixedDiff !== 0)}
+            >
+              {isProcessing ? 'Bajarilmoqda...' : 'To\'lovni yakunlash'}
             </button>
           </div>
         </div>
-      </Modal>
+      </Drawer>
 
       {/* Chek (Receipt) Modali */}
       <Modal isOpen={isReceiptModalOpen} onClose={() => setIsReceiptModalOpen(false)} title="Xarid cheki">
