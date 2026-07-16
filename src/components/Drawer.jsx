@@ -42,7 +42,7 @@ const Drawer = ({ isOpen, onClose, title, children, position = 'right' }) => {
       position: 'fixed',
       backgroundColor: 'var(--bg-surface)',
       boxShadow: 'var(--shadow-xl)',
-      zIndex: zIndex + 1,
+      zIndex: zIndex + 2,
       display: 'flex',
       flexDirection: 'column',
     };

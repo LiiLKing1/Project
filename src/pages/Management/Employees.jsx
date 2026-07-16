@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { UserPlus, Edit, Trash2 } from 'lucide-react';
+import CustomSelect from '../../components/CustomSelect';
 import { db, firebaseConfig } from '../../firebase';
 import { collection, onSnapshot, query, orderBy, doc, setDoc } from 'firebase/firestore';
 import { initializeApp, getApps, getApp } from 'firebase/app';
@@ -19,6 +20,7 @@ const Employees = () => {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
+  const [activeTab, setActiveTab] = useState('profile');
   const [formData, setFormData] = useState({ 
     fullName: '', phone: '', role: 'kassir', loginUsername: '', password: '', isActive: true, 
     permissions: DEFAULT_ROLES['kassir'].permissions,
@@ -169,6 +171,7 @@ const Employees = () => {
         salaryType: 'fixed', fixedSalary: '', percentageRate: ''
       });
     }
+    setActiveTab('profile');
     setIsModalOpen(true);
   };
 
@@ -253,85 +256,112 @@ const Employees = () => {
       </div>
 
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingId ? 'Xodimni tahrirlash' : 'Yangi xodim'}>
-        <FormInput label="F.I.O" value={formData.fullName} onChange={handleNameChange} required />
-        <FormInput label="Telefon raqami" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} required />
-        
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1rem' }}>
-          <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>Rol</label>
-          <select value={formData.role} onChange={handleRoleChange} style={{ padding: '0.75rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-surface)' }}>
-            <option value="admin">Admin (To'liq ruxsat)</option>
-            <option value="kassir">Kassir (Faqat kassa va mijozlar)</option>
-          </select>
+        <div style={{ display: 'flex', gap: '1rem', borderBottom: '1px solid var(--border-color)', marginBottom: '1.5rem' }}>
+          <button style={{ padding: '0.5rem 1rem', background: 'none', border: 'none', borderBottom: activeTab === 'profile' ? '2px solid var(--primary)' : '2px solid transparent', color: activeTab === 'profile' ? 'var(--primary)' : 'var(--text-secondary)', fontWeight: activeTab === 'profile' ? 600 : 400 }} onClick={() => setActiveTab('profile')}>Profil ma'lumotlari</button>
+          <button style={{ padding: '0.5rem 1rem', background: 'none', border: 'none', borderBottom: activeTab === 'role' ? '2px solid var(--primary)' : '2px solid transparent', color: activeTab === 'role' ? 'var(--primary)' : 'var(--text-secondary)', fontWeight: activeTab === 'role' ? 600 : 400 }} onClick={() => setActiveTab('role')}>Rol va Ruxsatlar</button>
+          <button style={{ padding: '0.5rem 1rem', background: 'none', border: 'none', borderBottom: activeTab === 'salary' ? '2px solid var(--primary)' : '2px solid transparent', color: activeTab === 'salary' ? 'var(--primary)' : 'var(--text-secondary)', fontWeight: activeTab === 'salary' ? 600 : 400 }} onClick={() => setActiveTab('salary')}>Qo'shimcha ma'lumotlar</button>
         </div>
 
-        <div style={{ padding: '1rem', backgroundColor: 'var(--bg-main)', borderRadius: 'var(--radius-md)', marginBottom: '1rem', border: '1px solid var(--border-color)' }}>
-          <h3 style={{ fontSize: '0.875rem', fontWeight: 600, marginBottom: '0.75rem', color: 'var(--text-secondary)' }}>Ish haqi (KPI)</h3>
-          
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1rem' }}>
-            <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>Oylik turi</label>
-            <select value={formData.salaryType} onChange={e => setFormData({...formData, salaryType: e.target.value})} style={{ padding: '0.75rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-surface)' }}>
-              <option value="fixed">Belgilangan oylik (Fixed)</option>
-              <option value="percentage">Sotuvdan foiz (Percentage)</option>
-              <option value="mixed">Aralash (Belgilangan + Foiz)</option>
-            </select>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-            {(formData.salaryType === 'fixed' || formData.salaryType === 'mixed') && (
-              <FormInput label="Belgilangan oylik summasi" type="number" value={formData.fixedSalary} onChange={e => setFormData({...formData, fixedSalary: e.target.value})} placeholder="Masalan: 3000000" />
-            )}
-            {(formData.salaryType === 'percentage' || formData.salaryType === 'mixed') && (
-              <FormInput label="Sotuvdan foiz (%)" type="number" value={formData.percentageRate} onChange={e => setFormData({...formData, percentageRate: e.target.value})} placeholder="Masalan: 3" />
-            )}
-          </div>
-        </div>
-
-        <div style={{ padding: '1rem', backgroundColor: 'var(--bg-main)', borderRadius: 'var(--radius-md)', marginBottom: '1rem', border: '1px solid var(--border-color)' }}>
-          <h3 style={{ fontSize: '0.875rem', fontWeight: 600, marginBottom: '0.75rem', color: 'var(--text-secondary)' }}>Huquqlar (Ruxsatlar)</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-            {Object.keys(DEFAULT_ROLES['admin'].permissions).map(key => (
-              <label key={key} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.875rem' }}>
-                <input 
-                  type="checkbox" 
-                  checked={!!formData.permissions[key]} 
-                  onChange={() => togglePermission(key)} 
+        {activeTab === 'profile' && (
+          <div className="flex-col" style={{ gap: '1rem' }}>
+            <FormInput label="F.I.O" value={formData.fullName} onChange={handleNameChange} required />
+            <FormInput label="Telefon raqami" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} required />
+            
+            <div style={{ padding: '1rem', backgroundColor: 'var(--bg-main)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+              <h3 style={{ fontSize: '0.875rem', fontWeight: 600, marginBottom: '1rem', color: 'var(--text-secondary)' }}>Tizimga kirish ma'lumotlari</h3>
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, marginBottom: '0.5rem', color: 'var(--text-main)' }}>Login (Username) <span style={{ color: 'var(--danger)' }}>*</span></label>
+                <div style={{ display: 'flex', alignItems: 'stretch' }}>
+                  <input 
+                    type="text" 
+                    value={formData.loginUsername} 
+                    onChange={e => setFormData({...formData, loginUsername: e.target.value.toLowerCase().replace(/[^a-z0-9_.-]/g, '')})} 
+                    placeholder="masalan: said" 
+                    required 
+                    disabled={!!editingId} 
+                    style={{ flex: 1, padding: '0.75rem 1rem', borderRadius: '8px 0 0 8px', border: '1px solid var(--border-color)', borderRight: 'none', backgroundColor: 'var(--bg-surface)', outline: 'none' }}
+                  />
+                  <div style={{ display: 'flex', alignItems: 'center', padding: '0 1rem', backgroundColor: 'var(--bg-main)', border: '1px solid var(--border-color)', borderRadius: '0 8px 8px 0', color: 'var(--text-secondary)', fontWeight: 500 }}>
+                    @pos.com
+                  </div>
+                </div>
+              </div>
+              {!editingId && (
+                <FormInput 
+                  label="Parol (Kamida 6 belgi)" 
+                  type="password" 
+                  value={formData.password} 
+                  onChange={e => setFormData({...formData, password: e.target.value})} 
+                  placeholder="••••••••" 
+                  required 
                 />
-                <span style={{ textTransform: 'capitalize' }}>{key}</span>
-              </label>
-            ))}
+              )}
+            </div>
           </div>
-        </div>
+        )}
 
-        <div style={{ padding: '1rem', backgroundColor: 'var(--bg-main)', borderRadius: 'var(--radius-md)', marginBottom: '1rem', border: '1px solid var(--border-color)' }}>
-          <h3 style={{ fontSize: '0.875rem', fontWeight: 600, marginBottom: '1rem', color: 'var(--text-secondary)' }}>Tizimga kirish ma'lumotlari</h3>
-          <div style={{ marginBottom: '1rem' }}>
-            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, marginBottom: '0.5rem', color: 'var(--text-main)' }}>Login (Username) <span style={{ color: 'var(--danger)' }}>*</span></label>
-            <div style={{ display: 'flex', alignItems: 'stretch' }}>
-              <input 
-                type="text" 
-                value={formData.loginUsername} 
-                onChange={e => setFormData({...formData, loginUsername: e.target.value.toLowerCase().replace(/[^a-z0-9_.-]/g, '')})} 
-                placeholder="masalan: said" 
-                required 
-                disabled={!!editingId} 
-                style={{ flex: 1, padding: '0.75rem 1rem', borderRadius: '8px 0 0 8px', border: '1px solid var(--border-color)', borderRight: 'none', backgroundColor: 'var(--bg-surface)', outline: 'none' }}
+        {activeTab === 'role' && (
+          <div className="flex-col" style={{ gap: '1rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>Lavozimi (Roli) *</label>
+              <CustomSelect 
+                value={formData.role} 
+                onChange={v => handleRoleChange({target: {value: v}})}
+                options={[
+                  {value: '', label: '-- Tanlang --'},
+                  ...Object.keys(DEFAULT_ROLES).map(r => ({value: r, label: DEFAULT_ROLES[r].title}))
+                ]}
               />
-              <div style={{ display: 'flex', alignItems: 'center', padding: '0 1rem', backgroundColor: 'var(--bg-main)', border: '1px solid var(--border-color)', borderRadius: '0 8px 8px 0', color: 'var(--text-secondary)', fontWeight: 500 }}>
-                @pos.com
+            </div>
+            <div style={{ padding: '1rem', backgroundColor: 'var(--bg-main)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+              <h3 style={{ fontSize: '0.875rem', fontWeight: 600, marginBottom: '0.75rem', color: 'var(--text-secondary)' }}>Huquqlar (Ruxsatlar)</h3>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                {Object.keys(DEFAULT_ROLES['admin'].permissions).map(key => (
+                  <label key={key} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.875rem' }}>
+                    <input 
+                      type="checkbox" 
+                      checked={!!formData.permissions[key]} 
+                      onChange={() => togglePermission(key)} 
+                    />
+                    <span style={{ textTransform: 'capitalize' }}>
+                      {key === 'importExport' ? 'Yuklanishlar (Import/Eksport)' : key}
+                    </span>
+                  </label>
+                ))}
               </div>
             </div>
           </div>
-          {!editingId && (
-            <FormInput 
-              label="Parol (Kamida 6 belgi)" 
-              type="password" 
-              value={formData.password} 
-              onChange={e => setFormData({...formData, password: e.target.value})} 
-              placeholder="••••••••" 
-              required 
-            />
-          )}
-        </div>
+        )}
+
+        {activeTab === 'salary' && (
+          <div className="flex-col" style={{ gap: '1rem' }}>
+            <div style={{ padding: '1rem', backgroundColor: 'var(--bg-main)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+              <h3 style={{ fontSize: '0.875rem', fontWeight: 600, marginBottom: '0.75rem', color: 'var(--text-secondary)' }}>Ish haqi (KPI)</h3>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1rem' }}>
+                <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>Ish haqi turi *</label>
+                <CustomSelect 
+                  value={formData.salaryType} 
+                  onChange={v => setFormData({...formData, salaryType: v})}
+                  options={[
+                    {value: 'fixed', label: 'Qat\'iy maosh'},
+                    {value: 'percentage', label: 'Savdodan foiz (%)'},
+                    {value: 'mixed', label: 'Aralash (Belgilangan + Foiz)'}
+                  ]}
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                {(formData.salaryType === 'fixed' || formData.salaryType === 'mixed') && (
+                  <FormInput label="Belgilangan oylik summasi" type="number" value={formData.fixedSalary} onChange={e => setFormData({...formData, fixedSalary: e.target.value})} placeholder="Masalan: 3000000" />
+                )}
+                {(formData.salaryType === 'percentage' || formData.salaryType === 'mixed') && (
+                  <FormInput label="Sotuvdan foiz (%)" type="number" value={formData.percentageRate} onChange={e => setFormData({...formData, percentageRate: e.target.value})} placeholder="Masalan: 3" />
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1.5rem' }}>
           <button className="btn btn-outline" onClick={() => setIsModalOpen(false)}>Bekor qilish</button>

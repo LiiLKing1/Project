@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const Modal = ({ isOpen, onClose, title, children }) => {
+const Modal = ({ isOpen, onClose, title, children, maxWidth = '500px' }) => {
   return (
     <AnimatePresence>
       {isOpen && (
@@ -39,7 +39,7 @@ const Modal = ({ isOpen, onClose, title, children }) => {
               borderRadius: 'var(--radius-xl)',
               boxShadow: 'var(--shadow-lg)',
               width: '90%',
-              maxWidth: '500px',
+              maxWidth: maxWidth,
               maxHeight: '90vh',
               display: 'flex',
               flexDirection: 'column',

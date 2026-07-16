@@ -9,6 +9,7 @@ import Modal from '../../components/Modal';
 import Receipt from '../../components/Receipt';
 import CurrencyDisplay from '../../components/CurrencyDisplay';
 import { Eye, Edit2 } from 'lucide-react';
+import DateRangePicker from '../../components/DateRangePicker';
 
 const Reports = () => {
   const [salesData, setSalesData] = useState([]);
@@ -19,6 +20,13 @@ const Reports = () => {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const getTodayStr = () => {
+    const d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  };
+  const [startDate, setStartDate] = useState(getTodayStr());
+  const [endDate, setEndDate] = useState(getTodayStr());
+  const [historySearch, setHistorySearch] = useState('');
   const { userProfile } = useRoles();
   const { addToast } = useToast();
   const storeId = userProfile?.storeOwnerId;
@@ -41,37 +49,111 @@ const Reports = () => {
 
   const formatMoney = (v) => new Intl.NumberFormat('uz-UZ').format(v || 0) + ' UZS';
 
-  const getChartData = () => {
-    const days = ['Yak', 'Dush', 'Sesh', 'Chor', 'Pay', 'Juma', 'Shan'];
-    const result = [];
-    
-    // Initialize last 7 days with 0
-    for(let i=6; i>=0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      result.push({
-        name: days[d.getDay()],
-        dateStr: d.toDateString(),
-        savdo: 0
-      });
+  const filteredSales = salesData.filter(sale => {
+    let matchSearch = true;
+    if (historySearch) {
+      const q = historySearch.toLowerCase();
+      const customerName = customers.find(c => c.id === sale.customerId)?.fullName?.toLowerCase() || '';
+      matchSearch = (sale.saleNumber && sale.saleNumber.toLowerCase().includes(q)) ||
+                    customerName.includes(q);
     }
-
-    salesData.forEach(sale => {
-      if(!sale.createdAt) return;
-      const saleDate = new Date(sale.createdAt).toDateString();
-      const dayData = result.find(r => r.dateStr === saleDate);
-      if (dayData) {
-        dayData.savdo += sale.finalTotal || 0;
+    let matchDate = true;
+    if (startDate || endDate) {
+      const saleDate = new Date(sale.createdAt);
+      if (startDate) {
+        matchDate = matchDate && saleDate >= new Date(startDate);
       }
-    });
+      if (endDate) {
+        const endD = new Date(endDate);
+        endD.setHours(23, 59, 59, 999);
+        matchDate = matchDate && saleDate <= endD;
+      }
+    }
+    return matchSearch && matchDate;
+  });
 
-    return result;
+  const getMonthLabel = () => {
+    if (!startDate && !endDate) return '';
+    const months = ["Yanvar", "Fevral", "Mart", "Aprel", "May", "Iyun", "Iyul", "Avgust", "Sentabr", "Oktabr", "Noyabr", "Dekabr"];
+    let startD = startDate ? new Date(startDate) : new Date();
+    let endD = endDate ? new Date(endDate) : new Date();
+    if (startDate && !endDate) endD = new Date();
+    else if (!startDate && endDate) {
+      startD = new Date(endDate);
+      startD.setDate(startD.getDate() - 7);
+    }
+    if (startD > endD) { const temp = startD; startD = endD; endD = temp; }
+    
+    const m1 = months[startD.getMonth()];
+    const m2 = months[endD.getMonth()];
+    if (m1 === m2 && startD.getFullYear() === endD.getFullYear()) return m1;
+    return `${m1} > ${m2}`;
+  };
+
+  const getChartData = () => {
+    if (!startDate && !endDate) {
+      const days = ['Yak', 'Dush', 'Sesh', 'Chor', 'Pay', 'Juma', 'Shan'];
+      const result = [];
+      for(let i=6; i>=0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        result.push({
+          name: days[d.getDay()],
+          dateStr: d.toDateString(),
+          savdo: 0
+        });
+      }
+      filteredSales.forEach(sale => {
+        if(!sale.createdAt) return;
+        const saleDate = new Date(sale.createdAt).toDateString();
+        const dayData = result.find(r => r.dateStr === saleDate);
+        if (dayData) {
+          dayData.savdo += sale.finalTotal || 0;
+        }
+      });
+      return result;
+    } else {
+      let startD = startDate ? new Date(startDate) : new Date();
+      let endD = endDate ? new Date(endDate) : new Date();
+      
+      if (startDate && !endDate) {
+        endD = new Date();
+      } else if (!startDate && endDate) {
+        startD = new Date(endDate);
+        startD.setDate(startD.getDate() - 7);
+      }
+      
+      if (startD > endD) {
+        const temp = startD; startD = endD; endD = temp;
+      }
+      
+      const map = {};
+      filteredSales.forEach(sale => {
+        if(!sale.createdAt) return;
+        const d = new Date(sale.createdAt);
+        const ymd = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+        if (!map[ymd]) map[ymd] = 0;
+        map[ymd] += sale.finalTotal || 0;
+      });
+
+      const result = [];
+      let currD = new Date(startD);
+      while(currD <= endD) {
+        const ymd = currD.getFullYear() + '-' + String(currD.getMonth()+1).padStart(2,'0') + '-' + String(currD.getDate()).padStart(2,'0');
+        result.push({
+          name: String(currD.getDate()),
+          savdo: map[ymd] || 0
+        });
+        currD.setDate(currD.getDate() + 1);
+      }
+      return result;
+    }
   };
 
   const chartData = getChartData();
 
-  const totalRevenue = salesData.reduce((acc, curr) => acc + (curr.finalTotal || 0), 0);
-  const totalProfit = salesData.reduce((acc, curr) => {
+  const totalRevenue = filteredSales.reduce((acc, curr) => acc + (curr.finalTotal || 0), 0);
+  const totalProfit = filteredSales.reduce((acc, curr) => {
     const cost = curr.items?.reduce((c, item) => c + (item.costPrice * item.qty), 0) || 0;
     return acc + ((curr.finalTotal || 0) - cost);
   }, 0);
@@ -186,9 +268,17 @@ const Reports = () => {
           <h1 className="h1">Hisobotlar</h1>
           <p className="subtitle">Sotuvlar va foyda tahlili</p>
         </div>
-        <div style={{ display: 'flex', gap: '1rem' }}>
-          <button className="btn btn-outline"><Calendar size={18} /> Oxirgi 7 kun</button>
-          <button className="btn btn-primary"><Download size={18} /> Excel ga yuklash</button>
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          <DateRangePicker 
+            startDate={startDate} 
+            endDate={endDate} 
+            onChange={({ start, end }) => {
+              const formatYMD = (d) => d ? d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0') : '';
+              setStartDate(formatYMD(start));
+              setEndDate(formatYMD(end));
+            }} 
+          />
+          <button className="btn btn-primary" onClick={() => addToast("Tez orada qo'shiladi", 'info')}><Download size={18} /> Excel ga yuklash</button>
         </div>
       </div>
 
@@ -211,13 +301,20 @@ const Reports = () => {
           <div style={{ padding: '1rem', borderRadius: 'var(--radius-lg)', backgroundColor: 'var(--warning-light)', color: 'var(--warning)' }}><ShoppingBag size={24} /></div>
           <div>
             <div className="subtitle">Sotilgan cheklar soni</div>
-            <div className="h2" style={{ marginTop: '0.25rem' }}>{salesData.length} ta</div>
+            <div className="h2" style={{ marginTop: '0.25rem' }}>{filteredSales.length} ta</div>
           </div>
         </div>
       </div>
 
       <div className="glass-panel flex-col" style={{ flex: 1, padding: '1.5rem', minHeight: '350px' }}>
-        <h2 className="h2" style={{ marginBottom: '1.5rem' }}>Haftalik sotuvlar grafigi</h2>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+          <h2 className="h2" style={{ margin: 0 }}>{startDate || endDate ? "Davr bo'yicha sotuvlar grafigi" : "Haftalik sotuvlar grafigi"}</h2>
+          {(startDate || endDate) && (
+            <span style={{ fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-secondary)', padding: '0.25rem 0.75rem', backgroundColor: 'var(--bg-main)', borderRadius: '1rem' }}>
+              {getMonthLabel()}
+            </span>
+          )}
+        </div>
         <div style={{ flex: 1, width: '100%' }}>
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={chartData}>
@@ -232,7 +329,16 @@ const Reports = () => {
       </div>
 
       <div className="glass-panel flex-col" style={{ flex: 1, padding: '1.5rem' }}>
-        <h2 className="h2" style={{ marginBottom: '1.5rem' }}>Sotuvlar tarixi</h2>
+        <div className="flex-between" style={{ marginBottom: '1.5rem' }}>
+          <h2 className="h2">Sotuvlar tarixi</h2>
+          <input 
+            type="text" 
+            placeholder="Chek raqami yoki mijoz qidirish..." 
+            value={historySearch}
+            onChange={(e) => setHistorySearch(e.target.value)}
+            style={{ padding: '0.5rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-surface)' }}
+          />
+        </div>
         <div style={{ overflowX: 'auto' }}>
           <div className="table-responsive">
 <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
@@ -248,9 +354,9 @@ const Reports = () => {
               </tr>
             </thead>
             <tbody>
-              {salesData.length === 0 ? (
+              {filteredSales.length === 0 ? (
                 <tr><td colSpan="7" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>Ma'lumot topilmadi</td></tr>
-              ) : salesData.map(sale => (
+              ) : filteredSales.map(sale => (
                 <tr key={sale.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
                   <td style={{ padding: '1rem' }}>{new Date(sale.createdAt).toLocaleString('uz-UZ', { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
                   <td style={{ padding: '1rem', fontWeight: 500 }}>{sale.saleNumber}</td>

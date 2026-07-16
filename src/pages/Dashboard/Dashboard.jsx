@@ -8,16 +8,22 @@ import { formatCurrency, formatCompact } from '../../utils/formatters';
 import { useNavigate } from 'react-router-dom';
 import { useSettings } from '../../context/SettingsContext';
 import { useWarehouse } from '../../context/WarehouseContext';
+import CurrencyDisplay from '../../components/CurrencyDisplay';
+import DateRangePicker from '../../components/DateRangePicker';
 
 const Dashboard = () => {
   const [sales, setSales] = useState([]);
   const [products, setProducts] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [debts, setDebts] = useState([]);
+  const [partnerDebts, setPartnerDebts] = useState([]);
   const [orders, setOrders] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
+  const [partners, setPartners] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [timeFilter, setTimeFilter] = useState('day');
+  const [timeFilter, setTimeFilter] = useState('bugun');
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
   
   const { userProfile } = useRoles();
   const { settings } = useSettings();
@@ -51,6 +57,11 @@ const Dashboard = () => {
       setDebts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }));
 
+    // Fetch Partner Debts
+    unsubs.push(onSnapshot(collection(db, `users/${storeId}/partnerDebts`), (snapshot) => {
+      setPartnerDebts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }));
+
     // Fetch Orders (Purchase Orders)
     unsubs.push(onSnapshot(query(collection(db, `users/${storeId}/purchaseOrders`), orderBy('createdAt', 'desc')), (snapshot) => {
       setOrders(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
@@ -62,6 +73,11 @@ const Dashboard = () => {
       setSuppliers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }));
 
+    // Fetch Partners
+    unsubs.push(onSnapshot(collection(db, `users/${storeId}/partners`), (snapshot) => {
+      setPartners(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }));
+
     return () => unsubs.forEach(unsub => unsub());
   }, [storeId]);
 
@@ -71,13 +87,34 @@ const Dashboard = () => {
     return items.filter(s => {
       if (!s.createdAt) return false;
       const date = new Date(s.createdAt);
-      if (filter === 'day') return date.toDateString() === now.toDateString();
-      if (filter === 'week') {
+
+      if (customStartDate || customEndDate) {
+        let matchDate = true;
+        if (customStartDate) {
+          const startD = new Date(customStartDate);
+          startD.setHours(0,0,0,0);
+          matchDate = matchDate && date >= startD;
+        }
+        if (customEndDate) {
+          const endD = new Date(customEndDate);
+          endD.setHours(23,59,59,999);
+          matchDate = matchDate && date <= endD;
+        }
+        return matchDate;
+      }
+
+      if (filter === 'kecha') {
+        const yesterday = new Date(now);
+        yesterday.setDate(yesterday.getDate() - 1);
+        return date.toDateString() === yesterday.toDateString();
+      }
+      if (filter === 'bugun' || filter === 'day') return date.toDateString() === now.toDateString();
+      if (filter === 'hafta' || filter === 'week') {
         const diff = (now - date) / (1000 * 60 * 60 * 24);
         return diff >= 0 && diff <= 7;
       }
-      if (filter === 'month') return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
-      if (filter === 'year') return date.getFullYear() === now.getFullYear();
+      if (filter === 'oy' || filter === 'month') return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+      if (filter === 'yil' || filter === 'year') return date.getFullYear() === now.getFullYear();
       return true;
     });
   };
@@ -95,6 +132,10 @@ const Dashboard = () => {
   const activeDebts = debts.filter(d => d.status === 'active' || d.status === 'partial');
   const totalDebt = activeDebts.reduce((acc, curr) => acc + Number(curr.remainingAmount || 0), 0);
   const overdueDebts = activeDebts.filter(d => new Date(d.dueDate) < now);
+
+  const activePartnerDebts = partnerDebts.filter(d => d.status === 'active' || d.status === 'partial' || d.status === 'partially_paid');
+  const totalPartnerDebt = activePartnerDebts.reduce((acc, curr) => acc + Number(curr.remainingAmount || 0), 0);
+  const overduePartnerDebts = activePartnerDebts.filter(d => new Date(d.dueDate) < now);
 
   const pendingOrders = orders.filter(o => o.status === 'pending');
   const pendingOrdersTotal = pendingOrders.reduce((acc, curr) => acc + Number(curr.totalAmount || 0), 0);
@@ -178,6 +219,48 @@ const Dashboard = () => {
     return dist;
   };
 
+  // Weekly Digest Calculations
+  const startOfThisWeek = new Date();
+  startOfThisWeek.setHours(0, 0, 0, 0);
+  startOfThisWeek.setDate(startOfThisWeek.getDate() - (startOfThisWeek.getDay() === 0 ? 6 : startOfThisWeek.getDay() - 1)); // Monday
+  
+  const startOfLastWeek = new Date(startOfThisWeek);
+  startOfLastWeek.setDate(startOfLastWeek.getDate() - 7);
+
+  const getDigestStats = (data, dateField = 'createdAt') => {
+    let thisWeek = 0;
+    let lastWeek = 0;
+    data.forEach(item => {
+      if (!item[dateField]) return;
+      const d = new Date(item[dateField]);
+      if (d >= startOfThisWeek) thisWeek++;
+      else if (d >= startOfLastWeek && d < startOfThisWeek) lastWeek++;
+    });
+    return { thisWeek, lastWeek };
+  };
+
+  const getDigestRevenue = () => {
+    let thisWeek = 0;
+    let lastWeek = 0;
+    sales.forEach(s => {
+      if (!s.createdAt) return;
+      const d = new Date(s.createdAt);
+      if (d >= startOfThisWeek) thisWeek += Number(s.finalTotal || 0);
+      else if (d >= startOfLastWeek && d < startOfThisWeek) lastWeek += Number(s.finalTotal || 0);
+    });
+    return { thisWeek, lastWeek };
+  };
+
+  const custDigest = getDigestStats(customers);
+  const partDigest = getDigestStats(partners);
+  const revDigest = getDigestRevenue();
+
+  const getTrend = (thisW, lastW) => {
+    if (lastW === 0) return thisW > 0 ? '+100%' : '0%';
+    const pct = ((thisW - lastW) / lastW) * 100;
+    return `${pct > 0 ? '+' : ''}${pct.toFixed(1)}%`;
+  };
+
   const chartData = getChartData();
   const topProducts = getTopProducts();
   const paymentData = getPaymentDistribution();
@@ -194,8 +277,37 @@ const Dashboard = () => {
   return (
     <div className="flex-col" style={{ gap: '2rem', height: '100%', overflowY: 'auto', paddingBottom: '2rem' }}>
       {/* Header */}
-      <div className="flex-between">
+      <div className="flex-between" style={{ flexWrap: 'wrap', gap: '1rem' }}>
         <h1 className="h1">Bosh Sahifa</h1>
+        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', backgroundColor: 'var(--bg-surface)', padding: '0.25rem', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-color)' }}>
+            {['kecha', 'bugun', 'hafta', 'oy', 'yil'].map(f => (
+              <button 
+                key={f}
+                className="btn"
+                style={{ 
+                  backgroundColor: timeFilter === f && !customStartDate && !customEndDate ? 'var(--bg-main)' : 'transparent',
+                  color: timeFilter === f && !customStartDate && !customEndDate ? 'var(--primary)' : 'var(--text-secondary)',
+                  border: 'none',
+                  padding: '0.5rem 1rem',
+                  textTransform: 'capitalize'
+                }}
+                onClick={() => { setTimeFilter(f); setCustomStartDate(''); setCustomEndDate(''); }}
+              >
+                {f}
+              </button>
+            ))}
+          </div>
+          <DateRangePicker 
+            startDate={customStartDate} 
+            endDate={customEndDate} 
+            onChange={({ start, end }) => {
+              const formatYMD = (d) => d ? d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0') : '';
+              setCustomStartDate(formatYMD(start));
+              setCustomEndDate(formatYMD(end));
+            }} 
+          />
+        </div>
       </div>
 
       {/* Quick Actions */}
@@ -212,8 +324,59 @@ const Dashboard = () => {
         <KpiCard title="Savdolar soni" value={`${periodSalesCount} ta`} icon={<ShoppingCart size={22}/>} color="var(--success)" trend={"+5%"}/>
         <KpiCard title="O'rtacha chek" value={formatCurrency(averageCheck, curr)} icon={<Activity size={22}/>} color="#8B5CF6" trend={"+8%"}/>
         <KpiCard title="Kam qolgan tovarlar" value={`${lowStockProducts} ta`} icon={<Package size={22}/>} color="var(--warning)" onClick={() => navigate('/products')}/>
-        <KpiCard title="Jami qarzdorlik" value={formatCurrency(totalDebt, curr)} icon={<CreditCard size={22}/>} color="var(--danger)" subtext={overdueDebts.length > 0 ? `${overdueDebts.length} ta muddati o'tgan` : ''} subtextColor="var(--danger)" onClick={() => navigate('/customers/debts')}/>
+        <KpiCard title="Mijozlar qarzi (Sizga)" value={formatCurrency(totalDebt, curr)} icon={<DollarSign size={22}/>} color="var(--danger)" subtext={overdueDebts.length > 0 ? `${overdueDebts.length} ta muddati o'tgan` : ''} subtextColor="var(--danger)" onClick={() => navigate('/customers/debts')}/>
+        <KpiCard title="Sizning qarzingiz (Hamkorlar)" value={formatCurrency(totalPartnerDebt, curr)} icon={<CreditCard size={22}/>} color="var(--warning)" subtext={overduePartnerDebts.length > 0 ? `${overduePartnerDebts.length} ta muddati o'tgan` : ''} subtextColor="var(--danger)" onClick={() => navigate('/partners/debts')}/>
         <KpiCard title="Mijozlar bazasi" value={`${activeCustomers} nafar`} icon={<Users size={22}/>} color="#06B6D4" trend={"+2%"}/>
+      </div>
+
+      {/* Weekly Digest */}
+      <div className="glass-panel" style={{ padding: '1.5rem' }}>
+        <h2 className="h2" style={{ fontSize: '1.25rem', marginBottom: '1rem' }}>Haftalik Dayjest (O'tgan haftaga nisbatan)</h2>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem' }}>
+          <div style={{ padding: '1rem', borderLeft: '4px solid var(--primary)', backgroundColor: 'var(--bg-surface)' }}>
+            <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Savdo aylanmasi</div>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.75rem' }}>
+              <span style={{ fontSize: '1.25rem', fontWeight: 600 }}><CurrencyDisplay amount={revDigest.thisWeek} /></span>
+              <span style={{ fontSize: '0.875rem', color: revDigest.thisWeek >= revDigest.lastWeek ? 'var(--success)' : 'var(--danger)', fontWeight: 500 }}>
+                {getTrend(revDigest.thisWeek, revDigest.lastWeek)}
+              </span>
+            </div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>O'tgan hafta: <CurrencyDisplay amount={revDigest.lastWeek} /></div>
+          </div>
+          
+          <div style={{ padding: '1rem', borderLeft: '4px solid var(--success)', backgroundColor: 'var(--bg-surface)' }}>
+            <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Yangi mijozlar</div>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.75rem' }}>
+              <span style={{ fontSize: '1.25rem', fontWeight: 600 }}>{custDigest.thisWeek} nafar</span>
+              <span style={{ fontSize: '0.875rem', color: custDigest.thisWeek >= custDigest.lastWeek ? 'var(--success)' : 'var(--danger)', fontWeight: 500 }}>
+                {getTrend(custDigest.thisWeek, custDigest.lastWeek)}
+              </span>
+            </div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>O'tgan hafta: {custDigest.lastWeek} nafar</div>
+          </div>
+
+          <div style={{ padding: '1rem', borderLeft: '4px solid var(--warning)', backgroundColor: 'var(--bg-surface)' }}>
+            <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Yangi hamkorlar</div>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.75rem' }}>
+              <span style={{ fontSize: '1.25rem', fontWeight: 600 }}>{partDigest.thisWeek} ta</span>
+              <span style={{ fontSize: '0.875rem', color: partDigest.thisWeek >= partDigest.lastWeek ? 'var(--success)' : 'var(--danger)', fontWeight: 500 }}>
+                {getTrend(partDigest.thisWeek, partDigest.lastWeek)}
+              </span>
+            </div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>O'tgan hafta: {partDigest.lastWeek} ta</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Target Setting Banner */}
+      <div className="glass-panel" style={{ padding: '2rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'var(--bg-main)', border: '1px solid var(--primary-light)' }}>
+        <div>
+          <h2 className="h2" style={{ marginBottom: '0.5rem' }}>Do'konda savdo maqsadlarini qo'ying va ularning bajarilishini kuzatib boring!</h2>
+          <p style={{ color: 'var(--text-secondary)', maxWidth: '600px' }}>Targetlar moduli yordamida siz do'kondagi sof tushum maqsadlarini belgilashingiz va kuzatishingiz mumkin.</p>
+        </div>
+        <button className="btn btn-primary" style={{ padding: '0.75rem 1.5rem', whiteSpace: 'nowrap' }} onClick={() => alert('Targetni o\'rnatish modali tez orada qo\'shiladi!')}>
+          Targetni o'rnatish
+        </button>
       </div>
 
       {/* Main Charts & Widgets */}

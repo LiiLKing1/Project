@@ -289,6 +289,11 @@ const Debts = () => {
 
   const filteredDebtors = debtors.filter(d => d.fullName?.toLowerCase().includes(search.toLowerCase()) || d.phone?.includes(search));
 
+  // Calc Stats
+  const totalDebtSum = debtors.reduce((acc, d) => acc + Number(d.currentDebt || 0), 0);
+  const totalPaymentsSum = 0; // In a full implementation, you'd calculate this from all payments
+  const totalDebtorsCount = debtors.length;
+
   return (
     <div className="flex-col" style={{ gap: '1.5rem', height: '100%' }}>
       <div style={{ display: 'flex', gap: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem' }}>
@@ -303,7 +308,9 @@ const Debts = () => {
         </button>
       </div>
 
-      <div className="glass-panel flex-col" style={{ flex: 1, overflow: 'hidden' }}>
+      <div style={{ display: 'flex', gap: '1.5rem', flex: 1, overflow: 'hidden', flexWrap: 'wrap' }}>
+        {/* Left: Main Table */}
+        <div className="glass-panel flex-col" style={{ flex: 2, minWidth: '60%', overflow: 'hidden' }}>
         <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border-color)' }}>
           <div style={{ position: 'relative', width: '350px' }}>
             <Search size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
@@ -396,7 +403,55 @@ const Debts = () => {
               ))}
             </tbody>
           </table>
-</div>
+          </div>
+        </div>
+        </div>
+        
+        {/* Right: Stats Panel */}
+        <div style={{ flex: 1, minWidth: '300px', maxWidth: '400px', display: 'flex', flexDirection: 'column', gap: '1rem', overflowY: 'auto' }}>
+          <button className="btn btn-primary" style={{ width: '100%', padding: '1rem', display: 'flex', justifyContent: 'space-between' }} onClick={() => alert('Ommaviy to\'lov tez orada qo\'shiladi')}>
+            <span><CreditCard size={18} style={{ display: 'inline', marginRight: '0.5rem' }}/> Ommaviy to'lov</span>
+            <span>→</span>
+          </button>
+          
+          <button className="btn btn-primary" style={{ width: '100%', padding: '1rem', display: 'flex', justifyContent: 'space-between', backgroundColor: '#3B82F6' }} onClick={() => alert('SMS-tarqatish tez orada qo\'shiladi')}>
+            <span>💬 Qarzdorlarga SMS-tarqatish</span>
+            <span>→</span>
+          </button>
+
+          <div className="glass-panel" style={{ padding: '1.5rem' }}>
+            <div style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginBottom: '0.5rem' }}>Qarzlar summasi</div>
+            <div className="h2" style={{ color: 'var(--primary)', marginBottom: '1.5rem' }}><CurrencyDisplay amount={totalDebtSum} /></div>
+            
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0', borderBottom: '1px solid var(--border-color)', fontSize: '0.875rem' }}>
+              <span style={{ color: 'var(--text-secondary)' }}>To'lovlar summasi</span>
+              <span style={{ color: 'var(--success)' }}><CurrencyDisplay amount={totalPaymentsSum} /></span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0', borderBottom: '1px solid var(--border-color)', fontSize: '0.875rem' }}>
+              <span style={{ color: 'var(--text-secondary)' }}>Tizimli to'lovlar</span>
+              <span><CurrencyDisplay amount={0} /></span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0', fontSize: '0.875rem', fontWeight: 600 }}>
+              <span>Qarzlar qoldig'i</span>
+              <span style={{ color: 'var(--danger)' }}><CurrencyDisplay amount={totalDebtSum} /></span>
+            </div>
+          </div>
+
+          <div className="glass-panel" style={{ padding: '1.5rem' }}>
+            <div style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginBottom: '0.5rem' }}>Qarzdorlar soni</div>
+            <div className="h2" style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              {totalDebtorsCount} <span style={{ fontSize: '1rem', color: 'var(--text-secondary)' }}>mijozlar</span>
+            </div>
+            
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0', borderBottom: '1px solid var(--border-color)', fontSize: '0.875rem' }}>
+              <span style={{ color: 'var(--text-secondary)' }}>To'langanlar</span>
+              <span style={{ color: 'var(--success)' }}>0 qarzlar</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0', borderBottom: '1px solid var(--border-color)', fontSize: '0.875rem' }}>
+              <span style={{ color: 'var(--text-secondary)' }}>To'lanmaganlar</span>
+              <span style={{ color: 'var(--danger)' }}>{totalDebtorsCount} qarzlar</span>
+            </div>
+          </div>
         </div>
       </div>
 

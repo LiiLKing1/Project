@@ -7,6 +7,10 @@ import PermissionRoute from './components/PermissionRoute';
 import Dashboard from './pages/Dashboard/Dashboard';
 import POS from './pages/Sales/POS';
 import Catalog from './pages/Products/Catalog';
+import Inventory from './pages/Products/Inventory';
+import Transfer from './pages/Products/Transfer';
+import Revaluation from './pages/Products/Revaluation';
+import WriteOff from './pages/Products/WriteOff';
 import Customers from './pages/Customers/Customers';
 import Debts from './pages/Customers/Debts';
 import Marketing from './pages/Marketing/Marketing';
@@ -22,6 +26,8 @@ import Backup from './pages/Settings/Backup';
 import IntegrityCheck from './pages/Settings/IntegrityCheck';
 import Suppliers from './pages/Orders/Suppliers';
 import Orders from './pages/Orders/Orders';
+import Partners from './pages/Partners/Partners';
+import PartnerDebts from './pages/Partners/PartnerDebts';
 
 import Login from './pages/Auth/Login';
 import Onboarding from './pages/Auth/Onboarding';
@@ -40,6 +46,10 @@ function App() {
 
           {/* Products / Mahsulotlar */}
           <Route path="products" element={<PermissionRoute permKey="products"><Catalog /></PermissionRoute>} />
+          <Route path="products/inventory" element={<PermissionRoute permKey="products"><Inventory /></PermissionRoute>} />
+          <Route path="products/transfer" element={<PermissionRoute permKey="products"><Transfer /></PermissionRoute>} />
+          <Route path="products/revaluation" element={<PermissionRoute permKey="products"><Revaluation /></PermissionRoute>} />
+          <Route path="products/write-off" element={<PermissionRoute permKey="products"><WriteOff /></PermissionRoute>} />
 
           {/* Sales / Sotuvlar (POS) */}
           <Route path="sales" element={<PermissionRoute permKey="sales"><POS /></PermissionRoute>} />
@@ -47,6 +57,10 @@ function App() {
           {/* Customers / Mijozlar */}
           <Route path="customers" element={<PermissionRoute permKey="customers"><Customers /></PermissionRoute>} />
           <Route path="customers/debts" element={<PermissionRoute permKey="customers"><Debts /></PermissionRoute>} />
+
+          {/* Partners / Hamkorlar */}
+          <Route path="partners" element={<PermissionRoute permKey="customers"><Partners /></PermissionRoute>} />
+          <Route path="partners/debts" element={<PermissionRoute permKey="customers"><PartnerDebts /></PermissionRoute>} />
 
           {/* Orders & Suppliers */}
           <Route path="orders" element={<PermissionRoute permKey="products"><Orders /></PermissionRoute>} />
@@ -70,7 +84,7 @@ function App() {
           <Route path="settings/loyalty" element={<PermissionRoute permKey="settings"><Loyalty /></PermissionRoute>} />
           <Route path="settings/trash" element={<PermissionRoute permKey="settings"><Trash /></PermissionRoute>} />
           <Route path="settings/audit" element={<PermissionRoute permKey="settings"><AuditLogs /></PermissionRoute>} />
-          <Route path="settings/backup" element={<PermissionRoute permKey="settings"><Backup /></PermissionRoute>} />
+          <Route path="settings/backup" element={<PermissionRoute permKey="importExport"><Backup /></PermissionRoute>} />
           <Route path="settings/integrity" element={<PermissionRoute permKey="settings"><IntegrityCheck /></PermissionRoute>} />
         </Route>
       </Routes>

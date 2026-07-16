@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Settings as SettingsIcon, Save, Store, Globe, LogOut } from 'lucide-react';
+import { Settings as SettingsIcon, Save, Store, Globe, LogOut, Gift } from 'lucide-react';
+import CustomSelect from '../../components/CustomSelect';
 import { db } from '../../firebase';
 import { doc, onSnapshot, collection, getDocs, writeBatch, setDoc } from 'firebase/firestore';
 import { putDoc } from '../../utils/firebaseUtils';
@@ -16,6 +17,9 @@ const Settings = () => {
   });
   const [generalData, setGeneralData] = useState({
     theme: 'light', language: 'uz', currency: 'UZS', showUsdConversion: false, usdRate: 12500, rubRate: 140
+  });
+  const [loyaltyData, setLoyaltyData] = useState({
+    bonusPercent: 0, minPurchaseForBonus: 0, vipMultiplier: 1
   });
   const [loading, setLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -54,7 +58,17 @@ const Settings = () => {
       }
       setLoading(false);
     });
-    return () => unsub();
+    const unsubLoyalty = onSnapshot(doc(db, `users/${storeId}/settings/loyalty`), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setLoyaltyData({
+          bonusPercent: data.bonusPercent || 0,
+          minPurchaseForBonus: data.minPurchaseForBonus || 0,
+          vipMultiplier: data.vipMultiplier || 1
+        });
+      }
+    });
+    return () => { unsub(); unsubLoyalty(); };
   }, [storeId]);
 
   const handleSave = async () => {
@@ -65,6 +79,12 @@ const Settings = () => {
         storeName: formData.storeName,
         address: formData.address,
         taxRate: Number(formData.taxRate || 0),
+        updatedAt: new Date().toISOString()
+      });
+      await putDoc(doc(db, `users/${storeId}/settings/loyalty`), {
+        bonusPercent: Number(loyaltyData.bonusPercent || 0),
+        minPurchaseForBonus: Number(loyaltyData.minPurchaseForBonus || 0),
+        vipMultiplier: Number(loyaltyData.vipMultiplier || 1),
         updatedAt: new Date().toISOString()
       });
       await updateSettings({
@@ -130,26 +150,38 @@ const Settings = () => {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>Til (Language)</label>
-              <select value={generalData.language} onChange={e => setGeneralData({...generalData, language: e.target.value})} style={{ padding: '0.75rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-surface)' }}>
-                <option value="uz">O'zbekcha</option>
-                <option value="ru">Русский</option>
-                <option value="en">English</option>
-              </select>
+              <CustomSelect 
+                value={generalData.language} 
+                onChange={v => setGeneralData({...generalData, language: v})} 
+                options={[
+                  {value: 'uz', label: "O'zbekcha"},
+                  {value: 'ru', label: "Русский"},
+                  {value: 'en', label: "English"}
+                ]}
+              />
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>Mavzu (Theme)</label>
-              <select value={generalData.theme} onChange={e => setGeneralData({...generalData, theme: e.target.value})} style={{ padding: '0.75rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-surface)' }}>
-                <option value="light">Yorug' (Light)</option>
-                <option value="dark">Qorong'i (Dark)</option>
-              </select>
+              <CustomSelect 
+                value={generalData.theme} 
+                onChange={v => setGeneralData({...generalData, theme: v})} 
+                options={[
+                  {value: 'light', label: "Yorug' (Light)"},
+                  {value: 'dark', label: "Qorong'i (Dark)"}
+                ]}
+              />
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>Asosiy Valyuta</label>
-              <select value={generalData.currency} onChange={e => setGeneralData({...generalData, currency: e.target.value})} style={{ padding: '0.75rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-surface)' }}>
-                <option value="UZS">UZS (So'm)</option>
-                <option value="USD">USD ($)</option>
-                <option value="RUB">RUB (₽)</option>
-              </select>
+              <CustomSelect 
+                value={generalData.currency} 
+                onChange={v => setGeneralData({...generalData, currency: v})} 
+                options={[
+                  {value: 'UZS', label: "UZS (So'm)"},
+                  {value: 'USD', label: "USD ($)"},
+                  {value: 'RUB', label: "RUB (₽)"}
+                ]}
+              />
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', justifyContent: 'center' }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', marginTop: '1.5rem' }}>

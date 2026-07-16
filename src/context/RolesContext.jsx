@@ -7,8 +7,8 @@ const RolesContext = createContext();
 export const useRoles = () => useContext(RolesContext);
 
 export const DEFAULT_ROLES = {
-  admin: { name: 'Admin', permissions: { dashboard: true, products: true, sales: true, customers: true, marketing: true, reports: true, finance: true, management: true, settings: true } },
-  kassir: { name: 'Kassir', permissions: { dashboard: true, products: false, sales: true, customers: true, marketing: false, reports: false, finance: false, management: false, settings: false } },
+  admin: { name: 'Admin', permissions: { dashboard: true, products: true, sales: true, customers: true, marketing: true, reports: true, finance: true, management: true, settings: true, importExport: true } },
+  kassir: { name: 'Kassir', permissions: { dashboard: true, products: false, sales: true, customers: true, marketing: false, reports: false, finance: false, management: false, settings: false, importExport: false } },
 };
 
 export const RolesProvider = ({ children }) => {

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Plus, Minus, Trash2, CreditCard, Banknote, User, FileText, ChevronDown, Percent, Calendar } from 'lucide-react';
 import { db } from '../../firebase';
-import { collection, onSnapshot, query, where, runTransaction, doc, orderBy, getDoc } from 'firebase/firestore';
+import { collection, onSnapshot, query, where, writeBatch, increment, doc, orderBy, getDoc } from 'firebase/firestore';
 import { useToast } from '../../context/ToastContext';
 import { useRoles } from '../../context/RolesContext';
 import { useSettings } from '../../context/SettingsContext';
@@ -15,7 +15,6 @@ import CurrencyDisplay from '../../components/CurrencyDisplay';
 const POS = () => {
   const [allProducts, setAllProducts] = useState([]);
   const [customers, setCustomers] = useState([]);
-  const [loyaltySettings, setLoyaltySettings] = useState({ bonusPercent: 0, minPurchaseForBonus: 0, vipMultiplier: 1 });
   const [cart, setCart] = useState([]);
   const [search, setSearch] = useState('');
   
@@ -63,7 +62,7 @@ const POS = () => {
   const [cashAmount, setCashAmount] = useState('');
   
   const [dueDate, setDueDate] = useState('');
-  const [useBonus, setUseBonus] = useState(false);
+  const [bonusToUse, setBonusToUse] = useState('');
   
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -80,13 +79,6 @@ const POS = () => {
 
     const unsubCustomers = onSnapshot(query(collection(db, `users/${storeId}/customers`), orderBy('createdAt', 'desc')), (snapshot) => {
       setCustomers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    });
-    
-    // Fetch Loyalty Settings
-    getDoc(doc(db, `users/${storeId}/settings/loyalty`)).then(snap => {
-      if (snap.exists()) {
-        setLoyaltySettings(snap.data());
-      }
     });
 
     return () => {
@@ -175,17 +167,18 @@ const POS = () => {
   
   // Apply bonus if checked
   let usedBonusAmount = 0;
-  if (useBonus && selectedCustomer && selectedCustomer.bonusBalance > 0) {
-    usedBonusAmount = Math.min(finalTotal, selectedCustomer.bonusBalance);
+  if (selectedCustomer && selectedCustomer.bonusBalance > 0 && Number(bonusToUse) > 0) {
+    usedBonusAmount = Math.min(finalTotal, Math.min(selectedCustomer.bonusBalance, Number(bonusToUse)));
     finalTotal -= usedBonusAmount;
   }
   
-  // Check if mixed payment matches
+  // Mixed payment auto calculation
   const mCash = Number(mixedCash) || 0;
   const mCard = Number(mixedCard) || 0;
-  const mDebt = Number(mixedDebt) || 0;
-  const mixedTotal = mCash + mCard + mDebt;
-  const mixedDiff = finalTotal - mixedTotal;
+  
+  const mDiff = finalTotal - (mCash + mCard);
+  const mDebt = Math.max(0, mDiff);
+  const mChange = Math.max(0, -mDiff);
 
   const filteredProducts = products.filter(p => 
     p.name.toLowerCase().includes(search.toLowerCase()) || p.barcode.includes(search)
@@ -216,143 +209,127 @@ const POS = () => {
       return;
     }
 
-    if (paymentType === 'mixed' && mixedDiff !== 0) {
-      addToast('Aralash to\'lovda kiritilgan summalar yig\'indisi yakuniy summaga teng emas', 'error');
-      return;
-    }
-
     setIsProcessing(true);
     try {
       let finalSaleData = null;
-      await runTransaction(db, async (transaction) => {
-        // 1. Read all product stocks first
-        const productRefs = cart.map(item => ({ ref: doc(db, `users/${storeId}/products`, item.id), ...item }));
-        const productSnaps = await Promise.all(productRefs.map(p => transaction.get(p.ref)));
-
-        let custSnap = null;
-        let custRef = null;
-        if (selectedCustomer) {
-          custRef = doc(db, `users/${storeId}/customers`, selectedCustomer.id);
-          custSnap = await transaction.get(custRef);
-        }
-
-        for (let i = 0; i < productSnaps.length; i++) {
-          const snap = productSnaps[i];
-          const item = productRefs[i];
-          const currentStock = snap.data().stockByWarehouse?.[selectedWarehouseId] || 0;
-          if (!snap.exists() || currentStock < item.qty) {
-            throw new Error(`Xatolik: ${item.name} qoldig'i (Filialda) yetarli emas.`);
-          }
-        }
-
-        // 2. Perform writes
-        for (let i = 0; i < productSnaps.length; i++) {
-          const snap = productSnaps[i];
-          const item = productRefs[i];
-          const currentStock = snap.data().stockByWarehouse?.[selectedWarehouseId] || 0;
-          transaction.update(item.ref, { [`stockByWarehouse.${selectedWarehouseId}`]: currentStock - item.qty });
-        }
-
-        // Calculate actual cash and card received
-        let finalCashReceived = 0;
-        let finalCardReceived = 0;
-        let finalDebtAmount = 0;
+      
+      const batch = writeBatch(db);
+      
+      // Calculate actual cash and card received
+      let finalCashReceived = 0;
+      let finalCardReceived = 0;
+      let finalDebtAmount = 0;
+      
+      let paymentBreakdown = [];
+      
+      if (paymentType === 'cash') {
+        finalCashReceived = finalTotal;
+        paymentBreakdown.push({ method: 'cash', amount: finalTotal });
+      } else if (paymentType === 'card') {
+        finalCardReceived = finalTotal;
+        paymentBreakdown.push({ method: 'card', amount: finalTotal });
+      } else if (paymentType === 'debt') {
+        finalDebtAmount = finalTotal;
+        paymentBreakdown.push({ method: 'debt', amount: finalTotal });
+      } else if (paymentType === 'mixed') {
+        let actualCash = mCash;
+        let actualCard = mCard;
+        let change = mChange;
         
-        let paymentBreakdown = [];
-        
-        if (paymentType === 'cash') {
-          finalCashReceived = finalTotal;
-          paymentBreakdown.push({ method: 'cash', amount: finalTotal });
-        } else if (paymentType === 'card') {
-          finalCardReceived = finalTotal;
-          paymentBreakdown.push({ method: 'card', amount: finalTotal });
-        } else if (paymentType === 'debt') {
-          finalDebtAmount = finalTotal;
-          paymentBreakdown.push({ method: 'debt', amount: finalTotal });
-        } else if (paymentType === 'mixed') {
-          finalCashReceived = mCash;
-          finalCardReceived = mCard;
-          finalDebtAmount = mDebt;
-          if (mCash > 0) paymentBreakdown.push({ method: 'cash', amount: mCash });
-          if (mCard > 0) paymentBreakdown.push({ method: 'card', amount: mCard });
-          if (mDebt > 0) paymentBreakdown.push({ method: 'debt', amount: mDebt });
-        }
-        
-        if (usedBonusAmount > 0) {
-          paymentBreakdown.push({ method: 'bonus', amount: usedBonusAmount });
-        }
-
-        // Loyalty calculation
-        let bonusEarned = 0;
-        if (selectedCustomer && custSnap.exists() && loyaltySettings.bonusPercent > 0) {
-          // Bonus is calculated on the amount actually paid by customer (excluding used bonus and maybe debt)
-          // Based on requirements: "Har bir yakunlangan sotuvda: bonusEarned = finalTotal * (bonusPercent/100) * vipMultiplier"
-          // Let's use finalTotal (which is after discount and after bonus deduction)
-          if (finalTotal >= (loyaltySettings.minPurchaseForBonus || 0)) {
-            const multiplier = custSnap.data().isVip ? (loyaltySettings.vipMultiplier || 1) : 1;
-            bonusEarned = finalTotal * (loyaltySettings.bonusPercent / 100) * multiplier;
+        if (change > 0) {
+          if (actualCash >= change) {
+            actualCash -= change;
+          } else {
+             let rem = change - actualCash;
+             actualCash = 0;
+             actualCard -= rem;
           }
         }
+        finalCashReceived = actualCash;
+        finalCardReceived = actualCard;
+        finalDebtAmount = mDebt;
+        if (actualCash > 0) paymentBreakdown.push({ method: 'cash', amount: actualCash });
+        if (actualCard > 0) paymentBreakdown.push({ method: 'card', amount: actualCard });
+        if (mDebt > 0) paymentBreakdown.push({ method: 'debt', amount: mDebt });
+      }
 
-        // 3. Create Sale Document
-        const saleRef = doc(collection(db, `users/${storeId}/sales`));
-        const saleData = {
-          saleNumber: 'CH-' + Date.now().toString().slice(-6),
-          items: cart.map(i => ({ productId: i.id, name: i.name, qty: i.qty, price: i.sellPrice, costPrice: i.costPrice })),
-          subtotal: subtotal,
-          discount: { type: discountType, value: discountAmount },
-          finalTotal: finalTotal,
-          paymentType: paymentType,
-          paymentBreakdown: paymentBreakdown,
-          cashReceived: finalCashReceived,
-          cardAmount: finalCardReceived,
-          bonusEarned: bonusEarned,
-          customerId: selectedCustomer?.id || null,
-          cashierId: userProfile?.name || 'Kassir',
-          status: 'completed',
-          createdAt: new Date().toISOString()
-        };
-        transaction.set(saleRef, saleData);
-        finalSaleData = { id: saleRef.id, ...saleData };
+      
+      if (usedBonusAmount > 0) {
+        paymentBreakdown.push({ method: 'bonus', amount: usedBonusAmount });
+      }
 
-        // 4. Create Debt Document if needed
-        if (finalDebtAmount > 0 && selectedCustomer) {
-          const debtRef = doc(collection(db, `users/${storeId}/customerDebts`));
-          transaction.set(debtRef, { 
-            customerId: selectedCustomer.id, 
-            relatedSaleId: saleRef.id,
-            amount: finalDebtAmount, 
-            remainingAmount: finalDebtAmount,
-            dueDate: dueDate,
-            note: 'Nasiya savdo ' + saleData.saleNumber,
-            status: 'active',
-            createdAt: new Date().toISOString(),
-            createdBy: userProfile?.name || 'Kassir'
-          });
-        }
+      // Loyalty calculation
+      let bonusEarned = 0;
+      if (selectedCustomer && selectedCustomer.bonusPercent > 0) {
+        bonusEarned = finalTotal * (Number(selectedCustomer.bonusPercent) / 100);
+      }
 
-        // 5. Update Customer
-        if (selectedCustomer && custSnap.exists()) {
-          const currentCust = custSnap.data();
-          const updates = { 
-            totalPurchases: (currentCust.totalPurchases || 0) + finalTotal, 
-            visits: (currentCust.visits || 0) + 1 
-          };
-          
-          if (finalDebtAmount > 0) {
-            updates.currentDebt = (currentCust.currentDebt || 0) + finalDebtAmount;
-          }
-          
-          if (usedBonusAmount > 0) {
-            updates.bonusBalance = (currentCust.bonusBalance || 0) - usedBonusAmount;
-          }
-          if (bonusEarned > 0) {
-            updates.bonusBalance = (updates.bonusBalance !== undefined ? updates.bonusBalance : (currentCust.bonusBalance || 0)) + bonusEarned;
-          }
-          
-          transaction.update(custRef, updates);
-        }
+      // 1. Update product stocks
+      cart.forEach(item => {
+        const productRef = doc(db, `users/${storeId}/products`, item.id);
+        batch.update(productRef, {
+          [`stockByWarehouse.${selectedWarehouseId}`]: increment(-item.qty)
+        });
       });
+
+      // 2. Create Sale Document
+      const saleRef = doc(collection(db, `users/${storeId}/sales`));
+      const saleData = {
+        saleNumber: 'CH-' + Date.now().toString().slice(-6),
+        items: cart.map(i => ({ productId: i.id, name: i.name, qty: i.qty, price: i.sellPrice, costPrice: i.costPrice })),
+        subtotal: subtotal,
+        discount: { type: discountType, value: discountAmount },
+        finalTotal: finalTotal,
+        paymentType: paymentType,
+        paymentBreakdown: paymentBreakdown,
+        cashReceived: finalCashReceived,
+        cardAmount: finalCardReceived,
+        bonusEarned: bonusEarned,
+        customerId: selectedCustomer?.id || null,
+        cashierId: userProfile?.name || 'Kassir',
+        status: 'completed',
+        createdAt: new Date().toISOString()
+      };
+      batch.set(saleRef, saleData);
+      finalSaleData = { id: saleRef.id, ...saleData };
+
+      // 3. Create Debt Document if needed
+      if (finalDebtAmount > 0 && selectedCustomer) {
+        const debtRef = doc(collection(db, `users/${storeId}/customerDebts`));
+        batch.set(debtRef, { 
+          customerId: selectedCustomer.id, 
+          relatedSaleId: saleRef.id,
+          amount: finalDebtAmount, 
+          remainingAmount: finalDebtAmount,
+          dueDate: dueDate,
+          note: 'Nasiya savdo ' + saleData.saleNumber,
+          status: 'active',
+          createdAt: new Date().toISOString(),
+          createdBy: userProfile?.name || 'Kassir'
+        });
+      }
+
+      // 4. Update Customer
+      if (selectedCustomer) {
+        const custRef = doc(db, `users/${storeId}/customers`, selectedCustomer.id);
+        const updates = { 
+          totalPurchases: increment(finalTotal), 
+          visits: increment(1) 
+        };
+        
+        if (finalDebtAmount > 0) {
+          updates.currentDebt = increment(finalDebtAmount);
+        }
+        
+        const netBonusChange = bonusEarned - usedBonusAmount;
+        if (netBonusChange !== 0) {
+          updates.bonusBalance = increment(netBonusChange);
+        }
+        
+        batch.update(custRef, updates);
+      }
+
+      await batch.commit();
 
       addToast('Sotuv muvaffaqiyatli amalga oshirildi', 'success');
       setLastSale({ ...finalSaleData, customerName: selectedCustomer?.fullName });
@@ -363,7 +340,7 @@ const POS = () => {
       setCustomerSearch('');
       setIsPaymentDrawerOpen(false);
       setDiscountValue('');
-      setUseBonus(false);
+      setBonusToUse('');
       setMixedCash('');
       setMixedCard('');
       setMixedDebt('');
@@ -531,8 +508,31 @@ const POS = () => {
         </div>
       </div>
 
-      <Drawer position="right" isOpen={isPaymentDrawerOpen} onClose={() => !isProcessing && setIsPaymentDrawerOpen(false)} title="To'lovni qabul qilish">
-        <div className="flex-col" style={{ gap: '1.5rem' }}>
+      <Modal maxWidth="1000px" isOpen={isPaymentDrawerOpen} onClose={() => !isProcessing && setIsPaymentDrawerOpen(false)} title="To'lovni qabul qilish">
+        <div style={{ display: 'flex', gap: '2rem', alignItems: 'stretch' }}>
+          
+          {/* Left Side: Receipt Preview */}
+          <div style={{ flex: 1, backgroundColor: 'var(--bg-surface)', padding: '1rem', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', alignItems: 'center', overflowY: 'auto', maxHeight: '70vh' }}>
+            <h3 style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: '1rem' }}>Chek namunasi</h3>
+            <div style={{ width: '100%', maxWidth: '350px', transform: 'scale(0.9)', transformOrigin: 'top center' }}>
+              <Receipt sale={{
+                id: 'PREVIEW',
+                items: cart,
+                subtotal: subtotal,
+                discountAmount: discountAmount,
+                usedBonusAmount: usedBonusAmount,
+                finalTotal: finalTotal,
+                paymentType: paymentType,
+                customerName: selectedCustomer ? selectedCustomer.fullName : 'Xaridor',
+                createdAt: new Date().toISOString(),
+                cashierId: userProfile?.name || 'Kassir',
+                storeId: storeId
+              }} storeId={storeId} />
+            </div>
+          </div>
+
+          {/* Right Side: Payment Options */}
+          <div className="flex-col" style={{ flex: 1, gap: '1.5rem', overflowY: 'auto', maxHeight: '70vh', paddingRight: '0.5rem' }}>
           
           {/* Summary */}
           <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
@@ -578,21 +578,47 @@ const POS = () => {
 
           {/* Bonus Option */}
           {selectedCustomer && selectedCustomer.bonusBalance > 0 && (
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '1rem', backgroundColor: '#fef3c7', borderRadius: 'var(--radius-md)', cursor: 'pointer' }}>
-              <input type="checkbox" checked={useBonus} onChange={e => setUseBonus(e.target.checked)} style={{ transform: 'scale(1.2)' }} />
-              <span style={{ fontWeight: 600, color: '#92400e' }}>
-                Bonusdan ishlatish (Mavjud: <CurrencyDisplay amount={selectedCustomer.bonusBalance} />)
+            <div style={{ padding: '1rem', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                <span style={{ fontWeight: 600 }}>Bonusdan ishlatish</span>
+                <span style={{ fontSize: '0.875rem', color: 'var(--primary)', fontWeight: 600 }}>Mavjud: <CurrencyDisplay amount={selectedCustomer.bonusBalance} /></span>
+              </div>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <input 
+                  type="number" 
+                  value={bonusToUse}
+                  onChange={e => {
+                     const val = Number(e.target.value);
+                     if (val <= selectedCustomer.bonusBalance) setBonusToUse(e.target.value);
+                  }}
+                  placeholder="Qancha ishlatmoqchisiz?"
+                  style={{ flex: 1, padding: '0.5rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}
+                />
+                <button 
+                  className="btn btn-outline" 
+                  onClick={() => setBonusToUse(selectedCustomer.bonusBalance)}
+                >Barchasi</button>
+              </div>
+            </div>
+          )}
+
+          {/* Expected Bonus */}
+          {selectedCustomer && selectedCustomer.bonusPercent > 0 && (
+            <div style={{ padding: '0.75rem', backgroundColor: 'var(--success-light)', border: '1px solid var(--success)', borderRadius: 'var(--radius-md)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ color: 'var(--success)', fontWeight: 600, fontSize: '0.875rem' }}>Ushbu xariddan tushadigan bonus:</span>
+              <span style={{ color: 'var(--success)', fontWeight: 'bold' }}>
+                <CurrencyDisplay amount={finalTotal * (Number(selectedCustomer.bonusPercent) / 100)} />
               </span>
-            </label>
+            </div>
           )}
 
           {/* Payment Methods Tabs */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem' }}>
             {[
               { id: 'cash', label: 'Naqd', icon: <Banknote size={16}/> },
               { id: 'card', label: 'Karta', icon: <CreditCard size={16}/> },
               { id: 'mixed', label: 'Aralash', icon: <FileText size={16}/> },
-              { id: 'debt', label: 'To\'liq Nasiya', icon: <Calendar size={16}/> }
+              { id: 'debt', label: 'Nasiya', icon: <Calendar size={16}/> }
             ].map(type => (
               <button 
                 key={type.id} 
@@ -602,7 +628,8 @@ const POS = () => {
                   flex: 1, 
                   backgroundColor: paymentType === type.id ? 'var(--primary)' : 'var(--bg-main)', 
                   color: paymentType === type.id ? 'white' : 'var(--text-secondary)',
-                  display: 'flex', gap: '0.5rem'
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.25rem',
+                  padding: '0.75rem 0.5rem', fontSize: '0.875rem'
                 }}
               >
                 {type.icon} {type.label}
@@ -611,19 +638,20 @@ const POS = () => {
           </div>
 
           {/* Inputs based on type */}
-          {paymentType === 'cash' && (
-            <FormInput label={`Qabul qilingan summa (${curr})`} type="number" value={cashAmount} onChange={e => setCashAmount(e.target.value)} placeholder={finalTotal} />
-          )}
           
           {paymentType === 'mixed' && (
             <div style={{ padding: '1rem', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <FormInput label={`Naqd (${curr})`} type="number" value={mixedCash} onChange={e => setMixedCash(e.target.value)} placeholder="0" />
               <FormInput label={`Karta (${curr})`} type="number" value={mixedCard} onChange={e => setMixedCard(e.target.value)} placeholder="0" />
-              <FormInput label={`Nasiya (${curr})`} type="number" value={mixedDebt} onChange={e => setMixedDebt(e.target.value)} placeholder="0" />
               
-              {mixedDiff !== 0 && (
-                <div style={{ color: mixedDiff > 0 ? 'var(--danger)' : 'var(--success)', fontWeight: 600, fontSize: '0.875rem' }}>
-                  {mixedDiff > 0 ? <>Yetishmayapti: <CurrencyDisplay amount={mixedDiff} /></> : <>Ortiqcha: <CurrencyDisplay amount={Math.abs(mixedDiff)} /></>}
+              {mDebt > 0 && (
+                <div style={{ color: 'var(--warning)', fontWeight: 600, fontSize: '0.875rem', padding: '1rem', backgroundColor: 'var(--warning-light)', borderRadius: 'var(--radius-md)' }}>
+                  Nasiyaga o'tmoqda: <CurrencyDisplay amount={mDebt} />
+                </div>
+              )}
+              {mChange > 0 && (
+                <div style={{ color: 'var(--success)', fontWeight: 600, fontSize: '0.875rem', padding: '1rem', backgroundColor: '#dcfce7', borderRadius: 'var(--radius-md)' }}>
+                  Qaytim: <CurrencyDisplay amount={mChange} />
                 </div>
               )}
             </div>
@@ -641,25 +669,19 @@ const POS = () => {
             </>
           )}
 
-          {paymentType === 'cash' && Number(cashAmount) > finalTotal && (
-            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '1rem', border: '1px dashed var(--success)', borderRadius: 'var(--radius-md)' }}>
-              <span style={{ fontWeight: 600 }}>Qaytim:</span>
-              <span style={{ fontWeight: 700, color: 'var(--success)' }}><CurrencyDisplay amount={Number(cashAmount) - finalTotal} /></span>
-            </div>
-          )}
-
           <div style={{ marginTop: 'auto', paddingTop: '1rem' }}>
             <button 
               className="btn btn-success" 
               style={{ width: '100%', padding: '1rem', fontSize: '1.125rem' }} 
               onClick={handleCheckout} 
-              disabled={isProcessing || ((paymentType === 'debt' || (paymentType === 'mixed' && mDebt > 0)) && !selectedCustomer) || (paymentType === 'mixed' && mixedDiff !== 0)}
+              disabled={isProcessing || ((paymentType === 'debt' || (paymentType === 'mixed' && mDebt > 0)) && !selectedCustomer)}
             >
               {isProcessing ? 'Bajarilmoqda...' : 'To\'lovni yakunlash'}
             </button>
           </div>
         </div>
-      </Drawer>
+        </div>
+      </Modal>
 
       {/* Chek (Receipt) Modali */}
       <Modal isOpen={isReceiptModalOpen} onClose={() => setIsReceiptModalOpen(false)} title="Xarid cheki">

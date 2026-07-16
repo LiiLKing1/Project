@@ -12,6 +12,7 @@ import FormInput from '../../components/FormInput';
 
 const Finance = () => {
   const [expenses, setExpenses] = useState([]);
+  const [partnerDebts, setPartnerDebts] = useState([]);
   const [loading, setLoading] = useState(false);
   const { addToast } = useToast();
   const { userProfile } = useRoles();
@@ -32,7 +33,12 @@ const Finance = () => {
       addToast(error.message, 'error');
       setLoading(false);
     });
-    return () => unsub();
+    
+    const unsubDebts = onSnapshot(collection(db, `users/${storeId}/partnerDebts`), (snapshot) => {
+      setPartnerDebts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+
+    return () => { unsub(); unsubDebts(); };
   }, [addToast, storeId]);
 
   const handleSave = async () => {
@@ -67,6 +73,13 @@ const Finance = () => {
   ];
 
   const totalExpenses = expenses.reduce((acc, curr) => acc + curr.amount, 0);
+  
+  const totalPartnerDebt = partnerDebts.reduce((acc, curr) => {
+    if (curr.status === 'active' || curr.status === 'partial' || curr.status === 'partially_paid') {
+      return acc + Number(curr.remainingAmount || 0);
+    }
+    return acc;
+  }, 0);
 
   return (
     <div className="flex-col" style={{ gap: '1.5rem', height: '100%' }}>
@@ -84,6 +97,16 @@ const Finance = () => {
               <div>
                 <div className="subtitle">Jami Xarajatlar (Tanlangan davr)</div>
                 <div className="h2"><CurrencyDisplay amount={totalExpenses} /></div>
+              </div>
+            </div>
+          </div>
+          
+          <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+              <div style={{ padding: '1rem', backgroundColor: 'var(--warning-light)', color: 'var(--warning)', borderRadius: 'var(--radius-lg)' }}><Wallet size={24} /></div>
+              <div>
+                <div className="subtitle">Hamkorlarga jami kreditorlik qarz</div>
+                <div className="h2" style={{ color: 'var(--warning)' }}><CurrencyDisplay amount={totalPartnerDebt} /></div>
               </div>
             </div>
           </div>
@@ -129,9 +152,11 @@ const Finance = () => {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1rem' }}>
             <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>Kategoriya</label>
-            <select value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})} style={{ padding: '0.75rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-surface)' }}>
-              {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
+            <CustomSelect 
+              value={formData.category} 
+              onChange={v => setFormData({...formData, category: v})}
+              options={categories.map(c => ({value: c.id, label: c.name}))}
+            />
           </div>
           <FormInput label="Sana" type="date" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} required />
         </div>

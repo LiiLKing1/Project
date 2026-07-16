@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useWarehouse } from '../../context/WarehouseContext';
 import { useRoles } from '../../context/RolesContext';
 import { useToast } from '../../context/ToastContext';
@@ -6,7 +6,8 @@ import { db } from '../../firebase';
 import { collection, query, where, getDocs, doc, runTransaction } from 'firebase/firestore';
 import Drawer from '../../components/Drawer';
 import FormInput from '../../components/FormInput';
-import { ArrowRight, Search, CheckCircle } from 'lucide-react';
+import { ArrowRight, Search, CheckCircle2, AlertTriangle } from 'lucide-react';
+import CustomSelect from '../../components/CustomSelect';
 
 const TransferDrawer = ({ isOpen, onClose }) => {
   const { warehouses } = useWarehouse();
@@ -104,18 +105,26 @@ const TransferDrawer = ({ isOpen, onClose }) => {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: '1rem', alignItems: 'center', backgroundColor: 'var(--bg-main)', padding: '1rem', borderRadius: 'var(--radius-md)' }}>
           <div className="flex-col" style={{ gap: '0.5rem' }}>
             <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>Qaysi ombordan</label>
-            <select value={sourceId} onChange={e => setSourceId(e.target.value)} style={{ padding: '0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-surface)' }}>
-              <option value="">-- Tanlang --</option>
-              {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
-            </select>
+            <CustomSelect 
+              value={sourceId} 
+              onChange={v => setSourceId(v)} 
+              options={[
+                {value: '', label: '-- Tanlang --'},
+                ...warehouses.map(w => ({value: w.id, label: w.name}))
+              ]}
+            />
           </div>
           <ArrowRight size={20} color="var(--text-secondary)" style={{ marginTop: '1.5rem' }} />
           <div className="flex-col" style={{ gap: '0.5rem' }}>
             <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>Qaysi omborga</label>
-            <select value={destId} onChange={e => setDestId(e.target.value)} style={{ padding: '0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-surface)' }}>
-              <option value="">-- Tanlang --</option>
-              {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
-            </select>
+            <CustomSelect 
+              value={destId} 
+              onChange={v => setDestId(v)} 
+              options={[
+                {value: '', label: '-- Tanlang --'},
+                ...warehouses.map(w => ({value: w.id, label: w.name}))
+              ]}
+            />
           </div>
         </div>
 

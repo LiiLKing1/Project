@@ -6,6 +6,7 @@ import { useToast } from '../../context/ToastContext';
 import { Download, Upload, CloudLightning, FileJson, FileSpreadsheet, AlertCircle } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import Modal from '../../components/Modal';
+import ProductImporter from '../../components/ProductImporter';
 
 const ALL_COLLECTIONS = [
   { id: 'products', label: 'Mahsulotlar' },
@@ -26,6 +27,7 @@ const Backup = () => {
   
   const [importFile, setImportFile] = useState(null);
   const [isRestoreModalOpen, setIsRestoreModalOpen] = useState(false);
+  const [isProductImportOpen, setIsProductImportOpen] = useState(false);
 
   const { userProfile } = useRoles();
   const { addToast } = useToast();
@@ -197,7 +199,7 @@ const Backup = () => {
 
   return (
     <div className="flex-col" style={{ gap: '1.5rem', height: '100%' }}>
-      <h1 className="h1">Zaxira Nusxa va Tiklash</h1>
+      <h1 className="h1">Yuklanishlar (Import / Eksport)</h1>
 
       <div className="glass-panel flex-col" style={{ gap: '1.5rem', padding: '2rem' }}>
         
@@ -248,20 +250,36 @@ const Backup = () => {
 
         <hr style={{ border: 'none', borderBottom: '1px solid var(--border-color)', margin: '1rem 0' }} />
 
-        <div style={{ padding: '1.5rem', backgroundColor: 'var(--bg-main)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <Upload size={24} color="var(--warning)" />
-            <h3 style={{ margin: 0, color: 'var(--warning)' }}>Zaxiradan tiklash (Restore)</h3>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem' }}>
+          <div style={{ padding: '1.5rem', backgroundColor: 'var(--bg-main)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+              <Upload size={24} color="var(--warning)" />
+              <h3 style={{ margin: 0, color: 'var(--warning)' }}>Zaxiradan tiklash (Restore)</h3>
+            </div>
+            <p style={{ fontSize: '0.875rem', margin: 0, color: 'var(--text-secondary)' }}>
+              Oldin yuklab olingan zaxira (.xlsx) faylini yuklash orqali ma'lumotlarni tiklashingiz mumkin. Tizimdagi bor ma'lumotlar ustidan yoziladi.
+            </p>
+            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+              <label className="btn btn-outline" style={{ borderColor: 'var(--warning)', color: 'var(--warning)', cursor: 'pointer' }}>
+                <input type="file" accept=".xlsx, .xls" style={{ display: 'none' }} onChange={handleFileChange} />
+                Excel orqali tiklash
+              </label>
+            </div>
           </div>
-          <p style={{ fontSize: '0.875rem', margin: 0, color: 'var(--text-secondary)' }}>
-            Oldin yuklab olingan Excel zaxira faylini (.xlsx) tizimga qayta yuklash orqali ma'lumotlarni tiklashingiz mumkin. 
-            <strong> Ogohlantirish:</strong> Exceldagi ma'lumotlar joriy bazadagi bir xil ID ga ega ma'lumotlarni ustidan yoziladi.
-          </p>
-          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-            <label className="btn btn-outline" style={{ borderColor: 'var(--warning)', color: 'var(--warning)', cursor: 'pointer' }}>
-              <input type="file" accept=".xlsx, .xls" style={{ display: 'none' }} onChange={handleFileChange} />
-              Excel orqali tiklash
-            </label>
+
+          <div style={{ padding: '1.5rem', backgroundColor: 'var(--bg-main)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+              <FileSpreadsheet size={24} color="var(--success)" />
+              <h3 style={{ margin: 0, color: 'var(--success)' }}>Mahsulotlarni Yuklash</h3>
+            </div>
+            <p style={{ fontSize: '0.875rem', margin: 0, color: 'var(--text-secondary)' }}>
+              Yangi mahsulotlarni shablon orqali ommaviy yuklash imkoniyati.
+            </p>
+            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginTop: 'auto' }}>
+              <button className="btn btn-outline" style={{ borderColor: 'var(--success)', color: 'var(--success)' }} onClick={() => setIsProductImportOpen(true)}>
+                Mahsulot importi
+              </button>
+            </div>
           </div>
         </div>
 
@@ -281,6 +299,8 @@ const Backup = () => {
           </div>
         </div>
       </Modal>
+
+      <ProductImporter isOpen={isProductImportOpen} onClose={() => setIsProductImportOpen(false)} />
 
     </div>
   );

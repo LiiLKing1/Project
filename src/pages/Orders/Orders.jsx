@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { PackageOpen, Search, Plus, Trash2, CheckCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { PackageOpen, Search, Plus, Trash2, CheckCircle, ChevronDown, ChevronUp, X } from 'lucide-react';
+import CustomSelect from '../../components/CustomSelect';
 import { db } from '../../firebase';
 import { collection, onSnapshot, query, orderBy, doc, runTransaction, getDocs } from 'firebase/firestore';
 import { useToast } from '../../context/ToastContext';
@@ -369,14 +370,14 @@ const Orders = () => {
                 + Yangi qo'shish
               </button>
             </div>
-            <select 
+            <CustomSelect 
               value={orderSupplierId} 
-              onChange={e => setOrderSupplierId(e.target.value)}
-              style={{ padding: '0.75rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-surface)' }}
-            >
-              <option value="">-- Tanlang --</option>
-              {suppliers.map(s => <option key={s.id} value={s.id}>{s.fullName} {s.companyName ? `(${s.companyName})` : ''}</option>)}
-            </select>
+              onChange={v => setOrderSupplierId(v)}
+              options={[
+                {value: '', label: '-- Tanlang --'},
+                ...suppliers.map(s => ({value: s.id, label: `${s.fullName} ${s.companyName ? `(${s.companyName})` : ''}`}))
+              ]}
+            />
           </div>
 
           {/* Product Selection */}
@@ -401,9 +402,14 @@ const Orders = () => {
               {showProductDropdown && (
                 <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', zIndex: 10, marginTop: '0.5rem', boxShadow: 'var(--shadow-md)', maxHeight: '250px', overflowY: 'auto' }}>
                   {filteredProdSearch.map(p => (
-                    <div key={p.id} onClick={() => handleAddProductToOrder(p)} style={{ padding: '0.75rem 1rem', cursor: 'pointer', borderBottom: '1px solid var(--border-color)' }}>
-                      <div style={{ fontWeight: 600 }}>{p.name}</div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'flex', gap: '0.25rem' }}>Tannarx: <CurrencyDisplay amount={p.costPrice} /></div>
+                    <div key={p.id} onClick={() => handleAddProductToOrder(p)} style={{ padding: '0.75rem 1rem', cursor: 'pointer', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <div style={{ fontWeight: 600 }}>{p.name}</div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'flex', gap: '0.25rem' }}>Tannarx: <CurrencyDisplay amount={p.costPrice} /></div>
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: Number(p.stockByWarehouse?.[selectedWarehouseId] || 0) <= 0 ? 'var(--danger)' : 'var(--success)', fontWeight: 500, textAlign: 'right' }}>
+                        Qoldiq: {p.stockByWarehouse?.[selectedWarehouseId] || 0} {p.unit || 'dona'}
+                      </div>
                     </div>
                   ))}
                   {filteredProdSearch.length === 0 && productSearch.trim() !== '' && (
@@ -492,12 +498,16 @@ const Orders = () => {
             <FormInput label="Miqdori *" type="number" value={newProductData.qty} onChange={e => setNewProductData({...newProductData, qty: e.target.value})} required />
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>Birlik</label>
-              <select value={newProductData.unit} onChange={e => setNewProductData({...newProductData, unit: e.target.value})} style={{ padding: '0.75rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-surface)' }}>
-                <option value="dona">Dona</option>
-                <option value="kg">Kg</option>
-                <option value="metr">Metr</option>
-                <option value="litr">Litr</option>
-              </select>
+              <CustomSelect 
+                value={newProductData.unit} 
+                onChange={v => setNewProductData({...newProductData, unit: v})}
+                options={[
+                  {value: 'dona', label: 'Dona'},
+                  {value: 'kg', label: 'Kg'},
+                  {value: 'metr', label: 'Metr'},
+                  {value: 'litr', label: 'Litr'}
+                ]}
+              />
             </div>
           </div>
           <FormInput label="Izoh" value={newProductData.note} onChange={e => setNewProductData({...newProductData, note: e.target.value})} />

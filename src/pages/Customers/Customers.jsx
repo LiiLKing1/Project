@@ -23,7 +23,7 @@ const Customers = () => {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
-  const [formData, setFormData] = useState({ fullName: '', phone: '+998', birthDate: '', gender: '', note: '', currentDebt: '', isVip: false, bonusBalance: '' });
+  const [formData, setFormData] = useState({ fullName: '', phone: '+998', birthDate: '', gender: '', note: '', currentDebt: '', isVip: false, bonusBalance: '', bonusPercent: '' });
   const [formErrors, setFormErrors] = useState({});
 
   useEffect(() => {
@@ -80,6 +80,7 @@ const Customers = () => {
       ...formData,
       currentDebt: formData.currentDebt ? Number(formData.currentDebt) : 0,
       bonusBalance: formData.bonusBalance ? Number(formData.bonusBalance) : (editingId ? undefined : 0),
+      bonusPercent: formData.bonusPercent ? Number(formData.bonusPercent) : 0,
       isVip: formData.isVip,
       phone: formData.phone.replace(/\s+/g, ''),
       totalPurchases: editingId ? undefined : 0,
@@ -133,11 +134,12 @@ const Customers = () => {
         note: customer.note || '', 
         currentDebt: customer.currentDebt || '',
         isVip: customer.isVip || false,
-        bonusBalance: customer.bonusBalance !== undefined ? customer.bonusBalance : ''
+        bonusBalance: customer.bonusBalance !== undefined ? customer.bonusBalance : '',
+        bonusPercent: customer.bonusPercent !== undefined ? customer.bonusPercent : ''
       });
     } else {
       setEditingId(null);
-      setFormData({ fullName: '', phone: '+998', birthDate: '', gender: '', note: '', currentDebt: '', isVip: false, bonusBalance: '' });
+      setFormData({ fullName: '', phone: '+998', birthDate: '', gender: '', note: '', currentDebt: '', isVip: false, bonusBalance: '', bonusPercent: '' });
     }
     setIsModalOpen(true);
   };
@@ -153,11 +155,46 @@ const Customers = () => {
     )
   );
 
+  // Summaries
+  const totalCustomers = customers.filter(c => c.status !== 'archived').length;
+  
+  const now = new Date();
+  const startOfThisWeek = new Date(now);
+  startOfThisWeek.setHours(0, 0, 0, 0);
+  startOfThisWeek.setDate(startOfThisWeek.getDate() - (startOfThisWeek.getDay() === 0 ? 6 : startOfThisWeek.getDay() - 1));
+  const newThisWeek = customers.filter(c => c.status !== 'archived' && c.createdAt && new Date(c.createdAt) >= startOfThisWeek).length;
+
+  const inactiveLimitDate = new Date(now);
+  inactiveLimitDate.setMonth(inactiveLimitDate.getMonth() - 3); // 3 oy
+  const inactiveCustomers = customers.filter(c => c.status !== 'archived' && (!c.lastPurchaseDate || new Date(c.lastPurchaseDate) < inactiveLimitDate)).length;
+
+  const currentMonth = String(now.getMonth() + 1).padStart(2, '0');
+  const birthdays = customers.filter(c => c.status !== 'archived' && c.birthDate && c.birthDate.split('-')[1] === currentMonth).length;
+
   return (
     <div className="flex-col" style={{ gap: '1.5rem', height: '100%' }}>
       <div className="flex-between">
-        <h1 className="h1">Mijozlar</h1>
+        <h1 className="h1">Barcha mijozlar</h1>
         <button className="btn btn-primary" onClick={() => openModal()}><UserPlus size={18} /> Yangi mijoz</button>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem' }}>
+        <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          <div style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>Jami mijozlar</div>
+          <div className="h2" style={{ color: 'var(--primary)' }}>{totalCustomers} <span style={{ fontSize: '1rem', color: 'var(--text-main)', fontWeight: 'normal' }}>mijozlar</span></div>
+        </div>
+        <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          <div style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>O'tgan hafta</div>
+          <div className="h2" style={{ color: 'var(--success)' }}>+{newThisWeek} <span style={{ fontSize: '1rem', color: 'var(--text-main)', fontWeight: 'normal' }}>mijozlar</span></div>
+        </div>
+        <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          <div style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>Qaytib kelmaydiganlar</div>
+          <div className="h2" style={{ color: 'var(--warning)' }}>{inactiveCustomers} <span style={{ fontSize: '1rem', color: 'var(--text-main)', fontWeight: 'normal' }}>mijozlar</span></div>
+        </div>
+        <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          <div style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>Tug'ilgan kunlar</div>
+          <div className="h2" style={{ color: '#8B5CF6' }}>{birthdays} <span style={{ fontSize: '1rem', color: 'var(--text-main)', fontWeight: 'normal' }}>mijozlar</span></div>
+        </div>
       </div>
 
       <div className="glass-panel" style={{ padding: '1.5rem', flex: 1, display: 'flex', flexDirection: 'column' }}>
@@ -193,6 +230,7 @@ const Customers = () => {
                     <td style={{ padding: '1rem', fontWeight: '500' }}>
                       {c.fullName}
                       {c.isVip && <span style={{ marginLeft: '0.5rem', fontSize: '0.7rem', padding: '0.15rem 0.4rem', backgroundColor: '#fbbf24', color: '#000', borderRadius: '1rem', fontWeight: 600 }}>VIP</span>}
+                      {c.bonusPercent > 0 && <span style={{ marginLeft: '0.5rem', fontSize: '0.7rem', padding: '0.15rem 0.4rem', backgroundColor: 'var(--primary-light)', color: 'var(--primary)', borderRadius: '1rem', fontWeight: 600 }}>{c.bonusPercent}% Bonus</span>}
                     </td>
                     <td style={{ padding: '1rem', color: 'var(--text-secondary)' }}>{c.phone}</td>
                     <td style={{ padding: '1rem', fontWeight: '600' }}><CurrencyDisplay amount={c.totalPurchases} /></td>
@@ -238,9 +276,11 @@ const Customers = () => {
           )}
         </div>
 
+        <FormInput label="Xarid bonusi foizi (%)" type="number" value={formData.bonusPercent} onChange={e => setFormData({...formData, bonusPercent: e.target.value})} placeholder="Masalan: 1" />
+
         <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', marginTop: '0.5rem', padding: '0.5rem', backgroundColor: 'var(--bg-main)', borderRadius: 'var(--radius-md)' }}>
           <input type="checkbox" checked={formData.isVip} onChange={e => setFormData({...formData, isVip: e.target.checked})} style={{ transform: 'scale(1.2)' }} />
-          <span style={{ fontWeight: 600, color: 'var(--warning)' }}>VIP mijoz (Bonuslar ko'paytmasi ishlaydi)</span>
+          <span style={{ fontWeight: 600, color: 'var(--warning)' }}>VIP mijoz (Yana qandaydir ustunliklar uchun ishlating)</span>
         </label>
 
         <FormInput label="Izoh" value={formData.note} onChange={e => setFormData({...formData, note: e.target.value})} />

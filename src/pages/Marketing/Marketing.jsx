@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Megaphone, Plus, Percent, Check, Send } from 'lucide-react';
+import CustomSelect from '../../components/CustomSelect';
 import { db } from '../../firebase';
 import { collection, onSnapshot, query, orderBy, doc } from 'firebase/firestore';
 import { saveDoc, editDoc } from '../../utils/firebaseUtils';
@@ -105,12 +106,16 @@ const Marketing = () => {
           <div style={{ padding: '1.5rem', flex: 1, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>Kimga yuboriladi?</label>
-              <select style={{ padding: '0.75rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-surface)' }}>
-                <option>Barcha mijozlarga</option>
-                <option>VIP mijozlarga</option>
-                <option>Qarzdorlarga</option>
-                <option>Bugun tug'ilgan kuni bo'lganlarga</option>
-              </select>
+              <CustomSelect 
+                value="all"
+                onChange={() => {}}
+                options={[
+                  {value: 'all', label: 'Barcha mijozlarga'},
+                  {value: 'vip', label: 'VIP mijozlarga'},
+                  {value: 'debtors', label: 'Qarzdorlarga'},
+                  {value: 'birthday', label: "Bugun tug'ilgan kuni bo'lganlarga"}
+                ]}
+              />
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>Xabar matni</label>
@@ -132,19 +137,27 @@ const Marketing = () => {
         <FormInput label="Aksiya nomi" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} required />
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1rem' }}>
           <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>Aksiya turi</label>
-          <select value={formData.type} onChange={e => setFormData({...formData, type: e.target.value})} style={{ padding: '0.75rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-surface)' }}>
-            <option value="discount">Umumiy chegirma</option>
-            <option value="bundle">To'plam (1+1=3)</option>
-          </select>
+          <CustomSelect 
+            value={formData.type} 
+            onChange={v => setFormData({...formData, type: v})}
+            options={[
+              {value: 'discount', label: 'Umumiy chegirma'},
+              {value: 'bundle', label: "To'plam (1+1=3)"}
+            ]}
+          />
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
           <FormInput label="Chegirma qiymati" type="number" value={formData.discountValue} onChange={e => setFormData({...formData, discountValue: e.target.value})} required />
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>Qiymat turi</label>
-            <select value={formData.discountType} onChange={e => setFormData({...formData, discountType: e.target.value})} style={{ padding: '0.75rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-surface)' }}>
-              <option value="percent">Foiz (%)</option>
-              <option value="amount">Summa ({curr})</option>
-            </select>
+            <CustomSelect 
+              value={formData.discountType} 
+              onChange={v => setFormData({...formData, discountType: v})}
+              options={[
+                {value: 'percent', label: 'Foiz (%)'},
+                {value: 'amount', label: `Summa (${curr})`}
+              ]}
+            />
           </div>
         </div>
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1.5rem' }}>

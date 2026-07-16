@@ -14,6 +14,7 @@ const Topbar = ({ toggleSidebar }) => {
   const [storeName, setStoreName] = useState(userProfile?.storeName || "Asosiy Filial");
   const [overdueDebts, setOverdueDebts] = useState([]);
   const [customers, setCustomers] = useState([]);
+  const [allProducts, setAllProducts] = useState([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [dismissedNotifs, setDismissedNotifs] = useState(() => {
     try { return JSON.parse(localStorage.getItem('dismissedNotifs')) || []; } catch { return []; }
@@ -71,10 +72,15 @@ const Topbar = ({ toggleSidebar }) => {
         setCustomers(snapshot.docs.map(d => ({id: d.id, ...d.data()})));
       });
 
+      const unsubProducts = onSnapshot(collection(db, `users/${userProfile.storeOwnerId}/products`), (snapshot) => {
+        setAllProducts(snapshot.docs.map(d => ({id: d.id, ...d.data()})));
+      });
+
       return () => {
         unsubStore();
         unsubDebts();
         unsubCustomers();
+        unsubProducts();
       };
     }
   }, [userProfile?.storeOwnerId]);
@@ -90,6 +96,14 @@ const Topbar = ({ toggleSidebar }) => {
   };
   
   const visibleDebts = overdueDebts.filter(d => !dismissedNotifs.includes(d.id));
+  
+  const outOfStockProducts = allProducts.filter(p => 
+    p.status !== 'archived' && 
+    (p.stockByWarehouse?.[selectedWarehouseId] || 0) <= (Number(p.minStock) || 0)
+  );
+  const visibleOutOfStock = outOfStockProducts.filter(p => !dismissedNotifs.includes(`stock-${p.id}`));
+  
+  const totalNotifs = visibleDebts.length + visibleOutOfStock.length;
 
   return (
     <header className="topbar">
@@ -124,9 +138,9 @@ const Topbar = ({ toggleSidebar }) => {
             style={{ padding: '8px', borderRadius: '50%', backgroundColor: 'var(--bg-main)', color: 'var(--text-secondary)', cursor: 'pointer', border: 'none' }}
           >
             <Bell size={20} />
-            {visibleDebts.length > 0 && (
+            {totalNotifs > 0 && (
               <span style={{ position: 'absolute', top: '-2px', right: '-2px', backgroundColor: 'var(--danger)', color: '#fff', fontSize: '0.65rem', fontWeight: 'bold', width: '18px', height: '18px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                {visibleDebts.length}
+                {totalNotifs > 99 ? '99+' : totalNotifs}
               </span>
             )}
           </button>
@@ -137,36 +151,63 @@ const Topbar = ({ toggleSidebar }) => {
                 Xabarnomalar
               </div>
               <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
-                {visibleDebts.length > 0 ? (
-                  visibleDebts.map(debt => {
-                    const customer = customers.find(c => c.id === debt.customerId);
-                    const customerName = customer ? customer.fullName : 'Noma\'lum mijoz';
-                    return (
+                {totalNotifs > 0 ? (
+                  <>
+                    {visibleDebts.map(debt => {
+                      const customer = customers.find(c => c.id === debt.customerId);
+                      const customerName = customer ? customer.fullName : 'Noma\'lum mijoz';
+                      return (
+                        <div 
+                          key={debt.id} 
+                          onClick={() => { 
+                            handleDismiss(debt.id);
+                            setShowDropdown(false); 
+                            navigate('/customers/debts'); 
+                          }}
+                          style={{ padding: '1rem', borderBottom: '1px solid var(--border-color)', cursor: 'pointer', transition: 'background-color 0.2s' }}
+                          onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--bg-main)'}
+                          onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div style={{ fontWeight: 500, color: 'var(--danger)', fontSize: '0.875rem' }}>Muddati o'tgan qarz</div>
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); handleDismiss(debt.id); }}
+                              style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '1rem' }}
+                              title="O'chirish"
+                            >×</button>
+                          </div>
+                          <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '0.25rem', lineHeight: '1.4' }}>
+                            Bugun <strong>{customerName}</strong> sizga <strong>{formatCurrency(debt.remainingAmount, curr)}</strong> qarzini berishi kerak.
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {visibleOutOfStock.map(product => (
                       <div 
-                        key={debt.id} 
+                        key={`stock-${product.id}`}
                         onClick={() => { 
-                          handleDismiss(debt.id);
+                          handleDismiss(`stock-${product.id}`);
                           setShowDropdown(false); 
-                          navigate('/customers/debts'); 
+                          navigate('/products/catalog', { state: { editProductId: product.id } }); 
                         }}
                         style={{ padding: '1rem', borderBottom: '1px solid var(--border-color)', cursor: 'pointer', transition: 'background-color 0.2s' }}
                         onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--bg-main)'}
                         onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
                       >
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <div style={{ fontWeight: 500, color: 'var(--danger)', fontSize: '0.875rem' }}>Muddati o'tgan qarz</div>
+                          <div style={{ fontWeight: 500, color: 'var(--warning)', fontSize: '0.875rem' }}>Kam qoldi / Tugadi</div>
                           <button 
-                            onClick={(e) => { e.stopPropagation(); handleDismiss(debt.id); }}
+                            onClick={(e) => { e.stopPropagation(); handleDismiss(`stock-${product.id}`); }}
                             style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '1rem' }}
                             title="O'chirish"
                           >×</button>
                         </div>
                         <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '0.25rem', lineHeight: '1.4' }}>
-                          Bugun <strong>{customerName}</strong> sizga <strong>{formatCurrency(debt.remainingAmount, curr)}</strong> qarzini berishi kerak.
+                          <strong>{product.name}</strong> mahsuloti omborda kam qoldi yoki tugadi (qoldiq: {product.stockByWarehouse?.[selectedWarehouseId] || 0} {product.unit || 'dona'}).
                         </div>
                       </div>
-                    );
-                  })
+                    ))}
+                  </>
                 ) : (
                   <div style={{ padding: '2rem 1rem', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
                     Yangi xabarnomalar yo'q
