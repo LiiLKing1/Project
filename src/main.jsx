@@ -7,6 +7,7 @@ import { RolesProvider } from './context/RolesContext';
 import { ToastProvider } from './context/ToastContext';
 import { SettingsProvider } from './context/SettingsContext';
 import { WarehouseProvider } from './context/WarehouseContext';
+import { ConfirmProvider } from './context/ConfirmContext';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
@@ -15,7 +16,9 @@ ReactDOM.createRoot(document.getElementById('root')).render(
         <SettingsProvider>
           <WarehouseProvider>
             <ToastProvider>
-              <App />
+              <ConfirmProvider>
+                <App />
+              </ConfirmProvider>
             </ToastProvider>
           </WarehouseProvider>
         </SettingsProvider>

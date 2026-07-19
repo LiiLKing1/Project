@@ -48,16 +48,22 @@ const Modal = ({ isOpen, onClose, title, children, maxWidth = '500px' }) => {
             }}
           >
             <div style={{
-              padding: '1.5rem',
+              padding: '20px 24px',
               borderBottom: '1px solid var(--border-color)',
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center'
             }}>
-              <h2 className="h2">{title}</h2>
-              <button onClick={onClose} style={{ fontSize: '1.25rem', color: 'var(--text-secondary)' }}>✕</button>
+              <h2 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-main)', margin: 0 }}>{title}</h2>
+              <button onClick={onClose} 
+                style={{ width: 32, height: 32, borderRadius: '10px', backgroundColor: '#F3F4F6', color: '#6B7280', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', cursor: 'pointer', transition: 'all 0.2s' }}
+                onMouseEnter={e => { e.currentTarget.style.backgroundColor = '#FEE2E2'; e.currentTarget.style.color = '#EF4444'; }}
+                onMouseLeave={e => { e.currentTarget.style.backgroundColor = '#F3F4F6'; e.currentTarget.style.color = '#6B7280'; }}
+              >
+                ✕
+              </button>
             </div>
-            <div style={{ padding: '1.5rem', overflowY: 'auto' }}>
+            <div style={{ padding: '24px', overflowY: 'auto', minHeight: 0 }}>
               {children}
             </div>
           </motion.div>

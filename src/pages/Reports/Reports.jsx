@@ -24,8 +24,8 @@ const Reports = () => {
     const d = new Date();
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   };
-  const [startDate, setStartDate] = useState(getTodayStr());
-  const [endDate, setEndDate] = useState(getTodayStr());
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [historySearch, setHistorySearch] = useState('');
   const { userProfile } = useRoles();
   const { addToast } = useToast();

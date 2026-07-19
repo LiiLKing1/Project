@@ -8,6 +8,7 @@ import { useToast } from '../../context/ToastContext';
 import { useRoles } from '../../context/RolesContext';
 import { useSettings } from '../../context/SettingsContext';
 import { useAuth } from '../../context/AuthContext';
+import { useConfirm } from '../../context/ConfirmContext';
 import FormInput from '../../components/FormInput';
 import Modal from '../../components/Modal';
 
@@ -29,6 +30,7 @@ const Settings = () => {
   const { addToast } = useToast();
   const { userProfile } = useRoles();
   const { settings, updateSettings } = useSettings();
+  const { confirm } = useConfirm();
   const { logout } = useAuth();
   const storeId = userProfile?.storeOwnerId;
 
@@ -102,7 +104,7 @@ const Settings = () => {
 
   const handleRunMigration = async () => {
     if (!storeId) return;
-    if (!window.confirm("Barcha mahsulotlarning 'stock' qoldig'i yangi 'Filiallar (Multi-Warehouse)' tizimiga o'tkaziladi. Buni faqat bir marta bajaring! Zaxira (Export) olganmisiz?")) return;
+    if (!(await confirm({ message: "Barcha mahsulotlarning 'stock' qoldig'i yangi 'Filiallar (Multi-Warehouse)' tizimiga o'tkaziladi. Buni faqat bir marta bajaring! Zaxira (Export) olganmisiz?" }))) return;
     
     setIsSaving(true);
     try {
@@ -133,23 +135,30 @@ const Settings = () => {
   };
 
   return (
-    <div className="flex-col" style={{ gap: '1.5rem', height: '100%', maxWidth: '800px', margin: '0 auto', width: '100%' }}>
-      <div className="flex-between">
-        <h1 className="h1">Sozlamalar</h1>
-        <button className="btn btn-primary" onClick={handleSave} disabled={isSaving}><Save size={18} /> {isSaving ? 'Saqlanmoqda...' : 'Saqlash'}</button>
+    <div className="page-wrapper" style={{ maxWidth: '800px', margin: '0 auto' }}>
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">Sozlamalar</h1>
+          <p className="page-subtitle">Tizim va do'kon sozlamalari</p>
+        </div>
+        <button className="btn btn-primary" onClick={handleSave} disabled={isSaving}>
+          <Save size={18} /> {isSaving ? 'Saqlanmoqda...' : 'Saqlash'}
+        </button>
       </div>
 
-      <div className="glass-panel" style={{ padding: '2rem', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+      <div className="page-card" style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: '32px' }}>
         
         {/* Umumiy (Tizim) */}
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
-            <Globe size={20} color="var(--primary)" />
-            <h2 className="h2" style={{ fontSize: '1.25rem' }}>Tizim sozlamalari</h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px', borderBottom: '1px solid #DCE8F5', paddingBottom: '12px' }}>
+            <div style={{ width: 36, height: 36, borderRadius: '10px', backgroundColor: '#F0F6FF', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#4A90E2' }}>
+              <Globe size={20} />
+            </div>
+            <h2 style={{ fontSize: 18, fontWeight: 700, color: '#1A2538', margin: 0 }}>Tizim sozlamalari</h2>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>Til (Language)</label>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <label style={{ fontSize: 14, fontWeight: 500, color: '#1A2538' }}>Til (Language)</label>
               <CustomSelect 
                 value={generalData.language} 
                 onChange={v => setGeneralData({...generalData, language: v})} 
@@ -160,8 +169,8 @@ const Settings = () => {
                 ]}
               />
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>Mavzu (Theme)</label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <label style={{ fontSize: 14, fontWeight: 500, color: '#1A2538' }}>Mavzu (Theme)</label>
               <CustomSelect 
                 value={generalData.theme} 
                 onChange={v => setGeneralData({...generalData, theme: v})} 
@@ -171,8 +180,8 @@ const Settings = () => {
                 ]}
               />
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>Asosiy Valyuta</label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <label style={{ fontSize: 14, fontWeight: 500, color: '#1A2538' }}>Asosiy Valyuta</label>
               <CustomSelect 
                 value={generalData.currency} 
                 onChange={v => setGeneralData({...generalData, currency: v})} 
@@ -183,10 +192,10 @@ const Settings = () => {
                 ]}
               />
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', justifyContent: 'center' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', marginTop: '1.5rem' }}>
-                <input type="checkbox" checked={generalData.showUsdConversion} onChange={e => setGeneralData({...generalData, showUsdConversion: e.target.checked})} />
-                <span style={{ fontSize: '0.875rem', fontWeight: 500 }}>Chet el valyutasi (USD/RUB) kiritilsa tagida UZS da ko'rsatilsin</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', justifyContent: 'center' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', marginTop: '24px' }}>
+                <input type="checkbox" checked={generalData.showUsdConversion} onChange={e => setGeneralData({...generalData, showUsdConversion: e.target.checked})} style={{ accentColor: '#4A90E2', width: 16, height: 16 }} />
+                <span style={{ fontSize: 14, fontWeight: 500, color: '#1A2538' }}>Chet el valyutasi (USD/RUB) kiritilsa tagida UZS da ko'rsatilsin</span>
               </label>
             </div>
             <FormInput label="USD kursi (1 $ = ... UZS)" type="number" value={generalData.usdRate} onChange={e => setGeneralData({...generalData, usdRate: e.target.value})} />
@@ -194,12 +203,12 @@ const Settings = () => {
           </div>
 
           {userProfile?.role === 'admin' && (
-            <div style={{ marginTop: '2rem', padding: '1.5rem', backgroundColor: 'var(--warning-light)', borderRadius: 'var(--radius-md)', border: '1px solid var(--warning)' }}>
-              <h3 style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--warning)', marginBottom: '0.5rem' }}>Baza Migratsiyasi (Multi-Warehouse)</h3>
-              <p style={{ fontSize: '0.875rem', marginBottom: '1rem', color: 'var(--text-secondary)' }}>
+            <div style={{ marginTop: '32px', padding: '24px', backgroundColor: '#FFFBEB', borderRadius: '12px', border: '1px solid #FDE68A' }}>
+              <h3 style={{ fontSize: 15, fontWeight: 600, color: '#D97706', margin: '0 0 8px 0' }}>Baza Migratsiyasi (Multi-Warehouse)</h3>
+              <p style={{ fontSize: 14, marginBottom: '16px', color: '#92400E', lineHeight: '1.5' }}>
                 Ushbu tugma barcha mavjud mahsulotlarning <b>stock</b> (qoldiq) maydonini yangi tizimga (`stockByWarehouse`) o'tkazadi va <b>Asosiy Filial</b> ni yaratadi. Buni faqat bir marta bajaring!
               </p>
-              <button className="btn btn-outline" style={{ borderColor: 'var(--warning)', color: 'var(--warning)' }} onClick={handleRunMigration} disabled={isSaving}>
+              <button className="btn btn-outline" style={{ borderColor: '#D97706', color: '#D97706', backgroundColor: '#fff' }} onClick={handleRunMigration} disabled={isSaving}>
                 {isSaving ? 'Bajarilmoqda...' : 'Migratsiyani boshlash'}
               </button>
             </div>
@@ -208,11 +217,13 @@ const Settings = () => {
 
         {/* Do'kon ma'lumotlari */}
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
-            <Store size={20} color="var(--primary)" />
-            <h2 className="h2" style={{ fontSize: '1.25rem' }}>Do'kon ma'lumotlari</h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px', borderBottom: '1px solid #DCE8F5', paddingBottom: '12px' }}>
+            <div style={{ width: 36, height: 36, borderRadius: '10px', backgroundColor: '#F0F6FF', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#4A90E2' }}>
+              <Store size={20} />
+            </div>
+            <h2 style={{ fontSize: 18, fontWeight: 700, color: '#1A2538', margin: 0 }}>Do'kon ma'lumotlari</h2>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
             <FormInput label="Do'kon nomi" value={formData.storeName} onChange={e => setFormData({...formData, storeName: e.target.value})} />
             <FormInput label="Manzil" value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} />
             <FormInput label="Soliq stavkasi (%)" type="number" value={formData.taxRate} onChange={e => setFormData({...formData, taxRate: e.target.value})} />
@@ -220,17 +231,19 @@ const Settings = () => {
         </div>
 
         {/* Xavfsizlik (Sign Out) */}
-        <div style={{ marginTop: '2rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
-            <LogOut size={20} color="var(--danger)" />
-            <h2 className="h2" style={{ fontSize: '1.25rem', color: 'var(--danger)' }}>Hisobdan chiqish</h2>
+        <div style={{ marginTop: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px', borderBottom: '1px solid #DCE8F5', paddingBottom: '12px' }}>
+            <div style={{ width: 36, height: 36, borderRadius: '10px', backgroundColor: '#FEF2F2', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#EF4B4B' }}>
+              <LogOut size={20} />
+            </div>
+            <h2 style={{ fontSize: 18, fontWeight: 700, color: '#EF4B4B', margin: 0 }}>Hisobdan chiqish</h2>
           </div>
-          <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
+          <p style={{ fontSize: 14, color: '#8A9BB5', marginBottom: '16px', lineHeight: '1.5' }}>
             Tizimdan chiqish uchun quyidagi tugmani bosing. Xavfsizlik maqsadida do'koningiz nomini kiritish talab qilinadi.
           </p>
           <button 
             className="btn btn-outline" 
-            style={{ color: 'var(--danger)', borderColor: 'var(--danger)', display: 'inline-flex', gap: '0.5rem' }}
+            style={{ color: '#EF4B4B', borderColor: '#EF4B4B', display: 'inline-flex', gap: '8px' }}
             onClick={() => { setLogoutConfirmText(''); setIsLogoutModalOpen(true); }}
           >
             <LogOut size={18} /> Sign Out
@@ -241,7 +254,7 @@ const Settings = () => {
 
       <Modal isOpen={isLogoutModalOpen} onClose={() => setIsLogoutModalOpen(false)} title="Hisobdan chiqishni tasdiqlang">
         <div className="flex-col" style={{ gap: '1rem' }}>
-          <div style={{ padding: '1rem', backgroundColor: 'var(--danger-light)', color: 'var(--danger)', borderRadius: 'var(--radius-md)', fontSize: '0.875rem', lineHeight: '1.5' }}>
+          <div style={{ padding: '1rem', backgroundColor: '#FEF2F2', color: '#EF4B4B', borderRadius: '8px', fontSize: 14, lineHeight: '1.5' }}>
             Ushbu qurilmadan hisobingizdan chiqmoqchisiz. Davom etish uchun pastdagi maydonga aynan <strong>{formData.storeName || "Do'kon nomi"}</strong> deb yozing.
           </div>
           <FormInput 
@@ -254,7 +267,7 @@ const Settings = () => {
             <button className="btn btn-ghost" onClick={() => setIsLogoutModalOpen(false)}>Bekor qilish</button>
             <button 
               className="btn btn-primary" 
-              style={{ backgroundColor: 'var(--danger)' }} 
+              style={{ backgroundColor: '#EF4B4B' }} 
               disabled={logoutConfirmText !== formData.storeName}
               onClick={logout}
             >

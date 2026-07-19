@@ -3,6 +3,7 @@ import { db } from '../../firebase';
 import { collection, getDocs, doc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { useRoles } from '../../context/RolesContext';
 import { useToast } from '../../context/ToastContext';
+import { useConfirm } from '../../context/ConfirmContext';
 import { RefreshCcw, Trash2, AlertCircle } from 'lucide-react';
 import { logAudit } from '../../utils/firebaseUtils';
 
@@ -11,6 +12,7 @@ const Trash = () => {
   const [loading, setLoading] = useState(true);
   const { userProfile } = useRoles();
   const { addToast } = useToast();
+  const { confirm } = useConfirm();
   const storeId = userProfile?.storeOwnerId;
 
   const loadTrash = async () => {
@@ -67,7 +69,7 @@ const Trash = () => {
   }, [storeId]);
 
   const handleRestore = async (item) => {
-    if (!window.confirm(`${item.displayName} qayta tiklansinmi?`)) return;
+    if (!(await confirm({ message: `${item.displayName} qayta tiklansinmi?` }))) return;
     try {
       await updateDoc(doc(db, `users/${storeId}/${item.collectionName}`, item.id), {
         status: 'active',
@@ -82,7 +84,7 @@ const Trash = () => {
   };
 
   const handleHardDelete = async (item) => {
-    if (!window.confirm(`DIQQAT! ${item.displayName} butunlay o'chib ketadi. Buni ortga qaytarib bo'lmaydi. Davom etasizmi?`)) return;
+    if (!(await confirm({ message: `DIQQAT! ${item.displayName} butunlay o'chib ketadi. Buni ortga qaytarib bo'lmaydi. Davom etasizmi?`, confirmStyle: 'danger' }))) return;
     try {
       await deleteDoc(doc(db, `users/${storeId}/${item.collectionName}`, item.id));
       await logAudit(storeId, userProfile, 'HARD_DELETE', item.collectionName, item.displayName);

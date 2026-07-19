@@ -1,17 +1,16 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // Global store to track open drawers to manage z-index and ESC/click-outside logic
 const drawerStack = [];
 
-const Drawer = ({ isOpen, onClose, title, children, position = 'right' }) => {
+const Drawer = ({ isOpen, onClose, title, children, position = 'right', width = '500px' }) => {
   const [zIndex, setZIndex] = useState(1000);
   const [drawerId] = useState(() => Math.random().toString(36).substring(2, 9));
 
   useEffect(() => {
     if (isOpen) {
       drawerStack.push(drawerId);
-      // Base z-index + 10 for each drawer to ensure stacking
       const newZIndex = 1000 + (drawerStack.length - 1) * 10;
       setZIndex(newZIndex);
 
@@ -24,69 +23,38 @@ const Drawer = ({ isOpen, onClose, title, children, position = 'right' }) => {
       return () => {
         window.removeEventListener('keydown', handleEscape);
         const index = drawerStack.indexOf(drawerId);
-        if (index > -1) {
-          drawerStack.splice(index, 1);
-        }
+        if (index > -1) drawerStack.splice(index, 1);
       };
     }
   }, [isOpen, drawerId, onClose]);
 
-  const handleBackdropClick = (e) => {
-    if (drawerStack[drawerStack.length - 1] === drawerId) {
-      onClose();
-    }
+  const handleBackdropClick = () => {
+    if (drawerStack[drawerStack.length - 1] === drawerId) onClose();
   };
 
   const getPanelStyle = () => {
-    const baseStyle = {
+    const base = {
       position: 'fixed',
-      backgroundColor: 'var(--bg-surface)',
-      boxShadow: 'var(--shadow-xl)',
+      backgroundColor: '#fff',
+      boxShadow: '-8px 0 40px -10px rgba(0,0,0,0.2)',
       zIndex: zIndex + 2,
       display: 'flex',
       flexDirection: 'column',
+      fontFamily: "'Poppins','Segoe UI',sans-serif",
     };
-
     if (position === 'bottom') {
-      return {
-        ...baseStyle,
-        bottom: 0,
-        left: 0,
-        right: 0,
-        width: '100%',
-        maxHeight: '90vh',
-        borderTopLeftRadius: 'var(--radius-xl)',
-        borderTopRightRadius: 'var(--radius-xl)',
-      };
+      return { ...base, bottom: 0, left: 0, right: 0, width: '100%', maxHeight: '90vh',
+        borderTopLeftRadius: '24px', borderTopRightRadius: '24px' };
     } else if (position === 'left') {
-      return {
-        ...baseStyle,
-        top: 0,
-        bottom: 0,
-        left: 0,
-        width: '100%',
-        maxWidth: '400px',
-      };
-    } else { // default right
-      return {
-        ...baseStyle,
-        top: 0,
-        bottom: 0,
-        right: 0,
-        width: '100%',
-        maxWidth: '500px',
-      };
+      return { ...base, top: 0, bottom: 0, left: 0, width: '100%', maxWidth: width };
     }
+    return { ...base, top: 0, bottom: 0, right: 0, width: '100%', maxWidth: width };
   };
 
-  const getAnimationVariants = () => {
-    if (position === 'bottom') {
-      return { initial: { y: '100%' }, animate: { y: 0 }, exit: { y: '100%' } };
-    } else if (position === 'left') {
-      return { initial: { x: '-100%' }, animate: { x: 0 }, exit: { x: '-100%' } };
-    } else {
-      return { initial: { x: '100%' }, animate: { x: 0 }, exit: { x: '100%' } };
-    }
+  const getAnimation = () => {
+    if (position === 'bottom') return { initial: { y: '100%' }, animate: { y: 0 }, exit: { y: '100%' } };
+    if (position === 'left')   return { initial: { x: '-100%' }, animate: { x: 0 }, exit: { x: '-100%' } };
+    return { initial: { x: '100%' }, animate: { x: 0 }, exit: { x: '100%' } };
   };
 
   return (
@@ -100,34 +68,49 @@ const Drawer = ({ isOpen, onClose, title, children, position = 'right' }) => {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
             style={{
-              position: 'fixed',
-              top: 0, left: 0, right: 0, bottom: 0,
-              backgroundColor: 'rgba(0, 0, 0, 0.35)',
+              position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+              backgroundColor: 'rgba(26,37,56,0.45)',
               backdropFilter: 'blur(4px)',
-              zIndex: zIndex
+              zIndex: zIndex,
             }}
             onClick={handleBackdropClick}
           />
-          
-          {/* Sliding Panel */}
+
+          {/* Panel */}
           <motion.div
-            {...getAnimationVariants()}
-            transition={{ type: 'tween', ease: 'easeOut', duration: 0.25 }}
+            {...getAnimation()}
+            transition={{ type: 'tween', ease: 'easeOut', duration: 0.28 }}
             style={getPanelStyle()}
           >
+            {/* ── Header with gradient ── */}
             <div style={{
-              padding: '1.5rem',
-              borderBottom: '1px solid var(--border-color)',
+              background: 'linear-gradient(135deg, #4A90E2 0%, #7BCEEB 100%)',
+              padding: '0 24px',
+              height: '64px',
               display: 'flex',
-              justifyContent: 'space-between',
               alignItems: 'center',
-              backgroundColor: 'var(--bg-main)'
+              justifyContent: 'space-between',
+              flexShrink: 0,
             }}>
-              <h2 className="h2">{title}</h2>
-              <button onClick={onClose} style={{ fontSize: '1.25rem', color: 'var(--text-secondary)', padding: '0.5rem' }}>✕</button>
+              <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: '#fff', letterSpacing: '-0.2px' }}>
+                {title}
+              </h2>
+              <button
+                onClick={onClose}
+                style={{
+                  width: 34, height: 34, borderRadius: '10px',
+                  backgroundColor: 'rgba(255,255,255,0.18)',
+                  color: '#fff', border: 'none', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: '18px', fontWeight: 300, transition: 'background 0.2s',
+                }}
+                onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.32)'}
+                onMouseLeave={e => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.18)'}
+              >✕</button>
             </div>
-            
-            <div style={{ padding: '1.5rem', overflowY: 'auto', flex: 1 }}>
+
+            {/* ── Scrollable content ── */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '24px', minHeight: 0 }}>
               {children}
             </div>
           </motion.div>

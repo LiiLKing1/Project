@@ -28,10 +28,10 @@ const FormInput = ({ label, type = 'text', value, onChange, error, placeholder, 
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1rem' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '14px', fontFamily: "'Poppins','Segoe UI',sans-serif" }}>
       {label && (
-        <label style={{ fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-main)' }}>
-          {label} {required && <span style={{ color: 'var(--danger)' }}>*</span>}
+        <label style={{ fontSize: '13px', fontWeight: 600, color: '#1A2538', letterSpacing: '0.01em' }}>
+          {label} {required && <span style={{ color: '#EF4B4B' }}>*</span>}
         </label>
       )}
       <input
@@ -40,19 +40,37 @@ const FormInput = ({ label, type = 'text', value, onChange, error, placeholder, 
         onChange={handleChange}
         placeholder={placeholder}
         style={{
-          border: `1px solid ${error ? 'var(--danger)' : 'var(--border-color)'}`,
+          border: `1.5px solid ${error ? '#EF4B4B' : '#DCE8F5'}`,
           outline: 'none',
-          padding: '0.75rem 1rem',
-          borderRadius: 'var(--radius-md)',
-          backgroundColor: 'var(--bg-surface)',
-          color: 'var(--text-main)',
-          transition: 'border-color 0.2s',
+          padding: '10px 14px',
+          borderRadius: '12px',
+          backgroundColor: props.disabled ? '#F7FAFF' : '#fff',
+          color: '#1A2538',
+          transition: 'all 0.2s',
           fontFamily: isNumber ? 'monospace' : 'inherit',
-          fontSize: '1rem'
+          fontSize: '14px',
+          width: '100%',
+          boxSizing: 'border-box',
+        }}
+        onFocus={(e) => {
+          if (!error) {
+            e.target.style.borderColor = '#4A90E2';
+            e.target.style.boxShadow = '0 0 0 3px rgba(74,144,226,0.12)';
+          }
+        }}
+        onBlur={(e) => {
+          if (!error) {
+            e.target.style.borderColor = '#DCE8F5';
+            e.target.style.boxShadow = 'none';
+          }
         }}
         {...props}
       />
-      {error && <span style={{ fontSize: '0.75rem', color: 'var(--danger)' }}>{error}</span>}
+      {error && (
+        <span style={{ fontSize: '12px', color: '#EF4B4B', display: 'flex', alignItems: 'center', gap: '4px' }}>
+          ⚠ {error}
+        </span>
+      )}
     </div>
   );
 };

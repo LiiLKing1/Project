@@ -188,7 +188,7 @@ const Topbar = ({ toggleSidebar }) => {
                         onClick={() => { 
                           handleDismiss(`stock-${product.id}`);
                           setShowDropdown(false); 
-                          navigate('/products/catalog', { state: { editProductId: product.id } }); 
+                          navigate('/products', { state: { editProductId: product.id } }); 
                         }}
                         style={{ padding: '1rem', borderBottom: '1px solid var(--border-color)', cursor: 'pointer', transition: 'background-color 0.2s' }}
                         onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--bg-main)'}

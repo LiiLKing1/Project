@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, Filter, Edit, Trash2, Download, Upload, CheckCircle2, AlertTriangle, XCircle, FileSpreadsheet } from 'lucide-react';
+import { Search, Plus, Filter, Edit, Trash2, Download, Upload, CheckCircle2, AlertTriangle, XCircle, FileSpreadsheet, Package, LayoutGrid, List, Grid3x3, Rows3 } from 'lucide-react';
 import CustomSelect from '../../components/CustomSelect';
 import { db } from '../../firebase';
 import { collection, onSnapshot, doc, query, orderBy, writeBatch } from 'firebase/firestore';
@@ -9,6 +9,7 @@ import { useToast } from '../../context/ToastContext';
 import { useRoles } from '../../context/RolesContext';
 import { useSettings } from '../../context/SettingsContext';
 import { useWarehouse } from '../../context/WarehouseContext';
+import { useConfirm } from '../../context/ConfirmContext';
 import Modal from '../../components/Modal';
 import Drawer from '../../components/Drawer';
 import FormInput from '../../components/FormInput';
@@ -16,6 +17,55 @@ import CurrencyDisplay from '../../components/CurrencyDisplay';
 import { motion, AnimatePresence } from 'framer-motion';
 import TransferDrawer from './TransferDrawer';
 import { useLocation, useNavigate } from 'react-router-dom';
+
+/* ─────── Design tokens & Components (Dashboard matching) ─────── */
+const GL     = '#4A90E2';
+const GD     = '#2C6FBF';
+const CARD_B = '#DCE8F5';
+const TG     = '#8A9BB5';
+const TD     = '#1A2538';
+const RED    = '#EF4B4B';
+const ACTIVE_TRACK = '#D1E8F5';
+const formatCompact = (num) => {
+  if (!num) return '0';
+  if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+  if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+  return num.toString();
+};
+
+const MiniRing = ({ pct: p, color = GL, bad = false }) => {
+  const R = 15, CIRC = 2 * Math.PI * R;
+  const fill = (p / 100) * CIRC;
+  const trackColor = bad ? '#FCE9E9' : ACTIVE_TRACK;
+  return (
+    <div style={{ position: 'relative', width: 36, height: 36 }}>
+      <svg width="36" height="36" viewBox="0 0 36 36" style={{ transform: 'rotate(-90deg)' }}>
+        <circle cx="18" cy="18" r={R} fill="none" stroke={trackColor} strokeWidth="4"/>
+        <circle cx="18" cy="18" r={R} fill="none" stroke={bad ? RED : GL} strokeWidth="4" strokeDasharray={`${Math.min(fill, CIRC)} ${CIRC}`} strokeLinecap="round"/>
+      </svg>
+      <span style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', fontSize:'11px', fontWeight:700, color: bad ? RED : GD }}>{p}%</span>
+    </div>
+  );
+};
+
+const MacroCard = ({ label, value, maxValue, unit, trend, isAlert, icon }) => {
+  const p = maxValue > 0 ? Math.round((value / maxValue) * 100) : 0;
+  return (
+    <div style={{ flex: 1, border: `1px solid ${CARD_B}`, borderRadius: '20px', padding: '16px', boxShadow: '0 8px 24px -18px rgba(0,0,0,.3)', background: '#fff', minWidth: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+        <div style={{ width: 32, height: 32, borderRadius: '50%', background: isAlert ? '#FCE9E9' : ACTIVE_TRACK, color: isAlert ? RED : GD, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          {icon}
+        </div>
+        <span style={{ fontSize: '11px', fontWeight: 700, color: '#fff', padding: '4px 8px', borderRadius: '8px', background: isAlert ? RED : '#1A2538' }}>{trend}</span>
+      </div>
+      <div style={{ fontSize: '15px', fontWeight: 700, color: TD, marginBottom: '6px' }}>{label}</div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span style={{ fontSize: '13px', color: TG, fontWeight: 600 }}>{value} / {unit}</span>
+        <MiniRing pct={Math.min(p, 100)} bad={isAlert}/>
+      </div>
+    </div>
+  );
+};
 
 const Catalog = () => {
   const location = useLocation();
@@ -26,15 +76,20 @@ const Catalog = () => {
   const [categoryFilter, setCategoryFilter] = useState('');
   const [loading, setLoading] = useState(false);
   const { addToast } = useToast();
+  const { confirm } = useConfirm();
   const { userProfile } = useRoles();
   const { settings } = useSettings();
   const { selectedWarehouseId } = useWarehouse();
   const storeId = userProfile?.storeOwnerId;
   const curr = settings?.currency || 'UZS';
 
+  // View mode: 'large' | 'small' | 'square' | 'list'
+  const [viewMode, setViewMode] = useState('list');
+
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isCatModalOpen, setIsCatModalOpen] = useState(false);
+  const [isSavingCat, setIsSavingCat] = useState(false);
   const [newCatName, setNewCatName] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [formData, setFormData] = useState({
@@ -56,8 +111,16 @@ const Catalog = () => {
       addToast("Kategoriya nomini kiriting", "error");
       return;
     }
-    if (!storeId) return;
+    
+    const isDuplicate = categories.some(c => c.name.toLowerCase().trim() === newCatName.toLowerCase().trim());
+    if (isDuplicate) {
+      addToast("Bu kategoriya allaqachon mavjud!", "warning");
+      return;
+    }
 
+    if (!storeId || isSavingCat) return;
+
+    setIsSavingCat(true);
     try {
       const auditData = { storeId, userProfile, resource: 'categories', details: newCatName.trim() };
       const newCat = { name: newCatName.trim(), createdAt: new Date().toISOString() };
@@ -70,6 +133,8 @@ const Catalog = () => {
       setNewCatName('');
     } catch (err) {
       addToast(err.message, "error");
+    } finally {
+      setIsSavingCat(false);
     }
   };
 
@@ -115,15 +180,19 @@ const Catalog = () => {
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
         if (isCatModalOpen) {
+          e.preventDefault();
+          e.stopImmediatePropagation();
           setIsCatModalOpen(false);
-        } else if (isModalOpen) {
-          setIsModalOpen(false);
+        } else if (isImportOpen) {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          setIsImportOpen(false);
         }
       }
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isCatModalOpen, isModalOpen, isImportOpen]);
+    window.addEventListener('keydown', handleKeyDown, { capture: true });
+    return () => window.removeEventListener('keydown', handleKeyDown, { capture: true });
+  }, [isCatModalOpen, isImportOpen]);
 
   const validate = () => {
     const errors = {};
@@ -196,7 +265,7 @@ const Catalog = () => {
 
   const handleDelete = async (product) => {
     if (!storeId) return;
-    if (window.confirm(`${product.name} ni o'chirishni xohlaysizmi? (Arxivga tushadi)`)) {
+    if (await confirm({ message: `${product.name} ni o'chirishni xohlaysizmi? (Arxivga tushadi)`, confirmStyle: 'danger' })) {
       try {
         const auditData = { storeId, userProfile, resource: 'products', details: product.name };
         await softDeleteDoc(doc(db, `users/${storeId}/products`, product.id), auditData);
@@ -269,101 +338,229 @@ const Catalog = () => {
     return 'var(--success)';
   };
 
+  /* ── View toggle icons ── */
+  const VIEW_MODES = [
+    { id: 'large',  icon: <LayoutGrid size={18}/>,  title: 'Katta kartochkalar' },
+    { id: 'small',  icon: <Grid3x3 size={18}/>,     title: 'Kichik kartochkalar' },
+    { id: 'square', icon: <Rows3 size={18}/>,        title: "To'rtburchak kartochkalar" },
+    { id: 'list',   icon: <List size={18}/>,         title: 'Ro\'yxat (List)' },
+  ];
+
+  const ProductActions = ({ p }) => (
+    <div style={{ display: 'flex', gap: '6px' }}>
+      <button title="Tahrirlash" onClick={() => openModal(p)}
+        style={{ width: 32, height: 32, borderRadius: '8px', border: '1.5px solid #DCE8F5', background: '#F7FAFF', color: '#4A90E2', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 0.2s' }}
+        onMouseEnter={e => e.currentTarget.style.background = '#E8F2FC'}
+        onMouseLeave={e => e.currentTarget.style.background = '#F7FAFF'}
+      ><Edit size={14}/></button>
+      <button title="O'chirish" onClick={() => handleDelete(p)}
+        style={{ width: 32, height: 32, borderRadius: '8px', border: '1.5px solid #FFE0E0', background: '#FFF5F5', color: '#EF4B4B', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 0.2s' }}
+        onMouseEnter={e => e.currentTarget.style.background = '#FCE8E8'}
+        onMouseLeave={e => e.currentTarget.style.background = '#FFF5F5'}
+      ><Trash2 size={14}/></button>
+    </div>
+  );
+
   return (
-    <div className="flex-col" style={{ gap: '1.5rem', height: '100%' }}>
-      <div className="flex-between">
-        <h1 className="h1">Mahsulotlar Katalogi</h1>
-        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-          <button className="btn btn-outline" style={{ backgroundColor: 'var(--bg-surface)' }} onClick={() => setIsTransferOpen(true)}><FileSpreadsheet size={18} /> Stok ko'chirish</button>
-
-          <button className="btn btn-primary" onClick={() => openModal()}><Plus size={18} /> Yangi mahsulot</button>
+    <div style={{ display:'flex', flexDirection:'column', gap:'1.25rem', fontFamily:"'Poppins','Segoe UI',sans-serif" }}>
+      {/* Header */}
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', flexShrink: 0 }}>
+        <div>
+          <h1 style={{ fontSize:'24px', fontWeight:800, color:'#1A2538', margin:0, letterSpacing:'-0.5px' }}>Mahsulotlar Katalogi</h1>
+          <p style={{ fontSize:'13px', color:'#8A9BB5', marginTop:4 }}>{products.filter(p=>p.status!=='archived').length} ta mahsulot ro'yxatda</p>
+        </div>
+        <div style={{ display:'flex', gap:'0.75rem' }}>
+          <button className="btn btn-outline" style={{ display:'flex', alignItems:'center', gap:'0.4rem' }} onClick={() => setIsTransferOpen(true)}>
+            <FileSpreadsheet size={18}/> Stok ko'chirish
+          </button>
+          <button onClick={() => openModal()} style={{ display:'flex', alignItems:'center', gap:'0.4rem', padding:'0.6rem 1.3rem', borderRadius:'12px', border:'none', cursor:'pointer', background:'linear-gradient(135deg,#4A90E2,#7BCEEB)', color:'#fff', fontWeight:700, fontSize:'0.875rem', boxShadow:'0 4px 14px -4px #4A90E255' }}>
+            <Plus size={18}/> Yangi mahsulot
+          </button>
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', marginBottom: '0.5rem' }}>
-        <div className="glass-panel" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Xilma-xillik (Soni)</span>
-          <span style={{ fontSize: '1.5rem', fontWeight: 600 }}>{new Intl.NumberFormat('uz-UZ').format(totalDistinctProducts)} ta</span>
-        </div>
-        <div className="glass-panel" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Jami Qoldiq</span>
-          <span style={{ fontSize: '1.5rem', fontWeight: 600 }}>{new Intl.NumberFormat('uz-UZ').format(totalPhysicalStock)}</span>
-        </div>
-        <div className="glass-panel" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Jami Tannarx (Tikilgan pul)</span>
-          <span style={{ fontSize: '1.5rem', fontWeight: 600, color: 'var(--warning)' }}><CurrencyDisplay amount={totalCostValue} /></span>
-        </div>
-        <div className="glass-panel" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Jami Kutilayotgan Tushum</span>
-          <span style={{ fontSize: '1.5rem', fontWeight: 600, color: 'var(--success)' }}><CurrencyDisplay amount={totalSellValue} /></span>
-        </div>
+      {/* MacroCards */}
+      <div style={{ display:'flex', gap:'1rem', flexShrink: 0 }}>
+        <MacroCard label="Xilma-xillik (Turi)" value={new Intl.NumberFormat('uz-UZ').format(totalDistinctProducts)} maxValue={100} unit="max" trend="100%" isAlert={false} icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>}/>
+        <MacroCard label="Jami Qoldiq" value={formatCompact(totalPhysicalStock)} maxValue={10000} unit="dona" trend="Barchasi" isAlert={false} icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 7h-7L10 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"></path></svg>}/>
+        <MacroCard label="Jami Tannarx" value={formatCompact(totalCostValue)} maxValue={totalCostValue+totalSellValue} unit={curr} trend="Tikilgan" isAlert={false} icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10"></circle><path d="M12 8v8"></path><path d="M8 12h8"></path></svg>}/>
+        <MacroCard label="Kutilayotgan Tushum" value={formatCompact(totalSellValue)} maxValue={totalCostValue+totalSellValue} unit={curr} trend="Prognoz" isAlert={false} icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>}/>
       </div>
 
-      <div className="glass-panel" style={{ padding: '1.5rem', flex: 1, display: 'flex', flexDirection: 'column' }}>
-        <div className="flex-between" style={{ marginBottom: '1.5rem' }}>
-          <div style={{ position: 'relative', width: '350px' }}>
-            <Search size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
-            <input 
-              type="text" 
-              placeholder="Mahsulot nomi yoki shtrix-kodi..." 
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              style={{ width: '100%', paddingLeft: '2.5rem' }}
+      {/* Main card — no fixed height, page scrolls naturally */}
+      <div style={{ border:'1px solid #DCE8F5', borderRadius:'20px', background:'#fff', boxShadow:'0 8px 24px -18px rgba(0,0,0,.3)' }}>
+        {/* Toolbar — sticky so it stays while scrolling */}
+        <div style={{ padding:'16px 20px', borderBottom:'1px solid #DCE8F5', display:'flex', justifyContent:'space-between', alignItems:'center', position:'sticky', top:0, zIndex:10, background:'#fff', borderRadius:'20px 20px 0 0' }}>
+          {/* Search */}
+          <div style={{ position:'relative', width:'320px' }}>
+            <Search size={17} style={{ position:'absolute', left:'1rem', top:'50%', transform:'translateY(-50%)', color:'#8A9BB5' }}/>
+            <input type="text" placeholder="Mahsulot nomi yoki shtrix-kodi..." value={search} onChange={e => setSearch(e.target.value)}
+              style={{ width:'100%', padding:'9px 10px 9px 2.6rem', borderRadius:'12px', border:'1.5px solid #DCE8F5', fontSize:'14px', outline:'none', fontFamily:'inherit' }}
+              onFocus={e => e.target.style.borderColor='#4A90E2'}
+              onBlur={e => e.target.style.borderColor='#DCE8F5'}
             />
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', width: '250px' }}>
-            <Filter size={18} color="var(--text-secondary)" />
-            <CustomSelect 
-              value={categoryFilter} 
-              onChange={v => setCategoryFilter(v)}
-              options={[
-                {value: '', label: 'Barcha kategoriyalar'},
-                ...categories.map(c => ({value: c.id, label: c.name}))
-              ]}
-              style={{ flex: 1 }}
-            />
+          <div style={{ display:'flex', alignItems:'center', gap:'12px' }}>
+            {/* Category filter */}
+            <div style={{ width:'220px' }}>
+              <CustomSelect value={categoryFilter} onChange={v => setCategoryFilter(v)}
+                options={[{value:'',label:'Barcha kategoriyalar'},...categories.map(c=>({value:c.id,label:c.name}))]}
+              />
+            </div>
+            {/* View mode toggle */}
+            <div style={{ display:'flex', background:'#F0F5FC', borderRadius:'12px', padding:'4px', gap:'2px' }}>
+              {VIEW_MODES.map(vm => (
+                <button key={vm.id} title={vm.title} onClick={() => setViewMode(vm.id)}
+                  style={{ width:36, height:36, borderRadius:'9px', border:'none', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', transition:'all 0.2s',
+                    background: viewMode===vm.id ? '#fff' : 'transparent',
+                    color: viewMode===vm.id ? '#4A90E2' : '#8A9BB5',
+                    boxShadow: viewMode===vm.id ? '0 2px 8px rgba(0,0,0,0.1)' : 'none'
+                  }}
+                >{vm.icon}</button>
+              ))}
+            </div>
           </div>
         </div>
 
-        <div style={{ flex: 1, overflow: 'auto' }}>
-          <div className="table-responsive">
-<table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-              <thead>
-                <tr style={{ borderBottom: '2px solid var(--border-color)', color: 'var(--text-secondary)' }}>
-                  <th style={{ padding: '1rem' }}>Shtrix-kod</th>
-                  <th style={{ padding: '1rem' }}>Nomi</th>
-                  <th style={{ padding: '1rem' }}>Kategoriya</th>
-                  <th style={{ padding: '1rem' }}>Sotish narxi</th>
-                  <th style={{ padding: '1rem' }}>Tannarx</th>
-                  <th style={{ padding: '1rem' }}>Qoldiq</th>
-                  <th style={{ padding: '1rem' }}>Amallar</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredProducts.length === 0 ? (
-                  <tr><td colSpan="7" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>Mahsulotlar topilmadi</td></tr>
-                ) : filteredProducts.map(p => {
-                  const cat = categories.find(c => c.id === p.categoryId);
-                  return (
-                    <tr key={p.id} style={{ borderBottom: '1px solid var(--border-color)', transition: 'background-color 0.2s' }} onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--bg-main)'} onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}>
-                      <td style={{ padding: '1rem', color: 'var(--text-secondary)' }}>{p.barcode}</td>
-                      <td style={{ padding: '1rem', fontWeight: '500' }}>{p.name}</td>
-                      <td style={{ padding: '1rem' }}><span style={{ padding: '0.25rem 0.75rem', backgroundColor: 'var(--primary-light)', color: 'var(--primary)', borderRadius: '999px', fontSize: '0.75rem', fontWeight: '600' }}>{cat ? cat.name : 'Boshqa'}</span></td>
-                      <td style={{ padding: '1rem', fontWeight: '600', color: 'var(--primary)' }}><CurrencyDisplay amount={p.sellPrice} /></td>
-                      <td style={{ padding: '1rem' }}><CurrencyDisplay amount={p.costPrice} /></td>
-                      <td style={{ padding: '1rem', fontWeight: '600', color: getStockColor(p.stockByWarehouse?.[selectedWarehouseId] || 0, p.minStock) }}>
-                        {p.stockByWarehouse?.[selectedWarehouseId] || 0} {p.unit}
-                      </td>
-                      <td style={{ padding: '1rem', display: 'flex', gap: '0.5rem' }}>
-                        <button className="btn btn-outline" style={{ padding: '0.5rem' }} onClick={() => openModal(p)}><Edit size={16} /></button>
-                        <button className="btn btn-outline" style={{ padding: '0.5rem', color: 'var(--danger)' }} onClick={() => handleDelete(p)}><Trash2 size={16} /></button>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-</div>
+        {/* Products area — no overflow, page scrolls */}
+        <div>
+          {filteredProducts.length === 0 ? (
+            <div style={{ textAlign:'center', padding:'5rem', color:'#8A9BB5', fontSize:'15px' }}>Mahsulotlar topilmadi</div>
+          ) : (
+            <>
+              {/* ── LIST VIEW ── */}
+              {viewMode === 'list' && (
+                <div>
+                  <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr 1fr 1fr 90px', gap:'1rem', padding:'12px 20px', borderBottom:'2px solid #DCE8F5', background:'#F7FAFF', color:'#8A9BB5', fontSize:'12px', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.05em' }}>
+                    <div style={{ paddingLeft:'54px' }}>Mahsulot</div>
+                    <div>Kategoriya</div>
+                    <div>Qoldiq</div>
+                    <div>Narxlar</div>
+                    <div style={{ textAlign:'right' }}>Amal</div>
+                  </div>
+                  {filteredProducts.map(p => {
+                    const cat = categories.find(c => c.id === p.categoryId);
+                    const stock = p.stockByWarehouse?.[selectedWarehouseId] || 0;
+                    return (
+                      <div key={p.id} style={{ display:'grid', gridTemplateColumns:'2fr 1fr 1fr 1fr 90px', gap:'1rem', alignItems:'center', padding:'12px 20px', borderBottom:'1px solid #DCE8F5', transition:'background .15s' }}
+                        onMouseEnter={e => e.currentTarget.style.backgroundColor='#F4F8FF'}
+                        onMouseLeave={e => e.currentTarget.style.backgroundColor='transparent'}>
+                        <div style={{ display:'flex', alignItems:'center', gap:'12px', minWidth:0 }}>
+                          <div style={{ width:40, height:40, borderRadius:'12px', background:'#F0F5FC', color:'#8A9BB5', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}><Package size={18}/></div>
+                          <div style={{ minWidth:0 }}>
+                            <div style={{ fontWeight:700, fontSize:'14px', color:'#1A2538', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{p.name}</div>
+                            <div style={{ fontSize:'11px', color:'#8A9BB5', marginTop:2, fontFamily:'monospace' }}>{p.barcode || '—'}</div>
+                          </div>
+                        </div>
+                        <span style={{ padding:'3px 10px', background:'#D1E8F5', color:'#2C6FBF', borderRadius:'999px', fontSize:'12px', fontWeight:700, display:'inline-block' }}>{cat?.name || 'Boshqa'}</span>
+                        <div>
+                          <div style={{ fontWeight:700, color:getStockColor(stock,p.minStock), fontSize:'14px' }}>{stock} {p.unit}</div>
+                          <div style={{ fontSize:'11px', color:'#8A9BB5' }}>qoldiq</div>
+                        </div>
+                        <div>
+                          <div style={{ fontWeight:700, color:'#4A90E2', fontSize:'14px' }}><CurrencyDisplay amount={p.sellPrice}/></div>
+                          <div style={{ fontSize:'11px', color:'#8A9BB5' }}>tn: <CurrencyDisplay amount={p.costPrice}/></div>
+                        </div>
+                        <div style={{ display:'flex', justifyContent:'flex-end' }}><ProductActions p={p}/></div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* ── LARGE CARD VIEW ── */}
+              {viewMode === 'large' && (
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(260px,1fr))', gap:'16px', padding:'20px' }}>
+                  {filteredProducts.map(p => {
+                    const cat = categories.find(c => c.id === p.categoryId);
+                    const stock = p.stockByWarehouse?.[selectedWarehouseId] || 0;
+                    return (
+                      <div key={p.id} style={{ border:'1.5px solid #DCE8F5', borderRadius:'20px', background:'#fff', padding:'20px', boxShadow:'0 4px 16px -8px rgba(0,0,0,.15)', display:'flex', flexDirection:'column', gap:'14px', transition:'all 0.2s' }}
+                        onMouseEnter={e => { e.currentTarget.style.boxShadow='0 8px 28px -8px rgba(74,144,226,0.25)'; e.currentTarget.style.borderColor='#B8D9F5'; }}
+                        onMouseLeave={e => { e.currentTarget.style.boxShadow='0 4px 16px -8px rgba(0,0,0,.15)'; e.currentTarget.style.borderColor='#DCE8F5'; }}>
+                        <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between' }}>
+                          <div style={{ width:52, height:52, borderRadius:'16px', background:'linear-gradient(135deg,#D1E8F5,#EAF4FC)', color:'#4A90E2', display:'flex', alignItems:'center', justifyContent:'center' }}><Package size={24}/></div>
+                          <span style={{ padding:'4px 10px', background:'#D1E8F5', color:'#2C6FBF', borderRadius:'999px', fontSize:'11px', fontWeight:700 }}>{cat?.name || 'Boshqa'}</span>
+                        </div>
+                        <div>
+                          <div style={{ fontWeight:800, fontSize:'16px', color:'#1A2538', marginBottom:4 }}>{p.name}</div>
+                          <div style={{ fontSize:'12px', color:'#8A9BB5', fontFamily:'monospace' }}>{p.barcode || '—'}</div>
+                        </div>
+                        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'10px' }}>
+                          <div style={{ background:'#F7FAFF', borderRadius:'12px', padding:'10px' }}>
+                            <div style={{ fontSize:'11px', color:'#8A9BB5', marginBottom:4 }}>Sotish narxi</div>
+                            <div style={{ fontWeight:800, color:'#4A90E2', fontSize:'15px' }}><CurrencyDisplay amount={p.sellPrice}/></div>
+                          </div>
+                          <div style={{ background:'#F7FAFF', borderRadius:'12px', padding:'10px' }}>
+                            <div style={{ fontSize:'11px', color:'#8A9BB5', marginBottom:4 }}>Qoldiq</div>
+                            <div style={{ fontWeight:800, color:getStockColor(stock,p.minStock), fontSize:'15px' }}>{stock} {p.unit}</div>
+                          </div>
+                        </div>
+                        <div style={{ display:'flex', justifyContent:'flex-end', paddingTop:4, borderTop:'1px solid #DCE8F5' }}><ProductActions p={p}/></div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* ── SMALL CARD VIEW ── */}
+              {viewMode === 'small' && (
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(170px,1fr))', gap:'12px', padding:'16px' }}>
+                  {filteredProducts.map(p => {
+                    const cat = categories.find(c => c.id === p.categoryId);
+                    const stock = p.stockByWarehouse?.[selectedWarehouseId] || 0;
+                    return (
+                      <div key={p.id} style={{ border:'1.5px solid #DCE8F5', borderRadius:'16px', background:'#fff', padding:'14px', display:'flex', flexDirection:'column', gap:'8px', transition:'all 0.2s', cursor:'default' }}
+                        onMouseEnter={e => { e.currentTarget.style.boxShadow='0 6px 20px -6px rgba(74,144,226,0.2)'; e.currentTarget.style.borderColor='#B8D9F5'; }}
+                        onMouseLeave={e => { e.currentTarget.style.boxShadow='none'; e.currentTarget.style.borderColor='#DCE8F5'; }}>
+                        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                          <div style={{ width:36, height:36, borderRadius:'10px', background:'#D1E8F5', color:'#4A90E2', display:'flex', alignItems:'center', justifyContent:'center' }}><Package size={16}/></div>
+                          <span style={{ width:10, height:10, borderRadius:'50%', background:getStockColor(stock,p.minStock), display:'inline-block' }}/>
+                        </div>
+                        <div style={{ fontWeight:700, fontSize:'13px', color:'#1A2538', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{p.name}</div>
+                        <div style={{ fontSize:'11px', color:'#4A90E2', fontWeight:700 }}><CurrencyDisplay amount={p.sellPrice}/></div>
+                        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                          <span style={{ fontSize:'11px', color:'#8A9BB5' }}>{stock} {p.unit}</span>
+                          <ProductActions p={p}/>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* ── SQUARE (grid 3-col with image-like top) VIEW ── */}
+              {viewMode === 'square' && (
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))', gap:'14px', padding:'18px' }}>
+                  {filteredProducts.map(p => {
+                    const cat = categories.find(c => c.id === p.categoryId);
+                    const stock = p.stockByWarehouse?.[selectedWarehouseId] || 0;
+                    return (
+                      <div key={p.id} style={{ border:'1.5px solid #DCE8F5', borderRadius:'18px', background:'#fff', overflow:'hidden', boxShadow:'0 2px 12px -6px rgba(0,0,0,.12)', transition:'all 0.2s' }}
+                        onMouseEnter={e => { e.currentTarget.style.transform='translateY(-2px)'; e.currentTarget.style.boxShadow='0 8px 24px -6px rgba(74,144,226,0.2)'; }}
+                        onMouseLeave={e => { e.currentTarget.style.transform='translateY(0)'; e.currentTarget.style.boxShadow='0 2px 12px -6px rgba(0,0,0,.12)'; }}>
+                        {/* Image-like gradient top */}
+                        <div style={{ height:90, background:'linear-gradient(135deg,#4A90E2 0%,#7BCEEB 50%,#D1E8F5 100%)', display:'flex', alignItems:'center', justifyContent:'center', position:'relative' }}>
+                          <Package size={36} color="rgba(255,255,255,0.8)"/>
+                          <span style={{ position:'absolute', top:10, right:10, padding:'3px 8px', background:'rgba(255,255,255,0.25)', backdropFilter:'blur(8px)', color:'#fff', borderRadius:'8px', fontSize:'11px', fontWeight:700 }}>{cat?.name || 'Boshqa'}</span>
+                          <span style={{ position:'absolute', bottom:10, left:10, width:10, height:10, borderRadius:'50%', background:getStockColor(stock,p.minStock), boxShadow:'0 0 0 2px rgba(255,255,255,0.5)' }}/>
+                        </div>
+                        {/* Body */}
+                        <div style={{ padding:'12px 14px' }}>
+                          <div style={{ fontWeight:700, fontSize:'14px', color:'#1A2538', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', marginBottom:4 }}>{p.name}</div>
+                          <div style={{ fontWeight:800, color:'#4A90E2', fontSize:'15px', marginBottom:6 }}><CurrencyDisplay amount={p.sellPrice}/></div>
+                          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                            <span style={{ fontSize:'12px', color:'#8A9BB5' }}>{stock} {p.unit}</span>
+                            <ProductActions p={p}/>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </>
+          )}
         </div>
       </div>
 
@@ -372,7 +569,7 @@ const Catalog = () => {
         <FormInput label="Nomi" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} error={formErrors.name} required />
         
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1rem' }}>
-          <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>Kategoriya <span style={{ color: 'var(--danger)' }}>*</span></label>
+          <label style={{ fontSize: '0.875rem', fontWeight: 600, color: '#1A2538' }}>Kategoriya <span style={{ color: 'var(--danger)' }}>*</span></label>
           <div style={{ display: 'flex', gap: '0.5rem' }}>
             <CustomSelect 
               value={formData.categoryId} 
@@ -384,16 +581,75 @@ const Catalog = () => {
               style={{ flex: 1, border: `1px solid ${formErrors.categoryId ? 'var(--danger)' : 'transparent'}`, borderRadius: 'var(--radius-md)' }}
             />
             <button 
-              className="btn btn-outline" 
-              style={{ padding: '0 1rem' }}
+              type="button"
               title="Yangi kategoriya qo'shish"
               onClick={() => setIsCatModalOpen(!isCatModalOpen)}
+              style={{
+                width: 44, height: 44, flexShrink: 0, borderRadius: '12px', border: 'none',
+                background: isCatModalOpen ? '#4A90E2' : '#D1E8F5',
+                color: isCatModalOpen ? '#fff' : '#4A90E2',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer', transition: 'all 0.2s'
+              }}
             >
               <Plus size={18} style={{ transform: isCatModalOpen ? 'rotate(45deg)' : 'none', transition: 'transform 0.2s' }} />
             </button>
           </div>
           {formErrors.categoryId && <span style={{ fontSize: '0.75rem', color: 'var(--danger)' }}>{formErrors.categoryId}</span>}
         </div>
+
+        {/* ── Inline category creation panel ── */}
+        <AnimatePresence>
+          {isCatModalOpen && (
+            <motion.div
+              initial={{ opacity: 0, height: 0, marginBottom: 0 }}
+              animate={{ opacity: 1, height: 'auto', marginBottom: '16px' }}
+              exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+              transition={{ duration: 0.25, ease: 'easeInOut' }}
+              style={{ overflow: 'hidden' }}
+            >
+              <div style={{
+                border: '2px solid #4A90E2', borderRadius: '16px',
+                background: 'linear-gradient(135deg, #F0F7FF 0%, #E8F4FD 100%)',
+                padding: '16px',
+                display: 'flex', flexDirection: 'column', gap: '12px',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#4A90E2' }} />
+                  <span style={{ fontSize: '13px', fontWeight: 700, color: '#4A90E2' }}>Yangi kategoriya qo'shish</span>
+                </div>
+                <input
+                  type="text"
+                  value={newCatName}
+                  onChange={e => setNewCatName(e.target.value)}
+                  placeholder="Masalan: Ichimliklar"
+                  autoFocus
+                  onKeyDown={e => { if (e.key === 'Enter') handleAddCategory(); }}
+                  style={{
+                    width: '100%', padding: '10px 14px',
+                    border: '1.5px solid #B8D9F5', borderRadius: '10px',
+                    fontSize: '14px', outline: 'none', background: '#fff',
+                    color: '#1A2538', fontFamily: 'inherit',
+                    boxSizing: 'border-box',
+                  }}
+                  onFocus={e => e.target.style.borderColor = '#4A90E2'}
+                  onBlur={e => e.target.style.borderColor = '#B8D9F5'}
+                />
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    onClick={() => { setIsCatModalOpen(false); setNewCatName(''); }}
+                    style={{ flex: 1, padding: '9px', borderRadius: '10px', border: '1.5px solid #B8D9F5', background: '#fff', color: '#8A9BB5', fontWeight: 600, fontSize: '13px', cursor: 'pointer' }}
+                  >Bekor</button>
+                  <button
+                    onClick={handleAddCategory}
+                    disabled={isSavingCat}
+                    style={{ flex: 2, padding: '9px', borderRadius: '10px', border: 'none', background: 'linear-gradient(135deg, #4A90E2, #7BCEEB)', color: '#fff', fontWeight: 700, fontSize: '13px', cursor: 'pointer', boxShadow: '0 4px 12px -4px #4A90E255' }}
+                  >{isSavingCat ? 'Saqlanmoqda...' : '+ Saqlash'}</button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
           <FormInput label={`Tannarx (${curr})`} type="number" value={formData.costPrice} onChange={e => setFormData({...formData, costPrice: e.target.value})} error={formErrors.costPrice} required />
@@ -417,7 +673,7 @@ const Catalog = () => {
           )}
           <FormInput label="Minimal qoldiq" type="number" value={formData.minStock} onChange={e => setFormData({...formData, minStock: e.target.value})} placeholder="5" />
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>Birlik</label>
+            <label style={{ fontSize: '0.875rem', fontWeight: 600, color: '#1A2538' }}>Birlik</label>
             <CustomSelect 
               value={formData.unit} 
               onChange={v => setFormData({...formData, unit: v})}
@@ -431,63 +687,20 @@ const Catalog = () => {
           </div>
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1.5rem' }}>
-          <button className="btn btn-outline" onClick={() => setIsModalOpen(false)}>Bekor qilish</button>
-          <button className="btn btn-primary" onClick={handleSave}>Saqlash</button>
+        <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
+          <button
+            onClick={() => setIsModalOpen(false)}
+            style={{ flex: 1, padding: '12px', borderRadius: '12px', border: '1.5px solid #DCE8F5', background: '#fff', color: '#1A2538', fontWeight: 600, fontSize: '15px', cursor: 'pointer' }}
+          >Bekor qilish</button>
+          <button
+            onClick={handleSave}
+            style={{ flex: 2, padding: '12px', borderRadius: '12px', border: 'none', background: 'linear-gradient(135deg, #4A90E2, #7BCEEB)', color: '#fff', fontWeight: 700, fontSize: '15px', cursor: 'pointer', boxShadow: '0 4px 14px -4px #4A90E266' }}
+          >Saqlash</button>
         </div>
       </Drawer>
       
       <TransferDrawer isOpen={isTransferOpen} onClose={() => setIsTransferOpen(false)} />
 
-      <AnimatePresence>
-        {isCatModalOpen && (
-          <motion.div
-            initial={{ x: '100%' }}
-            animate={{ x: 0 }}
-            exit={{ x: '100%' }}
-            transition={{ type: 'spring', damping: 20, stiffness: 200 }}
-            style={{
-              position: 'fixed',
-              top: 0,
-              right: '500px',
-              bottom: 0,
-              width: '320px',
-              backgroundColor: 'var(--bg-surface)',
-              boxShadow: '-4px 0 15px rgba(0,0,0,0.1)',
-              zIndex: 1001,
-              borderLeft: '1px solid var(--border-color)',
-              display: 'flex',
-              flexDirection: 'column'
-            }}
-          >
-            <div style={{
-              padding: '1.5rem',
-              borderBottom: '1px solid var(--border-color)',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              backgroundColor: 'var(--bg-main)'
-            }}>
-              <h2 className="h3">Yangi kategoriya</h2>
-              <button onClick={() => setIsCatModalOpen(false)} style={{ fontSize: '1.25rem', color: 'var(--text-secondary)' }}>✕</button>
-            </div>
-            
-            <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <FormInput 
-                label="Kategoriya nomi" 
-                value={newCatName} 
-                onChange={e => setNewCatName(e.target.value)} 
-                placeholder="Masalan: Ichimliklar" 
-                autoFocus 
-              />
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem' }}>
-                <button className="btn btn-outline" onClick={() => setIsCatModalOpen(false)}>Bekor qilish</button>
-                <button className="btn btn-primary" onClick={handleAddCategory}>Saqlash</button>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 };

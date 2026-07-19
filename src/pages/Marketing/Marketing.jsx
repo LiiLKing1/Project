@@ -64,32 +64,39 @@ const Marketing = () => {
   };
 
   return (
-    <div className="flex-col" style={{ gap: '1.5rem', height: '100%' }}>
-      <div className="flex-between">
-        <h1 className="h1">Marketing va Aksiyalar</h1>
-        <button className="btn btn-primary" onClick={() => setIsPromoModalOpen(true)}><Plus size={18} /> Yangi aksiya</button>
+    <div className="page-wrapper">
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">Marketing va Aksiyalar</h1>
+          <p className="page-subtitle">Aksiyalar va mijozlarga SMS xabarnomalar</p>
+        </div>
+        <button className="btn btn-primary" onClick={() => setIsPromoModalOpen(true)}>
+          <Plus size={18} /> Yangi aksiya
+        </button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', flex: 1, overflow: 'hidden' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', flex: 1, overflow: 'hidden' }}>
         
         {/* Promos */}
-        <div className="glass-panel flex-col" style={{ height: '100%' }}>
-          <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Percent size={20} color="var(--primary)" />
-            <h2 className="h2">Aktiv Aksiyalar</h2>
+        <div className="page-card" style={{ display: 'flex', flexDirection: 'column' }}>
+          <div className="page-card-header" style={{ padding: '20px 24px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Percent size={20} color="#4A90E2" />
+              <h2 style={{ fontSize: 16, fontWeight: 600, color: '#1A2538', margin: 0 }}>Aktiv Aksiyalar</h2>
+            </div>
           </div>
-          <div style={{ padding: '1.5rem', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            {loading ? <div className="flex-center" style={{color: 'var(--text-secondary)'}}>Yuklanmoqda...</div> : promotions.length === 0 ? <div className="flex-center" style={{color: 'var(--text-secondary)'}}>Aksiyalar yo'q</div> : null}
+          <div style={{ padding: '20px 24px', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {loading ? <div className="flex-center" style={{color: '#8A9BB5'}}>Yuklanmoqda...</div> : promotions.length === 0 ? <div className="flex-center" style={{color: '#8A9BB5'}}>Aksiyalar yo'q</div> : null}
             {promotions.map(p => (
-              <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', backgroundColor: p.isActive ? 'var(--bg-surface)' : 'var(--bg-main)' }}>
+              <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', border: '1px solid #DCE8F5', borderRadius: '12px', backgroundColor: p.isActive ? '#fff' : '#F9FAFB' }}>
                 <div>
-                  <div style={{ fontWeight: 600, color: p.isActive ? 'var(--text-main)' : 'var(--text-secondary)' }}>{p.name}</div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{p.discountType === 'percent' ? p.discountValue + '%' : p.discountValue + ` ${curr}`} chegirma</div>
+                  <div style={{ fontWeight: 600, color: p.isActive ? '#1A2538' : '#8A9BB5' }}>{p.name}</div>
+                  <div style={{ fontSize: 13, color: '#8A9BB5' }}>{p.discountType === 'percent' ? p.discountValue + '%' : p.discountValue + ` ${curr}`} chegirma</div>
                 </div>
                 <div>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-                    <input type="checkbox" checked={p.isActive} onChange={() => toggleActive(p)} />
-                    <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Aktiv</span>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={p.isActive} onChange={() => toggleActive(p)} style={{ accentColor: '#4A90E2', width: 16, height: 16 }} />
+                    <span style={{ fontSize: 14, color: p.isActive ? '#10B981' : '#8A9BB5', fontWeight: 500 }}>Aktiv</span>
                   </label>
                 </div>
               </div>
@@ -98,14 +105,16 @@ const Marketing = () => {
         </div>
 
         {/* SMS Campaigns */}
-        <div className="glass-panel flex-col" style={{ height: '100%' }}>
-          <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Megaphone size={20} color="var(--primary)" />
-            <h2 className="h2">SMS Yuborish</h2>
+        <div className="page-card" style={{ display: 'flex', flexDirection: 'column' }}>
+          <div className="page-card-header" style={{ padding: '20px 24px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Megaphone size={20} color="#4A90E2" />
+              <h2 style={{ fontSize: 16, fontWeight: 600, color: '#1A2538', margin: 0 }}>SMS Yuborish</h2>
+            </div>
           </div>
-          <div style={{ padding: '1.5rem', flex: 1, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>Kimga yuboriladi?</label>
+          <div style={{ padding: '20px 24px', flex: 1, display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <label style={{ fontSize: 14, fontWeight: 500, color: '#1A2538' }}>Kimga yuboriladi?</label>
               <CustomSelect 
                 value="all"
                 onChange={() => {}}
@@ -117,12 +126,12 @@ const Marketing = () => {
                 ]}
               />
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>Xabar matni</label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <label style={{ fontSize: 14, fontWeight: 500, color: '#1A2538' }}>Xabar matni</label>
               <textarea 
                 rows="5"
                 placeholder="Xabar matnini kiriting. (O'zgaruvchilar: {ism}, {qarz})"
-                style={{ padding: '0.75rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-surface)', resize: 'none' }}
+                style={{ padding: '12px 16px', borderRadius: '12px', border: '1px solid #DCE8F5', backgroundColor: '#fff', resize: 'none', outline: 'none', color: '#1A2538', fontFamily: 'inherit' }}
               />
             </div>
             <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'flex-end' }}>

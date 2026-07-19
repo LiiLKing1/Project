@@ -9,6 +9,7 @@ import { useSettings } from '../../context/SettingsContext';
 import CurrencyDisplay from '../../components/CurrencyDisplay';
 import Modal from '../../components/Modal';
 import FormInput from '../../components/FormInput';
+import CustomSelect from '../../components/CustomSelect';
 
 const Finance = () => {
   const [expenses, setExpenses] = useState([]);
@@ -82,69 +83,67 @@ const Finance = () => {
   }, 0);
 
   return (
-    <div className="flex-col" style={{ gap: '1.5rem', height: '100%' }}>
-      <div className="flex-between">
-        <h1 className="h1">Moliyalashtirish</h1>
-        <button className="btn btn-primary" onClick={() => setIsModalOpen(true)}><Plus size={18} /> Xarajat qo'shish</button>
+    <div className="page-wrapper">
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">Moliyalashtirish</h1>
+          <p className="page-subtitle">Kompaniyaning xarajatlari va qarzdorlik holati</p>
+        </div>
+        <button className="btn btn-primary" onClick={() => setIsModalOpen(true)}>
+          <Plus size={18} /> Xarajat qo'shish
+        </button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 3fr', gap: '2rem', flex: 1, overflow: 'hidden' }}>
-        
-        <div className="flex-col" style={{ gap: '1.5rem' }}>
-          <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-              <div style={{ padding: '1rem', backgroundColor: 'var(--danger-light)', color: 'var(--danger)', borderRadius: 'var(--radius-lg)' }}><ArrowDownRight size={24} /></div>
-              <div>
-                <div className="subtitle">Jami Xarajatlar (Tanlangan davr)</div>
-                <div className="h2"><CurrencyDisplay amount={totalExpenses} /></div>
-              </div>
-            </div>
-          </div>
-          
-          <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-              <div style={{ padding: '1rem', backgroundColor: 'var(--warning-light)', color: 'var(--warning)', borderRadius: 'var(--radius-lg)' }}><Wallet size={24} /></div>
-              <div>
-                <div className="subtitle">Hamkorlarga jami kreditorlik qarz</div>
-                <div className="h2" style={{ color: 'var(--warning)' }}><CurrencyDisplay amount={totalPartnerDebt} /></div>
-              </div>
-            </div>
+      <div className="stat-row">
+        <div className="stat-card">
+          <span className="stat-card-label">Jami Xarajatlar (Tanlangan davr)</span>
+          <span className="stat-card-value red"><CurrencyDisplay amount={totalExpenses} /></span>
+          <span className="stat-card-sub">Chiqimlar jami</span>
+        </div>
+        <div className="stat-card">
+          <span className="stat-card-label">Hamkorlarga jami kreditorlik qarz</span>
+          <span className="stat-card-value amber"><CurrencyDisplay amount={totalPartnerDebt} /></span>
+          <span className="stat-card-sub">To'lanishi kerak bo'lgan summa</span>
+        </div>
+      </div>
+
+      <div className="page-card" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+        <div className="page-card-header" style={{ padding: '20px 24px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Wallet size={20} color="#4A90E2" />
+            <h2 style={{ fontSize: 16, fontWeight: 600, color: '#1A2538', margin: 0 }}>Xarajatlar tarixi</h2>
           </div>
         </div>
 
-        <div className="glass-panel flex-col" style={{ height: '100%' }}>
-          <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Wallet size={20} color="var(--primary)" />
-            <h2 className="h2">Xarajatlar tarixi</h2>
-          </div>
-          <div style={{ padding: '1.5rem', overflowY: 'auto', flex: 1 }}>
-            <div className="table-responsive">
-<table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-              <thead>
-                <tr style={{ borderBottom: '2px solid var(--border-color)', color: 'var(--text-secondary)' }}>
-                  <th style={{ padding: '1rem' }}>Sana</th>
-                  <th style={{ padding: '1rem' }}>Kategoriya</th>
-                  <th style={{ padding: '1rem' }}>Izoh</th>
-                  <th style={{ padding: '1rem' }}>Summa</th>
-                  <th style={{ padding: '1rem' }}>Xodim</th>
+        <div style={{ flex: 1, overflowY: 'auto' }}>
+          <table className="page-table">
+            <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
+              <tr>
+                <th>Sana</th>
+                <th>Kategoriya</th>
+                <th>Izoh</th>
+                <th>Summa</th>
+                <th>Xodim</th>
+              </tr>
+            </thead>
+            <tbody>
+              {expenses.length === 0 ? (
+                <tr>
+                  <td colSpan="5" style={{ textAlign: 'center', padding: '3rem', color: '#8A9BB5' }}>
+                    Xarajatlar mavjud emas
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {expenses.length === 0 ? (
-                  <tr><td colSpan="5" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>Xarajatlar mavjud emas</td></tr>
-                ) : expenses.map(e => (
-                  <tr key={e.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                    <td style={{ padding: '1rem', color: 'var(--text-secondary)' }}>{e.date}</td>
-                    <td style={{ padding: '1rem', fontWeight: 500 }}>{categories.find(c => c.id === e.category)?.name || e.category}</td>
-                    <td style={{ padding: '1rem', color: 'var(--text-secondary)' }}>{e.note || '-'}</td>
-                    <td style={{ padding: '1rem', fontWeight: 600, color: 'var(--danger)' }}><CurrencyDisplay amount={e.amount} /></td>
-                    <td style={{ padding: '1rem', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>{e.createdBy}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-</div>
-          </div>
+              ) : expenses.map(e => (
+                <tr key={e.id}>
+                  <td style={{ color: '#8A9BB5', fontSize: 14 }}>{e.date}</td>
+                  <td style={{ fontWeight: 600, color: '#1A2538' }}>{categories.find(c => c.id === e.category)?.name || e.category}</td>
+                  <td style={{ color: '#8A9BB5' }}>{e.note || '-'}</td>
+                  <td style={{ fontWeight: 700, color: '#EF4B4B' }}><CurrencyDisplay amount={e.amount} /></td>
+                  <td style={{ color: '#8A9BB5', fontSize: 13 }}>{e.createdBy}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
 

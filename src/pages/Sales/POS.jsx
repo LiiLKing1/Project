@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, Minus, Trash2, CreditCard, Banknote, User, FileText, ChevronDown, Percent, Calendar } from 'lucide-react';
+import { Search, Plus, Minus, Trash2, CreditCard, Banknote, User, FileText, ChevronDown, Percent, Calendar, X, CheckCircle } from 'lucide-react';
 import { db } from '../../firebase';
 import { collection, onSnapshot, query, where, writeBatch, increment, doc, orderBy, getDoc } from 'firebase/firestore';
 import { useToast } from '../../context/ToastContext';
@@ -11,6 +11,8 @@ import Drawer from '../../components/Drawer';
 import FormInput from '../../components/FormInput';
 import Receipt from '../../components/Receipt';
 import CurrencyDisplay from '../../components/CurrencyDisplay';
+import { motion, AnimatePresence } from 'framer-motion';
+
 
 const POS = () => {
   const [allProducts, setAllProducts] = useState([]);
@@ -508,180 +510,343 @@ const POS = () => {
         </div>
       </div>
 
-      <Modal maxWidth="1000px" isOpen={isPaymentDrawerOpen} onClose={() => !isProcessing && setIsPaymentDrawerOpen(false)} title="To'lovni qabul qilish">
-        <div style={{ display: 'flex', gap: '2rem', alignItems: 'stretch' }}>
-          
-          {/* Left Side: Receipt Preview */}
-          <div style={{ flex: 1, backgroundColor: 'var(--bg-surface)', padding: '1rem', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', alignItems: 'center', overflowY: 'auto', maxHeight: '70vh' }}>
-            <h3 style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: '1rem' }}>Chek namunasi</h3>
-            <div style={{ width: '100%', maxWidth: '350px', transform: 'scale(0.9)', transformOrigin: 'top center' }}>
-              <Receipt sale={{
-                id: 'PREVIEW',
-                items: cart,
-                subtotal: subtotal,
-                discountAmount: discountAmount,
-                usedBonusAmount: usedBonusAmount,
-                finalTotal: finalTotal,
-                paymentType: paymentType,
-                customerName: selectedCustomer ? selectedCustomer.fullName : 'Xaridor',
-                createdAt: new Date().toISOString(),
-                cashierId: userProfile?.name || 'Kassir',
-                storeId: storeId
-              }} storeId={storeId} />
-            </div>
-          </div>
+      {/* ══ Fullscreen Payment Overlay ══ */}
+      <AnimatePresence>
+        {isPaymentDrawerOpen && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              key="pay-backdrop"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.25 }}
+              onClick={() => !isProcessing && setIsPaymentDrawerOpen(false)}
+              style={{
+                position: 'fixed', inset: 0,
+                background: 'rgba(10,20,40,0.55)',
+                backdropFilter: 'blur(6px)',
+                zIndex: 1100,
+              }}
+            />
 
-          {/* Right Side: Payment Options */}
-          <div className="flex-col" style={{ flex: 1, gap: '1.5rem', overflowY: 'auto', maxHeight: '70vh', paddingRight: '0.5rem' }}>
-          
-          {/* Summary */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
-            <span>Jami {cart.reduce((a,c)=>a+c.qty, 0)} dona mahsulot</span>
-            <span>Oraliq summa: <CurrencyDisplay amount={subtotal} /></span>
-          </div>
-
-          {/* Discount Block */}
-          <div style={{ padding: '1rem', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-              <span style={{ fontWeight: 600 }}>Chegirma</span>
-              {!canDiscount && <span style={{ fontSize: '0.75rem', color: 'var(--warning)' }}>(Faqat admin ruxsati bilan)</span>}
-            </div>
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <div style={{ display: 'flex', backgroundColor: 'var(--bg-main)', borderRadius: 'var(--radius-md)', padding: '2px', border: '1px solid var(--border-color)' }}>
-                <button 
-                  disabled={!canDiscount}
-                  onClick={() => setDiscountType('percent')}
-                  style={{ padding: '0.25rem 0.75rem', borderRadius: '4px', backgroundColor: discountType === 'percent' ? 'var(--primary)' : 'transparent', color: discountType === 'percent' ? 'white' : 'inherit' }}
-                >%</button>
-                <button 
-                  disabled={!canDiscount}
-                  onClick={() => setDiscountType('amount')}
-                  style={{ padding: '0.25rem 0.75rem', borderRadius: '4px', backgroundColor: discountType === 'amount' ? 'var(--primary)' : 'transparent', color: discountType === 'amount' ? 'white' : 'inherit' }}
-                >{curr}</button>
-              </div>
-              <input 
-                type="number" 
-                disabled={!canDiscount}
-                value={discountValue}
-                onChange={e => setDiscountValue(e.target.value)}
-                placeholder="Qiymat kiritish"
-                style={{ flex: 1, padding: '0.5rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}
-              />
-            </div>
-          </div>
-
-          {/* Final Total */}
-          <div style={{ padding: '1.5rem', backgroundColor: 'var(--primary-light)', borderRadius: 'var(--radius-lg)', textAlign: 'center' }}>
-            <div style={{ color: 'var(--primary)', fontWeight: 600, fontSize: '1.25rem', marginBottom: '0.5rem' }}>Yakuniy summa</div>
-            <div className="h1" style={{ color: 'var(--primary)' }}><CurrencyDisplay amount={finalTotal} /></div>
-          </div>
-
-          {/* Bonus Option */}
-          {selectedCustomer && selectedCustomer.bonusBalance > 0 && (
-            <div style={{ padding: '1rem', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                <span style={{ fontWeight: 600 }}>Bonusdan ishlatish</span>
-                <span style={{ fontSize: '0.875rem', color: 'var(--primary)', fontWeight: 600 }}>Mavjud: <CurrencyDisplay amount={selectedCustomer.bonusBalance} /></span>
-              </div>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <input 
-                  type="number" 
-                  value={bonusToUse}
-                  onChange={e => {
-                     const val = Number(e.target.value);
-                     if (val <= selectedCustomer.bonusBalance) setBonusToUse(e.target.value);
-                  }}
-                  placeholder="Qancha ishlatmoqchisiz?"
-                  style={{ flex: 1, padding: '0.5rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}
-                />
-                <button 
-                  className="btn btn-outline" 
-                  onClick={() => setBonusToUse(selectedCustomer.bonusBalance)}
-                >Barchasi</button>
-              </div>
-            </div>
-          )}
-
-          {/* Expected Bonus */}
-          {selectedCustomer && selectedCustomer.bonusPercent > 0 && (
-            <div style={{ padding: '0.75rem', backgroundColor: 'var(--success-light)', border: '1px solid var(--success)', borderRadius: 'var(--radius-md)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ color: 'var(--success)', fontWeight: 600, fontSize: '0.875rem' }}>Ushbu xariddan tushadigan bonus:</span>
-              <span style={{ color: 'var(--success)', fontWeight: 'bold' }}>
-                <CurrencyDisplay amount={finalTotal * (Number(selectedCustomer.bonusPercent) / 100)} />
-              </span>
-            </div>
-          )}
-
-          {/* Payment Methods Tabs */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem' }}>
-            {[
-              { id: 'cash', label: 'Naqd', icon: <Banknote size={16}/> },
-              { id: 'card', label: 'Karta', icon: <CreditCard size={16}/> },
-              { id: 'mixed', label: 'Aralash', icon: <FileText size={16}/> },
-              { id: 'debt', label: 'Nasiya', icon: <Calendar size={16}/> }
-            ].map(type => (
-              <button 
-                key={type.id} 
-                onClick={() => setPaymentType(type.id)} 
-                className="btn" 
-                style={{ 
-                  flex: 1, 
-                  backgroundColor: paymentType === type.id ? 'var(--primary)' : 'var(--bg-main)', 
-                  color: paymentType === type.id ? 'white' : 'var(--text-secondary)',
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.25rem',
-                  padding: '0.75rem 0.5rem', fontSize: '0.875rem'
-                }}
-              >
-                {type.icon} {type.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Inputs based on type */}
-          
-          {paymentType === 'mixed' && (
-            <div style={{ padding: '1rem', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <FormInput label={`Naqd (${curr})`} type="number" value={mixedCash} onChange={e => setMixedCash(e.target.value)} placeholder="0" />
-              <FormInput label={`Karta (${curr})`} type="number" value={mixedCard} onChange={e => setMixedCard(e.target.value)} placeholder="0" />
-              
-              {mDebt > 0 && (
-                <div style={{ color: 'var(--warning)', fontWeight: 600, fontSize: '0.875rem', padding: '1rem', backgroundColor: 'var(--warning-light)', borderRadius: 'var(--radius-md)' }}>
-                  Nasiyaga o'tmoqda: <CurrencyDisplay amount={mDebt} />
-                </div>
-              )}
-              {mChange > 0 && (
-                <div style={{ color: 'var(--success)', fontWeight: 600, fontSize: '0.875rem', padding: '1rem', backgroundColor: '#dcfce7', borderRadius: 'var(--radius-md)' }}>
-                  Qaytim: <CurrencyDisplay amount={mChange} />
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Debt requirement logic */}
-          {(paymentType === 'debt' || (paymentType === 'mixed' && mDebt > 0)) && (
-            <>
-              {!selectedCustomer && (
-                <div style={{ color: 'var(--danger)', fontSize: '0.875rem', fontWeight: 500, padding: '1rem', backgroundColor: 'var(--danger-light)', borderRadius: 'var(--radius-md)' }}>
-                  Nasiyaga sotish uchun kassa oynasidan mijozni tanlashingiz shart!
-                </div>
-              )}
-              <FormInput label="Qaytarish muddati *" type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} required />
-            </>
-          )}
-
-          <div style={{ marginTop: 'auto', paddingTop: '1rem' }}>
-            <button 
-              className="btn btn-success" 
-              style={{ width: '100%', padding: '1rem', fontSize: '1.125rem' }} 
-              onClick={handleCheckout} 
-              disabled={isProcessing || ((paymentType === 'debt' || (paymentType === 'mixed' && mDebt > 0)) && !selectedCustomer)}
+            {/* Panel */}
+            <motion.div
+              key="pay-panel"
+              initial={{ opacity: 0, scale: 0.94, y: 32 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.94, y: 32 }}
+              transition={{ type: 'spring', damping: 28, stiffness: 280 }}
+              style={{
+                position: 'fixed',
+                inset: 0,
+                zIndex: 1101,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '20px',
+                pointerEvents: 'none',
+              }}
             >
-              {isProcessing ? 'Bajarilmoqda...' : 'To\'lovni yakunlash'}
-            </button>
-          </div>
-        </div>
-        </div>
-      </Modal>
+              <div style={{
+                width: '100%',
+                maxWidth: '960px',
+                height: 'calc(100vh - 40px)',
+                maxHeight: '700px',
+                background: '#F4F8FF',
+                borderRadius: '28px',
+                boxShadow: '0 40px 100px -20px rgba(0,0,0,0.45)',
+                display: 'flex',
+                overflow: 'hidden',
+                pointerEvents: 'all',
+              }}>
+
+                {/* ── LEFT: Receipt ── */}
+                <div style={{
+                  width: '380px',
+                  flexShrink: 0,
+                  background: 'linear-gradient(160deg, #1A2538 0%, #2C4A7C 100%)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '24px 20px',
+                  gap: '16px',
+                  position: 'relative',
+                  overflow: 'hidden',
+                }}>
+                  {/* Decorative circles */}
+                  <div style={{ position: 'absolute', top: -60, right: -60, width: 200, height: 200, borderRadius: '50%', background: 'rgba(74,144,226,0.12)' }} />
+                  <div style={{ position: 'absolute', bottom: -40, left: -40, width: 150, height: 150, borderRadius: '50%', background: 'rgba(123,206,235,0.1)' }} />
+
+                  <div style={{ position: 'relative', zIndex: 1, color: '#fff', textAlign: 'center', marginBottom: 4 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, opacity: 0.6, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Chek namunasi</div>
+                    <div style={{ fontSize: 12, opacity: 0.4 }}>Tasdiqlashdan avval tekshiring</div>
+                  </div>
+
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.15, duration: 0.4 }}
+                    style={{ position: 'relative', zIndex: 1, width: '100%', overflowY: 'auto', maxHeight: 'calc(100% - 80px)',
+                      scrollbarWidth: 'none',
+                    }}
+                  >
+                    <style>{`.receipt-scroll::-webkit-scrollbar{display:none}`}</style>
+                    <div className="receipt-scroll">
+                      <Receipt sale={{
+                        id: 'PREVIEW',
+                        items: cart,
+                        subtotal,
+                        discountAmount,
+                        usedBonusAmount,
+                        finalTotal,
+                        paymentType,
+                        customerName: selectedCustomer ? selectedCustomer.fullName : 'Xaridor',
+                        createdAt: new Date().toISOString(),
+                        cashierId: userProfile?.name || 'Kassir',
+                        storeId,
+                      }} storeId={storeId} />
+                    </div>
+                  </motion.div>
+                </div>
+
+                {/* ── RIGHT: Payment Form ── */}
+                <div style={{
+                  flex: 1,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  overflow: 'hidden',
+                  background: '#fff',
+                }}>
+                  {/* Header */}
+                  <div style={{
+                    padding: '20px 24px',
+                    borderBottom: '1px solid #DCE8F5',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    flexShrink: 0,
+                  }}>
+                    <div>
+                      <div style={{ fontSize: 18, fontWeight: 800, color: '#1A2538', letterSpacing: '-0.5px' }}>To'lovni qabul qilish</div>
+                      <div style={{ fontSize: 13, color: '#8A9BB5', marginTop: 2 }}>
+                        {cart.reduce((a, c) => a + c.qty, 0)} ta mahsulot · Oraliq: <CurrencyDisplay amount={subtotal} />
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => !isProcessing && setIsPaymentDrawerOpen(false)}
+                      style={{ width: 36, height: 36, borderRadius: '10px', border: '1.5px solid #DCE8F5', background: '#F7FAFF', color: '#8A9BB5', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 0.2s' }}
+                      onMouseEnter={e => { e.currentTarget.style.background = '#FCE8E8'; e.currentTarget.style.color = '#EF4B4B'; e.currentTarget.style.borderColor = '#FFE0E0'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = '#F7FAFF'; e.currentTarget.style.color = '#8A9BB5'; e.currentTarget.style.borderColor = '#DCE8F5'; }}
+                    ><X size={16}/></button>
+                  </div>
+
+                  {/* Scrollable body */}
+                  <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+
+                    {/* Final Total */}
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
+                      style={{
+                        background: 'linear-gradient(135deg, #4A90E2, #7BCEEB)',
+                        borderRadius: '18px',
+                        padding: '18px 20px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        color: '#fff',
+                      }}
+                    >
+                      <div>
+                        <div style={{ fontSize: 12, opacity: 0.8, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Yakuniy summa</div>
+                        <div style={{ fontSize: 28, fontWeight: 900, letterSpacing: '-1px', marginTop: 2 }}>
+                          <CurrencyDisplay amount={finalTotal} />
+                        </div>
+                      </div>
+                      <div style={{ width: 52, height: 52, borderRadius: '16px', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Banknote size={26} color="#fff" />
+                      </div>
+                    </motion.div>
+
+                    {/* Discount Block */}
+                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
+                      style={{ border: '1.5px solid #DCE8F5', borderRadius: '16px', padding: '16px' }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
+                        <span style={{ fontWeight: 700, fontSize: 14, color: '#1A2538' }}>Chegirma</span>
+                        {!canDiscount && <span style={{ fontSize: 11, color: '#F59E0B', fontWeight: 600 }}>Faqat admin ruxsati bilan</span>}
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <div style={{ display: 'flex', background: '#F0F5FC', borderRadius: '10px', padding: '3px', gap: '2px' }}>
+                          {[{ val: 'percent', label: '%' }, { val: 'amount', label: curr }].map(t => (
+                            <button key={t.val} disabled={!canDiscount} onClick={() => setDiscountType(t.val)}
+                              style={{ padding: '6px 14px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 700, transition: 'all 0.2s',
+                                background: discountType === t.val ? '#4A90E2' : 'transparent',
+                                color: discountType === t.val ? '#fff' : '#8A9BB5',
+                              }}
+                            >{t.label}</button>
+                          ))}
+                        </div>
+                        <input
+                          type="number" disabled={!canDiscount} value={discountValue}
+                          onChange={e => setDiscountValue(e.target.value)} placeholder="Chegirma miqdori"
+                          style={{ flex: 1, padding: '9px 14px', borderRadius: '10px', border: '1.5px solid #DCE8F5', fontSize: 14, fontFamily: 'inherit', outline: 'none' }}
+                          onFocus={e => e.target.style.borderColor = '#4A90E2'}
+                          onBlur={e => e.target.style.borderColor = '#DCE8F5'}
+                        />
+                      </div>
+                    </motion.div>
+
+                    {/* Bonus */}
+                    {selectedCustomer && selectedCustomer.bonusBalance > 0 && (
+                      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.18 }}
+                        style={{ border: '1.5px solid #D1FAE5', borderRadius: '16px', padding: '16px', background: '#F0FDF4' }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+                          <span style={{ fontWeight: 700, fontSize: 14, color: '#059669' }}>Bonus ishlatish</span>
+                          <span style={{ fontSize: 12, color: '#059669', fontWeight: 600 }}>Mavjud: <CurrencyDisplay amount={selectedCustomer.bonusBalance} /></span>
+                        </div>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <input type="number" value={bonusToUse}
+                            onChange={e => { const val = Number(e.target.value); if (val <= selectedCustomer.bonusBalance) setBonusToUse(e.target.value); }}
+                            placeholder="Qancha ishlatmoqchisiz?"
+                            style={{ flex: 1, padding: '9px 14px', borderRadius: '10px', border: '1.5px solid #A7F3D0', fontSize: 14, fontFamily: 'inherit', outline: 'none', background: '#fff' }}
+                          />
+                          <button onClick={() => setBonusToUse(selectedCustomer.bonusBalance)}
+                            style={{ padding: '9px 16px', borderRadius: '10px', border: '1.5px solid #A7F3D0', background: '#fff', color: '#059669', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}
+                          >Barchasi</button>
+                        </div>
+                      </motion.div>
+                    )}
+
+                    {/* Expected Bonus */}
+                    {selectedCustomer && selectedCustomer.bonusPercent > 0 && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 14px', background: '#F0FDF4', borderRadius: '12px', border: '1.5px solid #D1FAE5' }}>
+                        <span style={{ color: '#059669', fontWeight: 600, fontSize: 13 }}>Ushbu xariddan tushadigan bonus:</span>
+                        <span style={{ color: '#059669', fontWeight: 800, fontSize: 13 }}>
+                          <CurrencyDisplay amount={finalTotal * (Number(selectedCustomer.bonusPercent) / 100)} />
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Payment Methods */}
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: '#8A9BB5', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>To'lov usuli</div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
+                        {[
+                          { id: 'cash', label: "Naqd pul", icon: <Banknote size={20}/>, color: '#10B981' },
+                          { id: 'card', label: 'Plastik karta', icon: <CreditCard size={20}/>, color: '#4A90E2' },
+                          { id: 'mixed', label: 'Aralash', icon: <FileText size={20}/>, color: '#8B5CF6' },
+                          { id: 'debt', label: 'Nasiya', icon: <Calendar size={20}/>, color: '#F59E0B' },
+                        ].map((type, i) => {
+                          const active = paymentType === type.id;
+                          return (
+                            <motion.button
+                              key={type.id}
+                              whileHover={{ scale: 1.02 }}
+                              whileTap={{ scale: 0.97 }}
+                              onClick={() => setPaymentType(type.id)}
+                              style={{
+                                display: 'flex', alignItems: 'center', gap: '10px',
+                                padding: '12px 14px', borderRadius: '14px', cursor: 'pointer',
+                                border: active ? `2px solid ${type.color}` : '2px solid #DCE8F5',
+                                background: active ? `${type.color}12` : '#F7FAFF',
+                                color: active ? type.color : '#8A9BB5',
+                                fontWeight: active ? 700 : 500,
+                                fontSize: 14,
+                                transition: 'all 0.2s',
+                                fontFamily: 'inherit',
+                              }}
+                            >
+                              <div style={{
+                                width: 36, height: 36, borderRadius: '10px',
+                                background: active ? `${type.color}20` : '#F0F5FC',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                flexShrink: 0, color: active ? type.color : '#8A9BB5',
+                                transition: 'all 0.2s',
+                              }}>
+                                {type.icon}
+                              </div>
+                              {type.label}
+                            </motion.button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Mixed inputs */}
+                    {paymentType === 'mixed' && (
+                      <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}
+                        style={{ border: '1.5px solid #DCE8F5', borderRadius: '16px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}
+                      >
+                        <FormInput label={`Naqd (${curr})`} type="number" value={mixedCash} onChange={e => setMixedCash(e.target.value)} placeholder="0" />
+                        <FormInput label={`Karta (${curr})`} type="number" value={mixedCard} onChange={e => setMixedCard(e.target.value)} placeholder="0" />
+                        {mDebt > 0 && (
+                          <div style={{ color: '#F59E0B', fontWeight: 700, fontSize: 13, padding: '10px 14px', background: '#FFFBEB', borderRadius: '10px' }}>
+                            Nasiyaga o'tmoqda: <CurrencyDisplay amount={mDebt} />
+                          </div>
+                        )}
+                        {mChange > 0 && (
+                          <div style={{ color: '#10B981', fontWeight: 700, fontSize: 13, padding: '10px 14px', background: '#F0FDF4', borderRadius: '10px' }}>
+                            Qaytim: <CurrencyDisplay amount={mChange} />
+                          </div>
+                        )}
+                      </motion.div>
+                    )}
+
+                    {/* Debt warning */}
+                    {(paymentType === 'debt' || (paymentType === 'mixed' && mDebt > 0)) && (
+                      <>
+                        {!selectedCustomer && (
+                          <div style={{ color: '#EF4B4B', fontSize: 13, fontWeight: 600, padding: '12px 14px', background: '#FFF5F5', borderRadius: '12px', border: '1.5px solid #FFE0E0' }}>
+                            ⚠ Nasiyaga sotish uchun kassa oynasidan mijozni tanlashingiz shart!
+                          </div>
+                        )}
+                        <FormInput label="Qaytarish muddati *" type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} required />
+                      </>
+                    )}
+                  </div>
+
+                  {/* Footer CTA */}
+                  <div style={{ padding: '16px 24px', borderTop: '1px solid #DCE8F5', flexShrink: 0, background: '#fff' }}>
+                    <motion.button
+                      whileHover={{ scale: isProcessing ? 1 : 1.01 }}
+                      whileTap={{ scale: isProcessing ? 1 : 0.98 }}
+                      onClick={handleCheckout}
+                      disabled={isProcessing || ((paymentType === 'debt' || (paymentType === 'mixed' && mDebt > 0)) && !selectedCustomer)}
+                      style={{
+                        width: '100%',
+                        padding: '15px',
+                        borderRadius: '16px',
+                        border: 'none',
+                        background: isProcessing ? '#8A9BB5' : 'linear-gradient(135deg, #10B981, #34D399)',
+                        color: '#fff',
+                        fontWeight: 800,
+                        fontSize: '16px',
+                        cursor: isProcessing ? 'not-allowed' : 'pointer',
+                        fontFamily: 'inherit',
+                        boxShadow: isProcessing ? 'none' : '0 6px 20px -6px rgba(16,185,129,0.5)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px',
+                        transition: 'all 0.2s',
+                        letterSpacing: '-0.3px',
+                      }}
+                    >
+                      <CheckCircle size={20} />
+                      {isProcessing ? 'Bajarilmoqda...' : "To'lovni yakunlash"}
+                    </motion.button>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+
 
       {/* Chek (Receipt) Modali */}
       <Modal isOpen={isReceiptModalOpen} onClose={() => setIsReceiptModalOpen(false)} title="Xarid cheki">

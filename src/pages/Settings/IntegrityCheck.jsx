@@ -3,6 +3,7 @@ import { db } from '../../firebase';
 import { collection, getDocs, doc, updateDoc, writeBatch } from 'firebase/firestore';
 import { useRoles } from '../../context/RolesContext';
 import { useToast } from '../../context/ToastContext';
+import { useConfirm } from '../../context/ConfirmContext';
 import { ShieldAlert, CheckCircle2, AlertTriangle, RefreshCcw, Wrench } from 'lucide-react';
 import { logAudit } from '../../utils/firebaseUtils';
 
@@ -12,6 +13,7 @@ const IntegrityCheck = () => {
   const [fixingId, setFixingId] = useState(null);
   const { userProfile } = useRoles();
   const { addToast } = useToast();
+  const { confirm } = useConfirm();
   const storeId = userProfile?.storeOwnerId;
 
   const runCheck = async () => {
@@ -73,7 +75,7 @@ const IntegrityCheck = () => {
   };
 
   const fixIssue = async (issue) => {
-    if (!window.confirm('Haqiqatan ham bu xatoni avtomatik to\'g\'irlamoqchimisiz?')) return;
+    if (!(await confirm({ message: 'Haqiqatan ham bu xatoni avtomatik to\'g\'irlamoqchimisiz?' }))) return;
     setFixingId(issue.id);
     try {
       await updateDoc(issue.docRef, issue.fixData);
@@ -89,7 +91,7 @@ const IntegrityCheck = () => {
 
   const fixAll = async () => {
     if (issues.length === 0) return;
-    if (!window.confirm(`Jami ${issues.length} ta xatolikni barchasini to'g'irlamoqchimisiz?`)) return;
+    if (!(await confirm({ message: `Jami ${issues.length} ta xatolikni barchasini to'g'irlamoqchimisiz?` }))) return;
     setLoading(true);
     try {
       const batch = writeBatch(db);

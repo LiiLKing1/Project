@@ -4,6 +4,7 @@ import { collection, onSnapshot, query, doc, writeBatch, increment } from 'fireb
 import { useToast } from '../../context/ToastContext';
 import { useRoles } from '../../context/RolesContext';
 import { useSettings } from '../../context/SettingsContext';
+import { useConfirm } from '../../context/ConfirmContext';
 import Drawer from '../../components/Drawer';
 import Modal from '../../components/Modal';
 import FormInput from '../../components/FormInput';
@@ -21,6 +22,7 @@ const PartnerDebts = () => {
   const { addToast } = useToast();
   const { userProfile } = useRoles();
   const { settings } = useSettings();
+  const { confirm } = useConfirm();
   const storeId = userProfile?.storeOwnerId;
   const curr = settings?.currency || 'UZS';
 
@@ -186,8 +188,7 @@ const PartnerDebts = () => {
       addToast('Bu amalni bajarish uchun huquqingiz yo\'q', 'error');
       return;
     }
-    
-    if (!window.confirm('Haqiqatan ham bu qarzni bekor qilmoqchimisiz?')) return;
+    if (!(await confirm({ message: 'Haqiqatan ham bu qarzni bekor qilmoqchimisiz?', confirmStyle: 'danger' }))) return;
     
     try {
       const batch = writeBatch(db);
@@ -267,75 +268,104 @@ const PartnerDebts = () => {
 
   const filteredDebtors = debtors.filter(d => d.companyName?.toLowerCase().includes(search.toLowerCase()) || d.contactPerson?.toLowerCase().includes(search.toLowerCase()));
 
+  const totalDebtors = filteredDebtors.length;
+  const totalDebtAmount = filteredDebtors.reduce((acc, d) => acc + (d.currentPayable || 0), 0);
+
   return (
-    <div className="flex-col" style={{ gap: '1.5rem', height: '100%' }}>
-      <div className="flex-between">
-        <h1 className="h1">Hamkor Qarzlari (Kreditorlik)</h1>
-        <button className="btn btn-primary" onClick={() => setIsDrawerOpen(true)}>
-          <Plus size={18} /> Qo'lda qarz qo'shish
-        </button>
+    <div className="page-wrapper">
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">Hamkor Qarzlari (Kreditorlik)</h1>
+          <p className="page-subtitle">Sizning yetkazib beruvchilardan bo'lgan qarzlaringiz</p>
+        </div>
+        <div style={{ display: 'flex', gap: '12px' }}>
+          <button className="btn btn-primary" onClick={() => setIsDrawerOpen(true)}>
+            <Plus size={18} /> Qo'lda qarz qo'shish
+          </button>
+        </div>
       </div>
 
-      <div className="glass-panel flex-col" style={{ flex: 1, overflow: 'hidden' }}>
-        <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border-color)' }}>
-          <div style={{ position: 'relative', width: '350px' }}>
-            <Search size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
+      <div className="stat-row">
+        <div className="stat-card">
+          <span className="stat-card-label">Qarzdorliklar soni</span>
+          <span className="stat-card-value amber">{totalDebtors} ta hamkor</span>
+        </div>
+        <div className="stat-card">
+          <span className="stat-card-label">Umumiy qarzingiz</span>
+          <span className="stat-card-value red"><CurrencyDisplay amount={totalDebtAmount} /></span>
+        </div>
+      </div>
+
+      <div className="page-card">
+        <div className="page-card-header">
+          <div className="search-wrap">
+            <Search size={16} className="search-icon" />
             <input 
               type="text" 
               placeholder="Kompaniya yoki mas'ul shaxs orqali qidirish..." 
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              style={{ width: '100%', paddingLeft: '2.5rem' }}
             />
           </div>
         </div>
 
-        <div style={{ flex: 1, overflowY: 'auto' }}>
-          <div className="table-responsive">
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+        <div style={{ overflowX: 'auto' }}>
+          <table className="page-table">
             <thead>
-              <tr style={{ borderBottom: '2px solid var(--border-color)', color: 'var(--text-secondary)' }}>
-                <th style={{ padding: '1rem' }}>Hamkor Kompaniya</th>
-                <th style={{ padding: '1rem' }}>Mas'ul shaxs / Telefon</th>
-                <th style={{ padding: '1rem' }}>Umumiy qarz (Sizning qarzingiz)</th>
-                <th style={{ padding: '1rem' }}>Amallar</th>
+              <tr>
+                <th>Hamkor Kompaniya</th>
+                <th>Mas'ul shaxs / Telefon</th>
+                <th>Umumiy qarz (Sizning qarzingiz)</th>
+                <th style={{ textAlign: 'right' }}>Amallar</th>
               </tr>
             </thead>
             <tbody>
               {filteredDebtors.length === 0 ? (
-                <tr><td colSpan="4" style={{ textAlign: 'center', padding: '2rem' }}>Qarzdorlik yo'q</td></tr>
+                <tr>
+                  <td colSpan="4" style={{ textAlign: 'center', padding: '3rem', color: '#8A9BB5' }}>
+                    Qarzdorlik yo'q
+                  </td>
+                </tr>
               ) : filteredDebtors.map(partner => (
                 <React.Fragment key={partner.id}>
-                  <tr style={{ borderBottom: '1px solid var(--border-color)', backgroundColor: expandedId === partner.id ? 'var(--bg-main)' : 'transparent', cursor: 'pointer' }} onClick={() => toggleExpand(partner.id)}>
-                    <td style={{ padding: '1rem', fontWeight: 600 }}>{partner.companyName}</td>
-                    <td style={{ padding: '1rem', color: 'var(--text-secondary)' }}>{partner.contactPerson} ({partner.phone})</td>
-                    <td style={{ padding: '1rem', fontWeight: 700, color: 'var(--danger)' }}><CurrencyDisplay amount={partner.currentPayable} /></td>
-                    <td style={{ padding: '1rem', textAlign: 'right' }}>
+                  <tr style={{ backgroundColor: expandedId === partner.id ? '#F7FAFF' : 'transparent', cursor: 'pointer' }} onClick={() => toggleExpand(partner.id)}>
+                    <td><div style={{ fontWeight: 600, color: '#1A2538' }}>{partner.companyName}</div></td>
+                    <td>
+                      <div style={{ color: '#8A9BB5' }}>{partner.contactPerson}</div>
+                      <div style={{ fontSize: 13, fontFamily: 'monospace', color: '#8A9BB5' }}>{partner.phone}</div>
+                    </td>
+                    <td>
+                      <span style={{ fontWeight: 700, color: '#EF4B4B' }}><CurrencyDisplay amount={partner.currentPayable} /></span>
+                    </td>
+                    <td style={{ textAlign: 'right', color: '#8A9BB5' }}>
                       {expandedId === partner.id ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
                     </td>
                   </tr>
                   {expandedId === partner.id && (
                     <tr>
                       <td colSpan="4" style={{ padding: 0 }}>
-                        <div style={{ backgroundColor: 'var(--bg-main)', padding: '1.5rem', borderBottom: '2px solid var(--primary)' }}>
-                          <h4 style={{ marginBottom: '1rem', color: 'var(--text-secondary)' }}>Qarz yozuvlari:</h4>
+                        <div style={{ backgroundColor: '#F0F5FC', padding: '24px', borderBottom: '2px solid #4A90E2', boxShadow: 'inset 0 4px 6px -4px rgba(0,0,0,0.05)' }}>
+                          <h4 style={{ marginBottom: '16px', color: '#1A2538', fontWeight: 600, fontSize: 14 }}>Qarz yozuvlari:</h4>
                           {partnerDebtsData[partner.id]?.filter(d => d.status !== 'cancelled' && d.status !== 'paid').length > 0 ? (
-                            <div style={{ display: 'grid', gap: '1rem' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                               {partnerDebtsData[partner.id]?.filter(d => d.status !== 'cancelled' && d.status !== 'paid').map(debt => (
-                                <div key={debt.id} className="glass-panel" style={{ padding: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div key={debt.id} style={{ background: '#fff', padding: '16px 20px', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid #DCE8F5', boxShadow: '0 2px 8px -4px rgba(0,0,0,0.05)' }}>
                                   <div>
-                                    <div style={{ fontWeight: 600, fontSize: '1.125rem', display: 'flex', gap: '0.25rem' }}>Qoldiq: <CurrencyDisplay amount={debt.remainingAmount} /></div>
-                                    <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '0.25rem', display: 'flex', gap: '0.25rem' }}>
-                                      Boshlang'ich summa: <CurrencyDisplay amount={debt.amount} /> | Muddat: {new Date(debt.dueDate).toLocaleDateString()}
+                                    <div style={{ fontWeight: 700, fontSize: 18, color: '#1A2538', display: 'flex', gap: 6 }}>
+                                      Qoldiq: <span style={{ color: '#EF4B4B' }}><CurrencyDisplay amount={debt.remainingAmount} /></span>
                                     </div>
-                                    {debt.note && <div style={{ fontSize: '0.875rem', marginTop: '0.25rem' }}>Izoh: {debt.note}</div>}
+                                    <div style={{ fontSize: 13, color: '#8A9BB5', marginTop: 6, display: 'flex', gap: 12 }}>
+                                      <span>Boshlang'ich summa: <CurrencyDisplay amount={debt.amount} /></span>
+                                      <span>Muddat: {new Date(debt.dueDate).toLocaleDateString()}</span>
+                                    </div>
+                                    {debt.note && <div style={{ fontSize: 13, color: '#8A9BB5', marginTop: 4 }}>Izoh: {debt.note}</div>}
                                   </div>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                                     {getStatusBadge(debt.status, debt.dueDate)}
-                                    <button className="btn btn-success" onClick={() => openPaymentModal(debt, partner.id)} style={{ padding: '0.5rem 1rem' }}>To'lov qilish</button>
+                                    <button className="btn btn-primary" onClick={() => openPaymentModal(debt, partner.id)} style={{ padding: '8px 16px', fontSize: 13 }}>To'lov qilish</button>
                                     {(userProfile?.role === 'admin' || userProfile?.role === 'manager') && (
-                                      <button className="btn btn-outline" style={{ color: 'var(--danger)' }} onClick={() => handleCancelDebt(debt, partner.id)} title="Qarzni bekor qilish">
-                                        <Trash2 size={18} />
+                                      <button className="action-btn delete" onClick={() => handleCancelDebt(debt, partner.id)} title="Qarzni bekor qilish">
+                                        <Trash2 size={16} />
                                       </button>
                                     )}
                                   </div>
@@ -343,16 +373,16 @@ const PartnerDebts = () => {
                               ))}
                             </div>
                           ) : (
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'var(--bg-surface)', padding: '1.5rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#fff', padding: '20px', borderRadius: '12px', border: '1px dashed #DCE8F5' }}>
                               <div>
-                                <div style={{ fontSize: '1.125rem', fontWeight: 600, color: 'var(--text-main)' }}>Aktiv qarz yozuvlari mavjud emas</div>
-                                <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
+                                <div style={{ fontSize: 15, fontWeight: 600, color: '#1A2538' }}>Aktiv qarz yozuvlari mavjud emas</div>
+                                <div style={{ fontSize: 13, color: '#8A9BB5', marginTop: 4 }}>
                                   Lekin hamkorning umumiy qarzdorlik balansi mavjud. Bu yerdan to'lov qilishingiz mumkin.
                                 </div>
                               </div>
-                              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                <button className="btn btn-success" onClick={() => openLegacyPayModal(partner)}><Minus size={18} /> To'lov qilish</button>
-                              </div>
+                              <button className="btn btn-outline" style={{ color: '#10B981', borderColor: '#10B981' }} onClick={() => openLegacyPayModal(partner)}>
+                                <Minus size={16} /> To'lov qilish
+                              </button>
                             </div>
                           )}
                         </div>
@@ -363,7 +393,6 @@ const PartnerDebts = () => {
               ))}
             </tbody>
           </table>
-          </div>
         </div>
       </div>
 

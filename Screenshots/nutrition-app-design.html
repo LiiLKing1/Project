@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nutrition App UI — Design Replica</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --green-light:#8BD843;
+    --green-dark:#619930;
+    --black:#000000;
+    --gray-bg:#E6E9E6;
+    --text-gray:#9AA09A;
+    --text-dark:#1C1E1B;
+    --red:#EF4B4B;
+    --card-border:#EEF1EC;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    font-family:'Poppins', sans-serif;
+    background: linear-gradient(180deg, #E9EBE5 0%, #E3E5DE 100%);
+    padding:60px 20px 0;
+  }
+  .stage{
+    display:flex;
+    justify-content:center;
+    align-items:flex-start;
+    gap:36px;
+    flex-wrap:wrap;
+    padding-bottom:60px;
+  }
+
+  /* ---------- PHONE FRAME ---------- */
+  .phone{
+    width:300px;
+    height:650px;
+    background:#fff;
+    border-radius:46px;
+    padding:10px;
+    box-shadow: 0 30px 60px -20px rgba(20,30,10,0.25), 0 0 0 1px rgba(0,0,0,0.03);
+    position:relative;
+  }
+  .screen{
+    width:100%;
+    height:100%;
+    border-radius:38px;
+    overflow:hidden;
+    position:relative;
+    display:flex;
+    flex-direction:column;
+    background:#fff;
+  }
+  .status-bar{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:18px 24px 6px;
+    font-weight:600;
+    font-size:14px;
+    color:var(--text-dark);
+    flex-shrink:0;
+  }
+  .status-icons{display:flex; align-items:center; gap:5px;}
+
+  /* ================= SCREEN 1 — ONBOARDING ================= */
+  .screen-onboard{
+    background: linear-gradient(160deg, #97D653 0%, #7FCB3E 55%, #6EBE33 100%);
+    position:relative;
+  }
+  .screen-onboard .status-bar{color:#1B2B0E;}
+  .star{position:absolute; opacity:0.9;}
+  .star svg{display:block;}
+  .star-big{top:38px; left:-18px; width:110px; height:110px; opacity:0.85;}
+  .star-mid{top:150px; right:38px; width:34px; height:34px;}
+  .star-small{top:330px; right:30px; width:20px; height:20px;}
+
+  .bubble{
+    background:#fff;
+    color:var(--text-dark);
+    font-weight:700;
+    font-size:15px;
+    line-height:1.35;
+    text-align:center;
+    padding:14px 20px;
+    border-radius:20px;
+    width:180px;
+    margin:70px auto 0;
+    position:relative;
+    box-shadow:0 10px 20px rgba(0,0,0,0.08);
+  }
+  .bubble::after{
+    content:"";
+    position:absolute;
+    bottom:-9px;
+    left:38%;
+    width:16px; height:16px;
+    background:#fff;
+    clip-path: polygon(0 0, 100% 0, 0 100%);
+    transform: rotate(-45deg);
+  }
+  .plate-wrap{
+    display:flex;
+    justify-content:center;
+    margin-top:22px;
+  }
+  .onboard-text{
+    background:#fff;
+    margin-top:24px;
+    padding:28px 26px 26px;
+    border-radius:32px 32px 0 0;
+    flex-grow:1;
+    display:flex;
+    flex-direction:column;
+    justify-content:flex-end;
+  }
+  .onboard-text h1{
+    font-size:23px;
+    font-weight:800;
+    color:var(--text-dark);
+    line-height:1.25;
+    margin-bottom:10px;
+  }
+  .onboard-text p{
+    font-size:12.5px;
+    color:var(--text-gray);
+    line-height:1.6;
+    margin-bottom:20px;
+  }
+  .btn-start{
+    background: linear-gradient(90deg, var(--green-light), var(--green-dark));
+    border-radius:30px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:6px 6px 6px 6px;
+    box-shadow:0 12px 24px -8px rgba(98,153,48,0.6);
+  }
+  .btn-start .icon-circle{
+    width:38px; height:38px; border-radius:50%;
+    background:rgba(255,255,255,0.25);
+    display:flex; align-items:center; justify-content:center;
+  }
+  .btn-start span{
+    color:#fff; font-weight:700; font-size:14.5px;
+  }
+  .btn-start .chevrons{
+    width:38px; height:38px; border-radius:50%;
+    background:rgba(255,255,255,0.25);
+    display:flex; align-items:center; justify-content:center;
+    color:#fff; font-weight:800; font-size:13px; letter-spacing:-2px;
+  }
+
+  /* ================= SCREEN 2 — DASHBOARD ================= */
+  .screen-dash{background:#fff;}
+  .dash-header{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:14px 20px 6px;
+  }
+  .dash-user{display:flex; align-items:center; gap:10px;}
+  .avatar-sm{width:42px; height:42px; border-radius:50%; overflow:hidden; flex-shrink:0;}
+  .dash-user .greet{font-size:13.5px; font-weight:600; color:var(--text-dark);}
+  .dash-user .sub{font-size:15px; font-weight:700; color:var(--text-dark);}
+  .dash-icons{display:flex; gap:8px;}
+  .round-btn{
+    width:38px; height:38px; border-radius:50%;
+    background:#F3F5F0;
+    display:flex; align-items:center; justify-content:center;
+    color:var(--text-dark);
+  }
+  .card{
+    margin:12px 18px 0;
+    border:1px solid var(--card-border);
+    border-radius:20px;
+    padding:16px 16px 8px;
+    box-shadow:0 8px 24px -18px rgba(0,0,0,0.3);
+  }
+  .card-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;}
+  .card-head .title{display:flex; align-items:center; gap:8px; font-weight:700; font-size:14px; color:var(--text-dark);}
+  .icon-badge{width:26px; height:26px; border-radius:50%; background:#EEF7E4; display:flex; align-items:center; justify-content:center; color:var(--green-dark);}
+  .dropdown{font-size:11.5px; color:var(--text-gray); font-weight:600; display:flex; align-items:center; gap:3px;}
+
+  .chart-wrap{position:relative; padding-top:6px;}
+  .chart-ylabels{position:absolute; left:0; top:6px; font-size:9px; color:var(--text-gray); font-weight:600; height:118px;}
+  .chart-ylabels span{position:absolute; left:0;}
+  .chart-ylabels span:nth-child(1){top:0;}
+  .chart-ylabels span:nth-child(2){top:66px;}
+  .chart-ylabels span:nth-child(3){top:86px;}
+  .chart-ylabels span:nth-child(4){top:104px;}
+  .chart-area{margin-left:26px; position:relative; height:130px;}
+  .dashed-line{position:absolute; top:14px; left:0; right:0; border-top:1.5px dashed #BFE49A; z-index:1;}
+  .badge-80{
+    position:absolute; top:2px; left:0;
+    background:var(--green-light); color:#fff; font-size:10px; font-weight:700;
+    padding:2px 7px; border-radius:8px; z-index:2;
+  }
+  .bars{display:flex; align-items:flex-end; justify-content:space-between; height:118px; position:relative; z-index:1; padding-top:16px;}
+  .bar-col{width:11%; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; height:100%;}
+  .bar{width:11px; border-radius:6px; background:#DCEFC3;}
+  .bar.active{background: linear-gradient(180deg, #7FCB3E, var(--green-dark));}
+  .bar.striped{
+    background: repeating-linear-gradient(-45deg, #EEF1EC, #EEF1EC 3px, #F7F9F5 3px, #F7F9F5 6px);
+  }
+  .day-labels{display:flex; justify-content:space-between; margin-left:26px; margin-top:6px;}
+  .day-labels span{font-size:9.5px; color:var(--text-gray); font-weight:600; width:11%; text-align:center;}
+
+  .macros{display:flex; gap:8px; margin:14px 18px 0;}
+  .macro-card{
+    flex:1; border:1px solid var(--card-border); border-radius:16px; padding:10px 8px;
+    box-shadow:0 8px 20px -16px rgba(0,0,0,0.3);
+    position:relative;
+  }
+  .macro-top{display:flex; align-items:center; justify-content:space-between;}
+  .macro-icon{width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center;}
+  .macro-icon.up{background:#EAF6E0; color:var(--green-dark);}
+  .macro-icon.warn{background:#FCE9E9; color:var(--red);}
+  .macro-badge{font-size:8.5px; font-weight:700; color:#fff; padding:1.5px 5px; border-radius:6px;}
+  .macro-badge.dark{background:#1C1E1B;}
+  .macro-badge.red{background:var(--red);}
+  .macro-name{font-size:11px; font-weight:700; color:var(--text-dark); margin-top:8px;}
+  .macro-bottom{display:flex; align-items:center; justify-content:space-between; margin-top:2px;}
+  .macro-val{font-size:9px; color:var(--text-gray); font-weight:600;}
+  .ring{position:relative; width:26px; height:26px;}
+  .ring svg{transform:rotate(-90deg);}
+  .ring span{position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:7px; font-weight:700; color:var(--text-dark);}
+
+  .meal-section{margin:16px 18px 0; display:flex; align-items:center; justify-content:space-between;}
+  .meal-section h3{font-size:14.5px; font-weight:700; color:var(--text-dark);}
+  .meal-section .view-all{font-size:11px; color:var(--green-dark); font-weight:700;}
+  .meal-item{display:flex; align-items:center; gap:10px; margin:10px 18px 0; padding-bottom:10px;}
+  .meal-thumb{width:52px; height:52px; border-radius:14px; overflow:hidden; flex-shrink:0;}
+  .meal-thumb svg{display:block;}
+  .meal-info{flex-grow:1;}
+  .meal-info .name{font-size:12.5px; font-weight:700; color:var(--text-dark);}
+  .meal-info .meta{font-size:10px; color:var(--text-gray); margin-top:2px;}
+  .btn-add{
+    background:var(--green-light); color:#fff; font-size:10.5px; font-weight:700;
+    padding:6px 14px; border-radius:20px; flex-shrink:0;
+  }
+
+  /* Bottom Nav (shared) */
+  .navbar{
+    position:absolute; bottom:14px; left:16px; right:16px;
+    background:#fff; border-radius:30px;
+    box-shadow:0 14px 30px -10px rgba(0,0,0,0.22);
+    display:flex; align-items:center; justify-content:space-between;
+    padding:10px 16px;
+  }
+  .nav-item{width:22px; height:22px; color:#B9BEB7; display:flex; align-items:center; justify-content:center;}
+  .nav-center{
+    width:46px; height:46px; border-radius:50%; background:var(--black);
+    color:#fff; margin-top:-26px;
+    box-shadow:0 10px 20px -6px rgba(0,0,0,0.5);
+  }
+  .nav-active{
+    width:30px; height:30px; border-radius:50%; background:var(--green-light);
+    color:#fff;
+  }
+
+  /* ================= SCREEN 3 — PROFILE ================= */
+  .screen-profile{background:#fff;}
+  .profile-header{display:flex; align-items:center; justify-content:space-between; padding:16px 18px 4px;}
+  .profile-header h2{font-size:15.5px; font-weight:700; color:var(--text-dark);}
+  .avatar-lg-wrap{display:flex; justify-content:center; margin-top:14px;}
+  .avatar-lg{width:92px; height:92px; border-radius:50%; overflow:hidden; box-shadow:0 10px 24px -8px rgba(0,0,0,0.25);}
+  .profile-name{text-align:center; font-size:18px; font-weight:700; color:var(--text-dark); margin-top:12px;}
+  .stat-row{display:flex; gap:10px; margin:16px 18px 0;}
+  .stat-card{
+    flex:1; border:1px solid var(--card-border); border-radius:16px; padding:12px;
+    display:flex; align-items:center; gap:10px;
+    box-shadow:0 8px 20px -16px rgba(0,0,0,0.3);
+  }
+  .stat-card .icon-badge{width:32px; height:32px;}
+  .stat-card .label{font-size:11.5px; font-weight:700; color:var(--text-dark);}
+  .stat-card .value{font-size:9.5px; color:var(--text-gray); font-weight:600;}
+
+  .list-card{margin:14px 18px 0; border:1px solid var(--card-border); border-radius:18px; overflow:hidden; box-shadow:0 8px 20px -16px rgba(0,0,0,0.3);}
+  .list-row{display:flex; align-items:center; gap:12px; padding:13px 14px; border-bottom:1px solid var(--card-border);}
+  .list-row:last-child{border-bottom:none;}
+  .list-row .icon-badge{background:#F3F5F0; color:var(--text-dark);}
+  .list-row .row-label{flex-grow:1; font-size:12.5px; font-weight:600; color:var(--text-dark);}
+  .chev{color:#C7CCC3;}
+  .toggle{width:36px; height:20px; border-radius:12px; background:var(--green-light); position:relative;}
+  .toggle::after{content:""; position:absolute; top:2px; right:2px; width:16px; height:16px; border-radius:50%; background:#fff;}
+
+  /* ============== PALETTE FOOTER ============== */
+  .palette-footer{
+    background: linear-gradient(180deg, #A9ACA3, #97998F);
+    margin:60px -20px 0;
+    padding:44px 20px 60px;
+    text-align:center;
+  }
+  .palette-footer .brand{
+    color:#fff; font-weight:800; letter-spacing:4px; font-size:15px; margin-bottom:34px;
+  }
+  .swatches{display:flex; justify-content:center; gap:22px; flex-wrap:wrap;}
+  .swatch{
+    width:150px; height:150px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    font-weight:800; font-size:17px;
+    box-shadow:0 20px 40px -14px rgba(0,0,0,0.35);
+  }
+</style>
+</head>
+<body>
+
+<div class="stage">
+
+  <!-- ===================== PHONE 1 — ONBOARDING ===================== -->
+  <div class="phone">
+    <div class="screen screen-onboard">
+      <div class="status-bar">
+        <span>11:41</span>
+        <div class="status-icons">
+          <svg width="17" height="11" viewBox="0 0 17 11"><rect x="0" y="7" width="3" height="4" rx="0.5" fill="currentColor"/><rect x="4.5" y="5" width="3" height="6" rx="0.5" fill="currentColor"/><rect x="9" y="2.5" width="3" height="8.5" rx="0.5" fill="currentColor"/><rect x="13.5" y="0" width="3" height="11" rx="0.5" fill="currentColor"/></svg>
+          <svg width="15" height="11" viewBox="0 0 16 12"><path d="M8 11.5c.5 0 .9-.4.9-.9 0-.5-.4-.9-.9-.9s-.9.4-.9.9c0 .5.4.9.9.9z" fill="currentColor"/><path d="M4.5 7.8a5 5 0 017 0" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round"/><path d="M1.7 4.9a9 9 0 0112.6 0" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round"/></svg>
+          <svg width="22" height="11" viewBox="0 0 24 12"><rect x="0.5" y="0.5" width="20" height="11" rx="2.5" stroke="currentColor" fill="none"/><rect x="2" y="2" width="17" height="8" rx="1.2" fill="currentColor"/><rect x="21.5" y="4" width="2" height="4" rx="1" fill="currentColor"/></svg>
+        </div>
+      </div>
+
+      <div class="star star-big">
+        <svg viewBox="0 0 100 100" fill="#fff" fill-opacity="0.85"><path d="M50 0 C54 28 72 46 100 50 C72 54 54 72 50 100 C46 72 28 54 0 50 C28 46 46 28 50 0 Z"/></svg>
+      </div>
+      <div class="star star-mid">
+        <svg viewBox="0 0 100 100" fill="#fff" fill-opacity="0.9"><path d="M50 0 C54 28 72 46 100 50 C72 54 54 72 50 100 C46 72 28 54 0 50 C28 46 46 28 50 0 Z"/></svg>
+      </div>
+      <div class="star star-small">
+        <svg viewBox="0 0 100 100" fill="#fff" fill-opacity="0.9"><path d="M50 0 C54 28 72 46 100 50 C72 54 54 72 50 100 C46 72 28 54 0 50 C28 46 46 28 50 0 Z"/></svg>
+      </div>
+
+      <div class="bubble">Track calories.<br>Eat smarter.</div>
+
+      <div class="plate-wrap">
+        <svg width="180" height="180" viewBox="0 0 200 200">
+          <circle cx="100" cy="100" r="94" fill="#fff" style="filter:drop-shadow(0 10px 16px rgba(0,0,0,0.18));"/>
+          <circle cx="100" cy="100" r="88" fill="none" stroke="#F2F2ED" stroke-width="2"/>
+          <!-- ruffled lettuce base, layered leaves with scalloped edges -->
+          <g>
+            <path d="M100,100 C80,84 74,58 84,30 C90,16 96,8 100,4 C104,14 96,26 98,44 C100,60 90,80 100,100 Z" fill="#6FAE33" transform="rotate(0 100 100)"/>
+            <path d="M100,100 C80,84 74,58 84,30 C90,16 96,8 100,4 C104,14 96,26 98,44 C100,60 90,80 100,100 Z" fill="#87C244" transform="rotate(40 100 100)"/>
+            <path d="M100,100 C80,84 74,58 84,30 C90,16 96,8 100,4 C104,14 96,26 98,44 C100,60 90,80 100,100 Z" fill="#6FAE33" transform="rotate(80 100 100)"/>
+            <path d="M100,100 C80,84 74,58 84,30 C90,16 96,8 100,4 C104,14 96,26 98,44 C100,60 90,80 100,100 Z" fill="#87C244" transform="rotate(120 100 100)"/>
+            <path d="M100,100 C80,84 74,58 84,30 C90,16 96,8 100,4 C104,14 96,26 98,44 C100,60 90,80 100,100 Z" fill="#6FAE33" transform="rotate(160 100 100)"/>
+            <path d="M100,100 C80,84 74,58 84,30 C90,16 96,8 100,4 C104,14 96,26 98,44 C100,60 90,80 100,100 Z" fill="#87C244" transform="rotate(200 100 100)"/>
+            <path d="M100,100 C80,84 74,58 84,30 C90,16 96,8 100,4 C104,14 96,26 98,44 C100,60 90,80 100,100 Z" fill="#6FAE33" transform="rotate(240 100 100)"/>
+            <path d="M100,100 C80,84 74,58 84,30 C90,16 96,8 100,4 C104,14 96,26 98,44 C100,60 90,80 100,100 Z" fill="#87C244" transform="rotate(280 100 100)"/>
+            <path d="M100,100 C80,84 74,58 84,30 C90,16 96,8 100,4 C104,14 96,26 98,44 C100,60 90,80 100,100 Z" fill="#6FAE33" transform="rotate(320 100 100)"/>
+          </g>
+          <!-- tomato wedges: quartered, seeded, red skin -->
+          <g>
+            <path d="M100,58 C88,50 82,32 88,14 C92,4 108,4 112,14 C118,32 112,50 100,58 Z" fill="#E2574C" transform="rotate(8 100 100)"/>
+            <path d="M100,58 C88,50 82,32 88,14 C92,4 108,4 112,14 C118,32 112,50 100,58 Z" fill="#EB6D62" transform="rotate(8 100 100)" opacity="0.5"/>
+            <path d="M100,58 C88,50 82,32 88,14 C92,4 108,4 112,14 C118,32 112,50 100,58 Z" fill="#E2574C" transform="rotate(98 100 100)"/>
+            <path d="M100,58 C88,50 82,32 88,14 C92,4 108,4 112,14 C118,32 112,50 100,58 Z" fill="#E2574C" transform="rotate(188 100 100)"/>
+            <path d="M100,58 C88,50 82,32 88,14 C92,4 108,4 112,14 C118,32 112,50 100,58 Z" fill="#E2574C" transform="rotate(278 100 100)"/>
+          </g>
+          <!-- cucumber slices with seed pattern -->
+          <g>
+            <g transform="translate(144,144)">
+              <circle r="14" fill="#DFF2C2" stroke="#7CB342" stroke-width="3"/>
+              <circle r="7" fill="#F3FADF" stroke="#BFE49A" stroke-width="1"/>
+              <circle r="1.3" fill="#8FA85C"/><circle cx="4" cy="2" r="1.1" fill="#8FA85C"/><circle cx="-3" cy="3" r="1.1" fill="#8FA85C"/><circle cx="1" cy="-4" r="1.1" fill="#8FA85C"/>
+            </g>
+            <g transform="translate(56,144)">
+              <circle r="14" fill="#DFF2C2" stroke="#7CB342" stroke-width="3"/>
+              <circle r="7" fill="#F3FADF" stroke="#BFE49A" stroke-width="1"/>
+              <circle r="1.3" fill="#8FA85C"/><circle cx="4" cy="2" r="1.1" fill="#8FA85C"/><circle cx="-3" cy="3" r="1.1" fill="#8FA85C"/><circle cx="1" cy="-4" r="1.1" fill="#8FA85C"/>
+            </g>
+            <g transform="translate(56,56)">
+              <circle r="14" fill="#DFF2C2" stroke="#7CB342" stroke-width="3"/>
+              <circle r="7" fill="#F3FADF" stroke="#BFE49A" stroke-width="1"/>
+              <circle r="1.3" fill="#8FA85C"/><circle cx="4" cy="2" r="1.1" fill="#8FA85C"/><circle cx="-3" cy="3" r="1.1" fill="#8FA85C"/><circle cx="1" cy="-4" r="1.1" fill="#8FA85C"/>
+            </g>
+            <g transform="translate(144,56)">
+              <circle r="14" fill="#DFF2C2" stroke="#7CB342" stroke-width="3"/>
+              <circle r="7" fill="#F3FADF" stroke="#BFE49A" stroke-width="1"/>
+              <circle r="1.3" fill="#8FA85C"/><circle cx="4" cy="2" r="1.1" fill="#8FA85C"/><circle cx="-3" cy="3" r="1.1" fill="#8FA85C"/><circle cx="1" cy="-4" r="1.1" fill="#8FA85C"/>
+            </g>
+          </g>
+          <!-- center dressing bowl with swirl and spoon -->
+          <circle cx="100" cy="100" r="23" fill="#F8F0DA" stroke="#E3D3A3" stroke-width="2"/>
+          <path d="M80,100 A20,20 0 0 1 120,100 A20,20 0 0 1 80,100" fill="#F1E4BE"/>
+          <path d="M88,94 Q100,88 112,95 Q102,98 100,105 Q98,98 88,94Z" fill="#E0902F" opacity="0.85"/>
+          <line x1="118" y1="84" x2="128" y2="74" stroke="#C9C9C9" stroke-width="2.4" stroke-linecap="round"/>
+          <ellipse cx="129" cy="72" rx="3.4" ry="2.2" fill="#D8D8D8" transform="rotate(40 129 72)"/>
+        </svg>
+      </div>
+
+      <div class="onboard-text">
+        <h1>The First Step to<br>Better Health</h1>
+        <p>Track your meals, monitor your daily calories, and gain valuable nutrition insights.</p>
+        <div class="btn-start">
+          <div class="icon-circle">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l8 3.5v5.6c0 5-3.4 8.4-8 10.4-4.6-2-8-5.4-8-10.4V5.5L12 2z"/><path d="M8.5 12l2.5 2.5 4.5-4.5"/></svg>
+          </div>
+          <span>Get Started</span>
+          <div class="chevrons">&gt;&gt;&gt;</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== PHONE 2 — DASHBOARD ===================== -->
+  <div class="phone">
+    <div class="screen screen-dash">
+      <div class="status-bar">
+        <span>11:41</span>
+        <div class="status-icons">
+          <svg width="17" height="11" viewBox="0 0 17 11"><rect x="0" y="7" width="3" height="4" rx="0.5" fill="currentColor"/><rect x="4.5" y="5" width="3" height="6" rx="0.5" fill="currentColor"/><rect x="9" y="2.5" width="3" height="8.5" rx="0.5" fill="currentColor"/><rect x="13.5" y="0" width="3" height="11" rx="0.5" fill="currentColor"/></svg>
+          <svg width="15" height="11" viewBox="0 0 16 12"><path d="M8 11.5c.5 0 .9-.4.9-.9 0-.5-.4-.9-.9-.9s-.9.4-.9.9c0 .5.4.9.9.9z" fill="currentColor"/><path d="M4.5 7.8a5 5 0 017 0" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round"/><path d="M1.7 4.9a9 9 0 0112.6 0" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round"/></svg>
+          <svg width="22" height="11" viewBox="0 0 24 12"><rect x="0.5" y="0.5" width="20" height="11" rx="2.5" stroke="currentColor" fill="none"/><rect x="2" y="2" width="17" height="8" rx="1.2" fill="currentColor"/><rect x="21.5" y="4" width="2" height="4" rx="1" fill="currentColor"/></svg>
+        </div>
+      </div>
+
+      <div class="dash-header">
+        <div class="dash-user">
+          <div class="avatar-sm">
+            <svg viewBox="0 0 100 100" width="42" height="42">
+              <defs><linearGradient id="skinGradSm" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#FBE2C4"/><stop offset="100%" stop-color="#F3D0A8"/></linearGradient></defs>
+              <circle cx="50" cy="50" r="50" fill="#F3E7D6"/>
+              <path d="M12 100 Q13 70 50 68 Q87 70 88 100 Z" fill="#3E4A3A"/>
+              <rect x="41" y="56" width="18" height="18" fill="url(#skinGradSm)"/>
+              <circle cx="50" cy="42" r="23" fill="url(#skinGradSm)"/>
+              <path d="M25 46 Q22 18 50 15 Q78 18 75 46 Q75 28 50 26 Q25 28 25 46Z" fill="#4A342A"/>
+              <path d="M26 38 Q22 58 29 72" stroke="#4A342A" stroke-width="7" fill="none" stroke-linecap="round"/>
+              <path d="M74 38 Q78 58 71 72" stroke="#4A342A" stroke-width="7" fill="none" stroke-linecap="round"/>
+              <circle cx="43" cy="43" r="1.7" fill="#4A342A"/>
+              <circle cx="58" cy="43" r="1.7" fill="#4A342A"/>
+              <path d="M45 52 Q50.5 55.5 56 52" stroke="#B5744F" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <div>
+            <div class="greet">Hi Amelia👋</div>
+            <div class="sub">Today's Progress</div>
+          </div>
+        </div>
+        <div class="dash-icons">
+          <div class="round-btn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+          </div>
+          <div class="round-btn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div class="title">
+            <div class="icon-badge">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 15a8 8 0 1116 0"/><path d="M12 15l4-5" stroke-linecap="round"/><circle cx="12" cy="15" r="1.3" fill="currentColor" stroke="none"/></svg>
+            </div>
+            Active Calories
+          </div>
+          <div class="dropdown">Today ⌄</div>
+        </div>
+
+        <div class="chart-wrap">
+          <div class="chart-ylabels">
+            <span>100%</span><span>40%</span><span>30%</span><span>20</span>
+          </div>
+          <div class="chart-area">
+            <span class="badge-80">80%</span>
+            <div class="dashed-line"></div>
+            <div class="bars">
+              <div class="bar-col"><div class="bar" style="height:38%"></div></div>
+              <div class="bar-col"><div class="bar" style="height:58%"></div></div>
+              <div class="bar-col"><div class="bar active" style="height:97%"></div></div>
+              <div class="bar-col"><div class="bar" style="height:27%"></div></div>
+              <div class="bar-col"><div class="bar" style="height:58%"></div></div>
+              <div class="bar-col"><div class="bar" style="height:42%"></div></div>
+              <div class="bar-col"><div class="bar striped" style="height:52%"></div></div>
+            </div>
+            <div style="position:absolute; left:calc(2/7*100% + 1/14*100% - 3px); top:14px; width:6px; height:6px; border-radius:50%; background:var(--green-dark); z-index:2;"></div>
+          </div>
+        </div>
+        <div class="day-labels">
+          <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
+        </div>
+      </div>
+
+      <div class="macros">
+        <div class="macro-card">
+          <div class="macro-top">
+            <div class="macro-icon up"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M7 17L17 7M17 7H8M17 7v9"/></svg></div>
+            <span class="macro-badge dark">-30%</span>
+          </div>
+          <div class="macro-name">Protein</div>
+          <div class="macro-bottom">
+            <span class="macro-val">85/120g</span>
+            <div class="ring">
+              <svg width="26" height="26" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15" fill="none" stroke="#EAF6E0" stroke-width="4"/><circle cx="18" cy="18" r="15" fill="none" stroke="#7FCB3E" stroke-width="4" stroke-dasharray="66 94" stroke-linecap="round"/></svg>
+              <span>70%</span>
+            </div>
+          </div>
+        </div>
+        <div class="macro-card">
+          <div class="macro-top">
+            <div class="macro-icon up"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M7 17L17 7M17 7H8M17 7v9"/></svg></div>
+            <span class="macro-badge dark">-35%</span>
+          </div>
+          <div class="macro-name">Carbs</div>
+          <div class="macro-bottom">
+            <span class="macro-val">160/250g</span>
+            <div class="ring">
+              <svg width="26" height="26" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15" fill="none" stroke="#EAF6E0" stroke-width="4"/><circle cx="18" cy="18" r="15" fill="none" stroke="#7FCB3E" stroke-width="4" stroke-dasharray="61 94" stroke-linecap="round"/></svg>
+              <span>65%</span>
+            </div>
+          </div>
+        </div>
+        <div class="macro-card">
+          <div class="macro-top">
+            <div class="macro-icon warn"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg></div>
+            <span class="macro-badge red">+10%</span>
+          </div>
+          <div class="macro-name">Fat</div>
+          <div class="macro-bottom">
+            <span class="macro-val">80/70g</span>
+            <div class="ring">
+              <svg width="26" height="26" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15" fill="none" stroke="#FCE9E9" stroke-width="4"/><circle cx="18" cy="18" r="15" fill="none" stroke="#EF4B4B" stroke-width="4" stroke-dasharray="94 94" stroke-linecap="round"/></svg>
+              <span>110%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="meal-section">
+        <h3>Today's Meal</h3>
+        <span class="view-all">View all</span>
+      </div>
+      <div class="meal-item">
+        <div class="meal-thumb">
+          <svg viewBox="0 0 60 60" width="52" height="52">
+            <rect width="60" height="60" fill="#F6EFE2"/>
+            <ellipse cx="30" cy="42" rx="25" ry="14" fill="#B98650"/>
+            <ellipse cx="30" cy="38" rx="25" ry="13" fill="#D9A268"/>
+            <ellipse cx="30" cy="33" rx="21" ry="10" fill="#F2E4C8"/>
+            <path d="M12 33c3-2 6-1 8 0s6 1 8-1 6-1 8 0 6 1 8-1" stroke="#DCC79A" stroke-width="1.4" fill="none" opacity="0.7"/>
+            <path d="M16 20 Q13 27 17 32 Q20 27 16 20Z" fill="#E9CD6C" transform="rotate(-10 16 26)"/>
+            <path d="M16 20 Q13 27 17 32 Q20 27 16 20Z" fill="#E9CD6C" transform="rotate(20 30 26)"/>
+            <circle cx="24" cy="30" r="2.2" fill="#5B7FBD"/>
+            <circle cx="38" cy="31" r="2.2" fill="#5B7FBD"/>
+            <circle cx="31" cy="27" r="1.6" fill="#4A6BA8"/>
+          </svg>
+        </div>
+        <div class="meal-info">
+          <div class="name">Oatmeal With Banana</div>
+          <div class="meta">Breakfast • Protein 10g • carbs 42g</div>
+        </div>
+        <div class="btn-add">Add</div>
+      </div>
+      <div class="meal-item" style="opacity:0.55;">
+        <div class="meal-thumb">
+          <svg viewBox="0 0 60 60" width="52" height="52">
+            <rect width="60" height="60" fill="#EAF3E0"/>
+            <ellipse cx="30" cy="34" rx="23" ry="15" fill="#fff"/>
+            <path d="M10 30c3-4 8-2 11 0s7-3 10-1 8 2 10-1" stroke="#8BC34A" stroke-width="5" fill="none" stroke-linecap="round" opacity="0.85"/>
+            <ellipse cx="21" cy="37" rx="5" ry="3.4" fill="#F0D9A6"/>
+            <ellipse cx="32" cy="40" rx="5" ry="3.4" fill="#F0D9A6"/>
+            <ellipse cx="27" cy="33" rx="4.2" ry="3" fill="#EAD196"/>
+            <circle cx="40" cy="35" r="3" fill="#E2574C"/>
+            <circle cx="14" cy="36" r="2.6" fill="#E2574C"/>
+            <path d="M35 27c2-2 5-2 6 0" stroke="#7CB342" stroke-width="2" fill="none" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="meal-info">
+          <div class="name">Mix Salad Chicken</div>
+          <div class="meta">Breakfast • Protein 10g • carbs 42g</div>
+        </div>
+        <div class="btn-add">Add</div>
+      </div>
+
+      <div class="navbar">
+        <div class="nav-item"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg></div>
+        <div class="nav-item"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg></div>
+        <div class="nav-item nav-center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 014-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg></div>
+        <div class="nav-item"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg></div>
+        <div class="nav-item nav-active"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-7 8-7s8 3 8 7"/></svg></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== PHONE 3 — PROFILE ===================== -->
+  <div class="phone">
+    <div class="screen screen-profile">
+      <div class="status-bar">
+        <span>09:41</span>
+        <div class="status-icons">
+          <svg width="17" height="11" viewBox="0 0 17 11"><rect x="0" y="7" width="3" height="4" rx="0.5" fill="currentColor"/><rect x="4.5" y="5" width="3" height="6" rx="0.5" fill="currentColor"/><rect x="9" y="2.5" width="3" height="8.5" rx="0.5" fill="currentColor"/><rect x="13.5" y="0" width="3" height="11" rx="0.5" fill="currentColor"/></svg>
+          <svg width="15" height="11" viewBox="0 0 16 12"><path d="M8 11.5c.5 0 .9-.4.9-.9 0-.5-.4-.9-.9-.9s-.9.4-.9.9c0 .5.4.9.9.9z" fill="currentColor"/><path d="M4.5 7.8a5 5 0 017 0" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round"/><path d="M1.7 4.9a9 9 0 0112.6 0" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round"/></svg>
+          <svg width="22" height="11" viewBox="0 0 24 12"><rect x="0.5" y="0.5" width="20" height="11" rx="2.5" stroke="currentColor" fill="none"/><rect x="2" y="2" width="17" height="8" rx="1.2" fill="currentColor"/><rect x="21.5" y="4" width="2" height="4" rx="1" fill="currentColor"/></svg>
+        </div>
+      </div>
+
+      <div class="profile-header">
+        <div class="round-btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg></div>
+        <h2>Profile</h2>
+        <div class="round-btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 10.5l6.8-4M8.6 13.5l6.8 4"/></svg></div>
+      </div>
+
+      <div class="avatar-lg-wrap">
+        <div class="avatar-lg">
+          <svg viewBox="0 0 120 120" width="92" height="92">
+            <defs>
+              <radialGradient id="bgGrad" cx="42%" cy="35%" r="75%">
+                <stop offset="0%" stop-color="#C7E29A"/>
+                <stop offset="55%" stop-color="#8FBE5A"/>
+                <stop offset="100%" stop-color="#5C8A3A"/>
+              </radialGradient>
+              <linearGradient id="skinGradLg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#FBE2C4"/><stop offset="100%" stop-color="#F3D0A8"/></linearGradient>
+            </defs>
+            <circle cx="60" cy="60" r="60" fill="url(#bgGrad)"/>
+            <circle cx="24" cy="22" r="7" fill="#fff" opacity="0.18"/>
+            <circle cx="96" cy="88" r="10" fill="#fff" opacity="0.12"/>
+            <path d="M8 120 Q10 82 60 79 Q110 82 112 120 Z" fill="#3E4A3A"/>
+            <rect x="49" y="66" width="22" height="22" fill="url(#skinGradLg)"/>
+            <circle cx="60" cy="49" r="27" fill="url(#skinGradLg)"/>
+            <path d="M30 54 Q26 20 60 16 Q94 20 90 54 Q90 32 60 30 Q30 32 30 54Z" fill="#4A342A"/>
+            <path d="M31 44 Q26 70 35 88" stroke="#4A342A" stroke-width="8" fill="none" stroke-linecap="round"/>
+            <path d="M89 44 Q94 70 85 88" stroke="#4A342A" stroke-width="8" fill="none" stroke-linecap="round"/>
+            <circle cx="51" cy="50" r="2" fill="#4A342A"/>
+            <circle cx="69" cy="50" r="2" fill="#4A342A"/>
+            <path d="M53 61 Q60 65.5 67 61" stroke="#B5744F" stroke-width="2" fill="none" stroke-linecap="round"/>
+            <path d="M56 55 q4 2 8 0" stroke="#E3B896" stroke-width="1.2" fill="none" stroke-linecap="round" opacity="0.6"/>
+          </svg>
+        </div>
+      </div>
+      <div class="profile-name">Amelia Andra</div>
+
+      <div class="stat-row">
+        <div class="stat-card">
+          <div class="icon-badge"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 15a8 8 0 1116 0"/><path d="M12 15l4-5" stroke-linecap="round"/><circle cx="12" cy="15" r="1.3" fill="currentColor" stroke="none"/></svg></div>
+          <div>
+            <div class="label">Calories</div>
+            <div class="value">1820 kcal</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="icon-badge"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2v7a2 2 0 002 2v11M6 2v7a2 2 0 01-2 2v0M6 2v20"/><path d="M18 2c-2 0-3 3-3 6s1 4 3 4v10"/></svg></div>
+          <div>
+            <div class="label">Meals</div>
+            <div class="value">1820 kcal</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="list-card">
+        <div class="list-row">
+          <div class="icon-badge"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg></div>
+          <span class="row-label">Account Settings</span>
+          <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 6l6 6-6 6"/></svg>
+        </div>
+        <div class="list-row">
+          <div class="icon-badge"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg></div>
+          <span class="row-label">Payment Method</span>
+          <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 6l6 6-6 6"/></svg>
+        </div>
+        <div class="list-row">
+          <div class="icon-badge"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></div>
+          <span class="row-label">Light Mood</span>
+          <div class="toggle"></div>
+        </div>
+      </div>
+
+      <div class="list-card" style="margin-top:12px;">
+        <div class="list-row">
+          <div class="icon-badge"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg></div>
+          <span class="row-label">Breakfast History</span>
+          <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 6l6 6-6 6"/></svg>
+        </div>
+        <div class="list-row">
+          <div class="icon-badge"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 014-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg></div>
+          <span class="row-label">Mix Salad chicken</span>
+          <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 6l6 6-6 6"/></svg>
+        </div>
+      </div>
+
+      <div class="navbar">
+        <div class="nav-item"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg></div>
+        <div class="nav-item"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg></div>
+        <div class="nav-item nav-center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 014-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg></div>
+        <div class="nav-item"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg></div>
+        <div class="nav-item nav-active"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-7 8-7s8 3 8 7"/></svg></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ===================== COLOR PALETTE FOOTER ===================== -->
+<div class="palette-footer">
+  <div class="brand">COLORSELECT.T.ME</div>
+  <div class="swatches">
+    <div class="swatch" style="background:#8BD843; color:#3E5C1E;">#8BD843</div>
+    <div class="swatch" style="background:#000000; color:#ffffff;">#000000</div>
+    <div class="swatch" style="background:#E6E9E6; color:#1C1E1B;">#E6E9E6</div>
+    <div class="swatch" style="background:#619930; color:#ffffff;">#619930</div>
+  </div>
+</div>
+
+</body>
+</html>

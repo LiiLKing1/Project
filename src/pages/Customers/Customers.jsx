@@ -6,6 +6,7 @@ import { saveDoc, editDoc, softDeleteDoc, generateDiff } from '../../utils/fireb
 import { useToast } from '../../context/ToastContext';
 import { useRoles } from '../../context/RolesContext';
 import { useSettings } from '../../context/SettingsContext';
+import { useConfirm } from '../../context/ConfirmContext';
 import Modal from '../../components/Modal';
 import Drawer from '../../components/Drawer';
 import FormInput from '../../components/FormInput';
@@ -18,6 +19,7 @@ const Customers = () => {
   const { addToast } = useToast();
   const { userProfile } = useRoles();
   const { settings } = useSettings();
+  const { confirm } = useConfirm();
   const storeId = userProfile?.storeOwnerId;
   const curr = settings?.currency || 'UZS';
 
@@ -111,7 +113,7 @@ const Customers = () => {
 
   const handleDelete = async (customer) => {
     if (!storeId) return;
-    if (window.confirm('Haqiqatan ham bu mijozni o\'chirmoqchimisiz? (Arxivga tushadi)')) {
+    if (await confirm({ message: 'Haqiqatan ham bu mijozni o\'chirmoqchimisiz? (Arxivga tushadi)', confirmStyle: 'danger' })) {
       try {
         const auditData = { storeId, userProfile, resource: 'customers', details: customer.fullName };
         await softDeleteDoc(doc(db, `users/${storeId}/customers`, customer.id), auditData);
@@ -172,94 +174,117 @@ const Customers = () => {
   const birthdays = customers.filter(c => c.status !== 'archived' && c.birthDate && c.birthDate.split('-')[1] === currentMonth).length;
 
   return (
-    <div className="flex-col" style={{ gap: '1.5rem', height: '100%' }}>
-      <div className="flex-between">
-        <h1 className="h1">Barcha mijozlar</h1>
-        <button className="btn btn-primary" onClick={() => openModal()}><UserPlus size={18} /> Yangi mijoz</button>
+    <div className="page-wrapper">
+      {/* Header */}
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">Mijozlar</h1>
+          <p className="page-subtitle">{totalCustomers} ta faol mijoz</p>
+        </div>
+        <button className="btn btn-primary" onClick={() => openModal()}>
+          <UserPlus size={18} /> Yangi mijoz
+        </button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem' }}>
-        <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          <div style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>Jami mijozlar</div>
-          <div className="h2" style={{ color: 'var(--primary)' }}>{totalCustomers} <span style={{ fontSize: '1rem', color: 'var(--text-main)', fontWeight: 'normal' }}>mijozlar</span></div>
+      {/* Stats */}
+      <div className="stat-row">
+        <div className="stat-card">
+          <span className="stat-card-label">Jami mijozlar</span>
+          <span className="stat-card-value blue">{totalCustomers}</span>
+          <span className="stat-card-sub">Faol ro'yxat</span>
         </div>
-        <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          <div style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>O'tgan hafta</div>
-          <div className="h2" style={{ color: 'var(--success)' }}>+{newThisWeek} <span style={{ fontSize: '1rem', color: 'var(--text-main)', fontWeight: 'normal' }}>mijozlar</span></div>
+        <div className="stat-card">
+          <span className="stat-card-label">Bu hafta yangi</span>
+          <span className="stat-card-value green">+{newThisWeek}</span>
+          <span className="stat-card-sub">Yangi qo'shilgan</span>
         </div>
-        <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          <div style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>Qaytib kelmaydiganlar</div>
-          <div className="h2" style={{ color: 'var(--warning)' }}>{inactiveCustomers} <span style={{ fontSize: '1rem', color: 'var(--text-main)', fontWeight: 'normal' }}>mijozlar</span></div>
+        <div className="stat-card">
+          <span className="stat-card-label">Faol emas</span>
+          <span className="stat-card-value amber">{inactiveCustomers}</span>
+          <span className="stat-card-sub">3 oydan ko'p</span>
         </div>
-        <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          <div style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>Tug'ilgan kunlar</div>
-          <div className="h2" style={{ color: '#8B5CF6' }}>{birthdays} <span style={{ fontSize: '1rem', color: 'var(--text-main)', fontWeight: 'normal' }}>mijozlar</span></div>
+        <div className="stat-card">
+          <span className="stat-card-label">Tug'ilgan kunlar</span>
+          <span className="stat-card-value" style={{ color: '#8B5CF6' }}>{birthdays}</span>
+          <span className="stat-card-sub">Bu oyda</span>
         </div>
       </div>
 
-      <div className="glass-panel" style={{ padding: '1.5rem', flex: 1, display: 'flex', flexDirection: 'column' }}>
-        <div style={{ position: 'relative', width: '350px', marginBottom: '1.5rem' }}>
-          <Search size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
-          <input 
-            type="text" 
-            placeholder="Ism yoki telefon raqam..." 
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            style={{ width: '100%', paddingLeft: '2.5rem' }}
-          />
+      {/* Table Card */}
+      <div className="page-card">
+        <div className="page-card-header">
+          <div className="search-wrap">
+            <Search size={16} className="search-icon" />
+            <input
+              type="text"
+              placeholder="Ism yoki telefon raqam..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
         </div>
 
-        <div style={{ flex: 1, overflow: 'auto' }}>
-          <div className="table-responsive">
-<table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-              <thead>
-                <tr style={{ borderBottom: '2px solid var(--border-color)', color: 'var(--text-secondary)' }}>
-                  <th style={{ padding: '1rem' }}>F.I.O</th>
-                  <th style={{ padding: '1rem' }}>Telefon</th>
-                  <th style={{ padding: '1rem' }}>Umumiy xarid</th>
-                  <th style={{ padding: '1rem' }}>Bonus</th>
-                  <th style={{ padding: '1rem' }}>Qarzdorlik</th>
-                  <th style={{ padding: '1rem' }}>Amallar</th>
+        <div style={{ overflowX: 'auto' }}>
+          <table className="page-table">
+            <thead>
+              <tr>
+                <th>F.I.O</th>
+                <th>Telefon</th>
+                <th>Jami xarid</th>
+                <th>Bonus</th>
+                <th>Qarz</th>
+                <th style={{ textAlign: 'right' }}>Amallar</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredCustomers.length === 0 ? (
+                <tr>
+                  <td colSpan="6" style={{ textAlign: 'center', padding: '3rem', color: '#8A9BB5' }}>
+                    Mijozlar topilmadi
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {filteredCustomers.length === 0 ? (
-                  <tr><td colSpan="7" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>Mijozlar topilmadi</td></tr>
-                ) : filteredCustomers.map(c => (
-                  <tr key={c.id} style={{ borderBottom: '1px solid var(--border-color)', transition: 'background-color 0.2s' }} onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--bg-main)'} onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}>
-                    <td style={{ padding: '1rem', fontWeight: '500' }}>
+              ) : filteredCustomers.map(c => (
+                <tr key={c.id}>
+                  <td>
+                    <div style={{ fontWeight: 600, color: '#1A2538' }}>
                       {c.fullName}
-                      {c.isVip && <span style={{ marginLeft: '0.5rem', fontSize: '0.7rem', padding: '0.15rem 0.4rem', backgroundColor: '#fbbf24', color: '#000', borderRadius: '1rem', fontWeight: 600 }}>VIP</span>}
-                      {c.bonusPercent > 0 && <span style={{ marginLeft: '0.5rem', fontSize: '0.7rem', padding: '0.15rem 0.4rem', backgroundColor: 'var(--primary-light)', color: 'var(--primary)', borderRadius: '1rem', fontWeight: 600 }}>{c.bonusPercent}% Bonus</span>}
-                    </td>
-                    <td style={{ padding: '1rem', color: 'var(--text-secondary)' }}>{c.phone}</td>
-                    <td style={{ padding: '1rem', fontWeight: '600' }}><CurrencyDisplay amount={c.totalPurchases} /></td>
-                    <td style={{ padding: '1rem', fontWeight: '600', color: 'var(--primary)' }}><CurrencyDisplay amount={c.bonusBalance} /></td>
-                    <td style={{ padding: '1rem', fontWeight: '600', color: c.currentDebt > 0 ? 'var(--danger)' : 'var(--text-main)' }}>
-                      {c.currentDebt > 0 ? <CurrencyDisplay amount={c.currentDebt} /> : 'Yo\'q'}
-                    </td>
-                    <td style={{ padding: '1rem', display: 'flex', gap: '0.5rem' }}>
-                      <button className="btn btn-outline" style={{ padding: '0.5rem', color: 'var(--primary)' }} onClick={() => openModal(c)}><Edit size={16} /></button>
-                      <button className="btn btn-outline" style={{ padding: '0.5rem', color: 'var(--danger)' }} onClick={() => handleDelete(c)}><Trash2 size={16} /></button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-</div>
+                      {c.isVip && <span className="badge badge-amber" style={{ marginLeft: 6 }}>VIP</span>}
+                      {c.bonusPercent > 0 && <span className="badge badge-blue" style={{ marginLeft: 6 }}>{c.bonusPercent}% Bonus</span>}
+                    </div>
+                  </td>
+                  <td style={{ color: '#8A9BB5', fontFamily: 'monospace', fontSize: 13 }}>{c.phone}</td>
+                  <td style={{ fontWeight: 600 }}><CurrencyDisplay amount={c.totalPurchases} /></td>
+                  <td style={{ fontWeight: 600, color: '#4A90E2' }}><CurrencyDisplay amount={c.bonusBalance} /></td>
+                  <td>
+                    {c.currentDebt > 0
+                      ? <span style={{ fontWeight: 700, color: '#EF4B4B' }}><CurrencyDisplay amount={c.currentDebt} /></span>
+                      : <span className="badge badge-green">Yo'q</span>
+                    }
+                  </td>
+                  <td>
+                    <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                      <button className="action-btn edit" onClick={() => openModal(c)} title="Tahrirlash"><Edit size={14}/></button>
+                      <button className="action-btn delete" onClick={() => handleDelete(c)} title="O'chirish"><Trash2 size={14}/></button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
 
-      {/* Mijoz Qo'shish Modali */}
+      {/* Drawer */}
       <Drawer isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingId ? 'Mijozni tahrirlash' : 'Yangi mijoz'}>
         <FormInput label="F.I.O" value={formData.fullName} onChange={e => setFormData({...formData, fullName: e.target.value})} error={formErrors.fullName} required />
         <FormInput label="Telefon raqami" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} error={formErrors.phone} required placeholder="+998901234567" />
         
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
           <FormInput label="Tug'ilgan sana" type="date" value={formData.birthDate} onChange={e => setFormData({...formData, birthDate: e.target.value})} />
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>Jinsi</label>
-            <select value={formData.gender} onChange={e => setFormData({...formData, gender: e.target.value})} style={{ padding: '0.75rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-surface)' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '14px' }}>
+            <label style={{ fontSize: '13px', fontWeight: 600, color: '#1A2538' }}>Jinsi</label>
+            <select value={formData.gender} onChange={e => setFormData({...formData, gender: e.target.value})}
+              style={{ padding: '10px 14px', borderRadius: '12px', border: '1.5px solid #DCE8F5', backgroundColor: '#fff', fontSize: 14, fontFamily: 'inherit', outline: 'none' }}>
               <option value="">Tanlang</option>
               <option value="erkak">Erkak</option>
               <option value="ayol">Ayol</option>
@@ -267,27 +292,25 @@ const Customers = () => {
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-          {editingId && (
+        {editingId && (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
             <FormInput label={`Joriy qarz (${curr})`} type="number" value={formData.currentDebt} onChange={e => setFormData({...formData, currentDebt: e.target.value})} placeholder="0" />
-          )}
-          {editingId && (
             <FormInput label={`Bonus balansi (${curr})`} type="number" value={formData.bonusBalance} onChange={e => setFormData({...formData, bonusBalance: e.target.value})} placeholder="0" />
-          )}
-        </div>
+          </div>
+        )}
 
         <FormInput label="Xarid bonusi foizi (%)" type="number" value={formData.bonusPercent} onChange={e => setFormData({...formData, bonusPercent: e.target.value})} placeholder="Masalan: 1" />
 
-        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', marginTop: '0.5rem', padding: '0.5rem', backgroundColor: 'var(--bg-main)', borderRadius: 'var(--radius-md)' }}>
-          <input type="checkbox" checked={formData.isVip} onChange={e => setFormData({...formData, isVip: e.target.checked})} style={{ transform: 'scale(1.2)' }} />
-          <span style={{ fontWeight: 600, color: 'var(--warning)' }}>VIP mijoz (Yana qandaydir ustunliklar uchun ishlating)</span>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', padding: '12px 14px', backgroundColor: '#FFFBEB', borderRadius: '12px', border: '1.5px solid #FEF3C7', marginBottom: 14 }}>
+          <input type="checkbox" checked={formData.isVip} onChange={e => setFormData({...formData, isVip: e.target.checked})} style={{ transform: 'scale(1.2)', accentColor: '#F59E0B' }} />
+          <span style={{ fontWeight: 600, color: '#D97706', fontSize: 14 }}>⭐ VIP mijoz</span>
         </label>
 
         <FormInput label="Izoh" value={formData.note} onChange={e => setFormData({...formData, note: e.target.value})} />
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1.5rem' }}>
-          <button className="btn btn-outline" onClick={() => setIsModalOpen(false)}>Bekor qilish</button>
-          <button className="btn btn-primary" onClick={handleSave}>Saqlash</button>
+        <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
+          <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => setIsModalOpen(false)}>Bekor qilish</button>
+          <button className="btn btn-primary" style={{ flex: 2 }} onClick={handleSave}>Saqlash</button>
         </div>
       </Drawer>
     </div>
@@ -295,3 +318,4 @@ const Customers = () => {
 };
 
 export default Customers;
+

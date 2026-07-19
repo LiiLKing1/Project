@@ -1,619 +1,497 @@
-import React, { useState, useEffect } from 'react';
-import { DollarSign, ShoppingCart, Users, Package, TrendingUp, TrendingDown, CreditCard, Banknote, Calendar, ChevronRight, PlusCircle, Activity } from 'lucide-react';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import React, { useState, useEffect, useMemo } from 'react';
+import {
+  ShoppingCart, Users, Package, TrendingUp, TrendingDown,
+  CreditCard, Banknote, Wallet, ChevronRight, BarChart2,
+  AlertCircle, ArrowUpRight
+} from 'lucide-react';
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
+  ResponsiveContainer, Cell
+} from 'recharts';
 import { db } from '../../firebase';
-import { collection, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { useRoles } from '../../context/RolesContext';
 import { formatCurrency, formatCompact } from '../../utils/formatters';
 import { useNavigate } from 'react-router-dom';
 import { useSettings } from '../../context/SettingsContext';
 import { useWarehouse } from '../../context/WarehouseContext';
 import CurrencyDisplay from '../../components/CurrencyDisplay';
-import DateRangePicker from '../../components/DateRangePicker';
 
-const Dashboard = () => {
-  const [sales, setSales] = useState([]);
-  const [products, setProducts] = useState([]);
-  const [customers, setCustomers] = useState([]);
-  const [debts, setDebts] = useState([]);
-  const [partnerDebts, setPartnerDebts] = useState([]);
-  const [orders, setOrders] = useState([]);
-  const [suppliers, setSuppliers] = useState([]);
-  const [partners, setPartners] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [timeFilter, setTimeFilter] = useState('bugun');
-  const [customStartDate, setCustomStartDate] = useState('');
-  const [customEndDate, setCustomEndDate] = useState('');
-  
-  const { userProfile } = useRoles();
-  const { settings } = useSettings();
-  const { selectedWarehouseId } = useWarehouse();
-  const storeId = userProfile?.storeOwnerId;
-  const navigate = useNavigate();
-  const curr = settings?.currency || 'UZS';
+/* ─────── Design tokens (from HTML reference) ─────── */
+const GL     = '#4A90E2';   // blue-primary
+const GM     = '#7BCEEB';   // blue-mid
+const GD     = '#2C6FBF';   // blue-dark
+const CARD_B = '#DCE8F5';   // card border
+const TG     = '#8A9BB5';   // text-gray
+const TD     = '#1A2538';   // text-dark
+const RED    = '#EF4B4B';
+const HERO_GRADIENT = 'linear-gradient(to bottom right, #4A90E2, #7BCEEB, #D1E8E2)';
+const ACTIVE_TRACK  = '#D1E8F5';
+const ACTIVE_BAR    = 'linear-gradient(180deg, #7BCEEB, #4A90E2)';
 
-  useEffect(() => {
-    if (!storeId) return;
+/* ─────── Helpers ─────── */
+const pct = (a, b) => b > 0 ? Math.round((a / b) * 100) : 0;
+const trendStr = (now, prev) => {
+  if (prev === 0) return now > 0 ? '+100' : '0';
+  const v = ((now - prev) / prev * 100).toFixed(1);
+  return v > 0 ? `+${v}` : `${v}`;
+};
 
-    let unsubs = [];
-    
-    // Fetch Sales
-    unsubs.push(onSnapshot(query(collection(db, `users/${storeId}/sales`), orderBy('createdAt', 'desc')), (snapshot) => {
-      setSales(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }));
-
-    // Fetch Customers
-    unsubs.push(onSnapshot(collection(db, `users/${storeId}/customers`), (snapshot) => {
-      setCustomers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }));
-
-    // Fetch Products
-    unsubs.push(onSnapshot(collection(db, `users/${storeId}/products`), (snapshot) => {
-      setProducts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }));
-
-    // Fetch Debts
-    unsubs.push(onSnapshot(collection(db, `users/${storeId}/customerDebts`), (snapshot) => {
-      setDebts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }));
-
-    // Fetch Partner Debts
-    unsubs.push(onSnapshot(collection(db, `users/${storeId}/partnerDebts`), (snapshot) => {
-      setPartnerDebts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }));
-
-    // Fetch Orders (Purchase Orders)
-    unsubs.push(onSnapshot(query(collection(db, `users/${storeId}/purchaseOrders`), orderBy('createdAt', 'desc')), (snapshot) => {
-      setOrders(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-      setLoading(false);
-    }));
-
-    // Fetch Suppliers
-    unsubs.push(onSnapshot(collection(db, `users/${storeId}/suppliers`), (snapshot) => {
-      setSuppliers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }));
-
-    // Fetch Partners
-    unsubs.push(onSnapshot(collection(db, `users/${storeId}/partners`), (snapshot) => {
-      setPartners(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }));
-
-    return () => unsubs.forEach(unsub => unsub());
-  }, [storeId]);
-
-  const now = new Date();
-  
-  const filterByDate = (items, filter) => {
-    return items.filter(s => {
-      if (!s.createdAt) return false;
-      const date = new Date(s.createdAt);
-
-      if (customStartDate || customEndDate) {
-        let matchDate = true;
-        if (customStartDate) {
-          const startD = new Date(customStartDate);
-          startD.setHours(0,0,0,0);
-          matchDate = matchDate && date >= startD;
-        }
-        if (customEndDate) {
-          const endD = new Date(customEndDate);
-          endD.setHours(23,59,59,999);
-          matchDate = matchDate && date <= endD;
-        }
-        return matchDate;
-      }
-
-      if (filter === 'kecha') {
-        const yesterday = new Date(now);
-        yesterday.setDate(yesterday.getDate() - 1);
-        return date.toDateString() === yesterday.toDateString();
-      }
-      if (filter === 'bugun' || filter === 'day') return date.toDateString() === now.toDateString();
-      if (filter === 'hafta' || filter === 'week') {
-        const diff = (now - date) / (1000 * 60 * 60 * 24);
-        return diff >= 0 && diff <= 7;
-      }
-      if (filter === 'oy' || filter === 'month') return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
-      if (filter === 'yil' || filter === 'year') return date.getFullYear() === now.getFullYear();
-      return true;
-    });
-  };
-
-  const filteredSales = filterByDate(sales, timeFilter);
-  
-  // Calculate KPIs
-  const periodRevenue = filteredSales.reduce((acc, curr) => acc + Number(curr.finalTotal || 0), 0);
-  const periodSalesCount = filteredSales.length;
-  const averageCheck = periodSalesCount > 0 ? periodRevenue / periodSalesCount : 0;
-  
-  const lowStockProducts = products.filter(p => Number(p.stockByWarehouse?.[selectedWarehouseId] || 0) <= Number(p.minStock || 5)).length;
-  const activeCustomers = customers.length;
-  
-  const activeDebts = debts.filter(d => d.status === 'active' || d.status === 'partial');
-  const totalDebt = activeDebts.reduce((acc, curr) => acc + Number(curr.remainingAmount || 0), 0);
-  const overdueDebts = activeDebts.filter(d => new Date(d.dueDate) < now);
-
-  const activePartnerDebts = partnerDebts.filter(d => d.status === 'active' || d.status === 'partial' || d.status === 'partially_paid');
-  const totalPartnerDebt = activePartnerDebts.reduce((acc, curr) => acc + Number(curr.remainingAmount || 0), 0);
-  const overduePartnerDebts = activePartnerDebts.filter(d => new Date(d.dueDate) < now);
-
-  const pendingOrders = orders.filter(o => o.status === 'pending');
-  const pendingOrdersTotal = pendingOrders.reduce((acc, curr) => acc + Number(curr.totalAmount || 0), 0);
-
-  // Chart Data Pre-fill
-  const getChartData = () => {
-    const dataMap = {};
-    
-    if (timeFilter === 'day') {
-      for (let i = 8; i <= 23; i++) dataMap[`${i.toString().padStart(2, '0')}:00`] = 0;
-    } else if (timeFilter === 'week') {
-      const days = ['Yak', 'Du', 'Se', 'Chor', 'Pay', 'Ju', 'Shan'];
-      days.forEach(d => dataMap[d] = 0);
-    } else if (timeFilter === 'month') {
-      const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-      for (let i = 1; i <= daysInMonth; i++) dataMap[i.toString()] = 0;
-    } else if (timeFilter === 'year') {
-      const months = ['Yan', 'Fev', 'Mar', 'Apr', 'May', 'Iyun', 'Iyul', 'Avg', 'Sen', 'Okt', 'Noy', 'Dek'];
-      months.forEach(m => dataMap[m] = 0);
-    }
-
-    filteredSales.forEach(s => {
-      const d = new Date(s.createdAt);
-      let key = '';
-      if (timeFilter === 'day') {
-        key = `${d.getHours().toString().padStart(2, '0')}:00`;
-      } else if (timeFilter === 'week') {
-        const days = ['Yak', 'Du', 'Se', 'Chor', 'Pay', 'Ju', 'Shan'];
-        key = days[d.getDay()];
-      } else if (timeFilter === 'month') {
-        key = d.getDate().toString();
-      } else if (timeFilter === 'year') {
-        const months = ['Yan', 'Fev', 'Mar', 'Apr', 'May', 'Iyun', 'Iyul', 'Avg', 'Sen', 'Okt', 'Noy', 'Dek'];
-        key = months[d.getMonth()];
-      }
-      if (dataMap[key] !== undefined) {
-        dataMap[key] += Number(s.finalTotal || 0);
-      }
-    });
-
-    if (timeFilter === 'week' || timeFilter === 'year') {
-      return Object.keys(dataMap).map(k => ({ name: k, jami: dataMap[k] }));
-    }
-    
-    return Object.keys(dataMap).sort((a, b) => parseInt(a) - parseInt(b)).map(k => ({ name: k, jami: dataMap[k] }));
-  };
-
-  const getTopProducts = () => {
-    const productCounts = {};
-    filteredSales.forEach(sale => {
-      sale.items?.forEach(item => {
-        if (!productCounts[item.productId]) {
-          productCounts[item.productId] = { name: item.name, qty: 0, revenue: 0 };
-        }
-        productCounts[item.productId].qty += Number(item.qty || 0);
-        productCounts[item.productId].revenue += Number(item.qty || 0) * Number(item.price || 0);
-      });
-    });
-    
-    return Object.values(productCounts).sort((a, b) => b.qty - a.qty).slice(0, 5);
-  };
-
-  const getPaymentDistribution = () => {
-    const dist = { cash: 0, card: 0, debt: 0 };
-    filteredSales.forEach(s => {
-      if (s.paymentBreakdown && s.paymentBreakdown.length > 0) {
-        s.paymentBreakdown.forEach(({ method, amount }) => {
-          if (dist[method] !== undefined) {
-            dist[method] += Number(amount || 0);
-          }
-        });
-      } else {
-        // Fallback for older data
-        let pType = s.paymentType;
-        if (pType === 'mixed' || !pType) pType = 'cash'; // Default mixed/unknown to cash if no breakdown
-        if (dist[pType] !== undefined) {
-          dist[pType] += Number(s.finalTotal || 0);
-        }
-      }
-    });
-    return dist;
-  };
-
-  // Weekly Digest Calculations
-  const startOfThisWeek = new Date();
-  startOfThisWeek.setHours(0, 0, 0, 0);
-  startOfThisWeek.setDate(startOfThisWeek.getDate() - (startOfThisWeek.getDay() === 0 ? 6 : startOfThisWeek.getDay() - 1)); // Monday
-  
-  const startOfLastWeek = new Date(startOfThisWeek);
-  startOfLastWeek.setDate(startOfLastWeek.getDate() - 7);
-
-  const getDigestStats = (data, dateField = 'createdAt') => {
-    let thisWeek = 0;
-    let lastWeek = 0;
-    data.forEach(item => {
-      if (!item[dateField]) return;
-      const d = new Date(item[dateField]);
-      if (d >= startOfThisWeek) thisWeek++;
-      else if (d >= startOfLastWeek && d < startOfThisWeek) lastWeek++;
-    });
-    return { thisWeek, lastWeek };
-  };
-
-  const getDigestRevenue = () => {
-    let thisWeek = 0;
-    let lastWeek = 0;
-    sales.forEach(s => {
-      if (!s.createdAt) return;
-      const d = new Date(s.createdAt);
-      if (d >= startOfThisWeek) thisWeek += Number(s.finalTotal || 0);
-      else if (d >= startOfLastWeek && d < startOfThisWeek) lastWeek += Number(s.finalTotal || 0);
-    });
-    return { thisWeek, lastWeek };
-  };
-
-  const custDigest = getDigestStats(customers);
-  const partDigest = getDigestStats(partners);
-  const revDigest = getDigestRevenue();
-
-  const getTrend = (thisW, lastW) => {
-    if (lastW === 0) return thisW > 0 ? '+100%' : '0%';
-    const pct = ((thisW - lastW) / lastW) * 100;
-    return `${pct > 0 ? '+' : ''}${pct.toFixed(1)}%`;
-  };
-
-  const chartData = getChartData();
-  const topProducts = getTopProducts();
-  const paymentData = getPaymentDistribution();
-  
-  if (loading) {
-    return (
-      <div className="flex-center" style={{ height: '100%', flexDirection: 'column', gap: '1rem' }}>
-        <div className="spinner"></div>
-        <div style={{ color: 'var(--text-secondary)' }}>Dashboard ma'lumotlari yuklanmoqda...</div>
-      </div>
-    );
-  }
-
+const CustomTooltip = ({ active, payload, label, curr }) => {
+  if (!active || !payload?.length) return null;
   return (
-    <div className="flex-col" style={{ gap: '2rem', height: '100%', overflowY: 'auto', paddingBottom: '2rem' }}>
-      {/* Header */}
-      <div className="flex-between" style={{ flexWrap: 'wrap', gap: '1rem' }}>
-        <h1 className="h1">Bosh Sahifa</h1>
-        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', backgroundColor: 'var(--bg-surface)', padding: '0.25rem', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-color)' }}>
-            {['kecha', 'bugun', 'hafta', 'oy', 'yil'].map(f => (
-              <button 
-                key={f}
-                className="btn"
-                style={{ 
-                  backgroundColor: timeFilter === f && !customStartDate && !customEndDate ? 'var(--bg-main)' : 'transparent',
-                  color: timeFilter === f && !customStartDate && !customEndDate ? 'var(--primary)' : 'var(--text-secondary)',
-                  border: 'none',
-                  padding: '0.5rem 1rem',
-                  textTransform: 'capitalize'
-                }}
-                onClick={() => { setTimeFilter(f); setCustomStartDate(''); setCustomEndDate(''); }}
-              >
-                {f}
-              </button>
-            ))}
-          </div>
-          <DateRangePicker 
-            startDate={customStartDate} 
-            endDate={customEndDate} 
-            onChange={({ start, end }) => {
-              const formatYMD = (d) => d ? d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0') : '';
-              setCustomStartDate(formatYMD(start));
-              setCustomEndDate(formatYMD(end));
-            }} 
-          />
+    <div style={{ background: '#1A2538', border: `1px solid #4A90E244`, borderRadius: '10px', padding: '10px 16px', color: '#fff', fontSize: '14px', boxShadow: '0 8px 24px rgba(0,0,0,.4)' }}>
+      <div style={{ color: '#8A9BB5', marginBottom: '4px' }}>{label}</div>
+      <div style={{ fontWeight: 700, color: '#4A90E2' }}>{formatCurrency(payload[0].value, curr)}</div>
+    </div>
+  );
+};
+
+/* ─────── SVG Ring (from HTML reference .ring) ─────── */
+const MiniRing = ({ pct: p, color = GL, bad = false }) => {
+  const R = 15, CIRC = 2 * Math.PI * R;
+  const fill = (p / 100) * CIRC;
+  const trackColor = bad ? '#FCE9E9' : ACTIVE_TRACK;
+  return (
+    <div style={{ position: 'relative', width: 36, height: 36 }}>
+      <svg width="36" height="36" viewBox="0 0 36 36" style={{ transform: 'rotate(-90deg)' }}>
+        <circle cx="18" cy="18" r={R} fill="none" stroke={trackColor} strokeWidth="4"/>
+        <circle cx="18" cy="18" r={R} fill="none" stroke={bad ? RED : GL}
+        strokeWidth="4" strokeDasharray={`${Math.min(fill, CIRC)} ${CIRC}`} strokeLinecap="round"/>
+    </svg>
+    <span style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', fontSize:'11px', fontWeight:700, color: bad ? RED : GD }}>
+        {p}%
+      </span>
+    </div>
+  );
+};
+
+/* ─────── Macro card (from .macro-card) ─────── */
+const MacroCard = ({ label, value, maxValue, unit, trend, isAlert }) => {
+  const p = maxValue > 0 ? Math.round((value / maxValue) * 100) : 0;
+  const pos = parseFloat(trend) >= 0;
+  return (
+    <div style={{
+      flex: 1,
+      border: `1px solid ${CARD_B}`,
+      borderRadius: '16px',
+      padding: '16px 12px',
+      boxShadow: '0 8px 20px -16px rgba(0,0,0,0.3)',
+      background: '#fff',
+      minWidth: 0,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+        <div style={{
+          width: 28, height: 28, borderRadius: '50%',
+          background: isAlert ? '#FCE9E9' : ACTIVE_TRACK,
+          color: isAlert ? RED : GD,
+          display: 'flex', alignItems: 'center', justifyContent: 'center'
+        }}>
+          {isAlert
+            ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 6L9 17l-5-5"/></svg>
+            : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M7 17L17 7M17 7H8M17 7v9"/></svg>}
         </div>
+        <span style={{
+          fontSize: '11px', fontWeight: 700, color: '#fff',
+          padding: '4px 8px', borderRadius: '8px',
+          background: isAlert ? RED : '#1C1E1B'
+        }}>{trend}</span>
       </div>
-
-      {/* Quick Actions */}
-      <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-        <button className="btn btn-primary" onClick={() => navigate('/sales')} style={{ flex: 1, minWidth: '150px' }}><ShoppingCart size={18}/> Yangi Sotuv</button>
-        <button className="btn btn-outline" onClick={() => navigate('/products')} style={{ flex: 1, minWidth: '150px', backgroundColor: 'var(--bg-surface)' }}><Package size={18}/> Mahsulot qo'shish</button>
-        <button className="btn btn-outline" onClick={() => navigate('/customers')} style={{ flex: 1, minWidth: '150px', backgroundColor: 'var(--bg-surface)' }}><Users size={18}/> Mijoz qo'shish</button>
-        <button className="btn btn-outline" onClick={() => navigate('/orders')} style={{ flex: 1, minWidth: '150px', backgroundColor: 'var(--bg-surface)' }}><Calendar size={18}/> Buyurtma berish</button>
-      </div>
-
-      {/* KPI Cards Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem' }}>
-        <KpiCard title="Tushum" value={formatCurrency(periodRevenue, curr)} icon={<DollarSign size={22}/>} color="var(--primary)" trend={"+12%"}/>
-        <KpiCard title="Savdolar soni" value={`${periodSalesCount} ta`} icon={<ShoppingCart size={22}/>} color="var(--success)" trend={"+5%"}/>
-        <KpiCard title="O'rtacha chek" value={formatCurrency(averageCheck, curr)} icon={<Activity size={22}/>} color="#8B5CF6" trend={"+8%"}/>
-        <KpiCard title="Kam qolgan tovarlar" value={`${lowStockProducts} ta`} icon={<Package size={22}/>} color="var(--warning)" onClick={() => navigate('/products')}/>
-        <KpiCard title="Mijozlar qarzi (Sizga)" value={formatCurrency(totalDebt, curr)} icon={<DollarSign size={22}/>} color="var(--danger)" subtext={overdueDebts.length > 0 ? `${overdueDebts.length} ta muddati o'tgan` : ''} subtextColor="var(--danger)" onClick={() => navigate('/customers/debts')}/>
-        <KpiCard title="Sizning qarzingiz (Hamkorlar)" value={formatCurrency(totalPartnerDebt, curr)} icon={<CreditCard size={22}/>} color="var(--warning)" subtext={overduePartnerDebts.length > 0 ? `${overduePartnerDebts.length} ta muddati o'tgan` : ''} subtextColor="var(--danger)" onClick={() => navigate('/partners/debts')}/>
-        <KpiCard title="Mijozlar bazasi" value={`${activeCustomers} nafar`} icon={<Users size={22}/>} color="#06B6D4" trend={"+2%"}/>
-      </div>
-
-      {/* Weekly Digest */}
-      <div className="glass-panel" style={{ padding: '1.5rem' }}>
-        <h2 className="h2" style={{ fontSize: '1.25rem', marginBottom: '1rem' }}>Haftalik Dayjest (O'tgan haftaga nisbatan)</h2>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem' }}>
-          <div style={{ padding: '1rem', borderLeft: '4px solid var(--primary)', backgroundColor: 'var(--bg-surface)' }}>
-            <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Savdo aylanmasi</div>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.75rem' }}>
-              <span style={{ fontSize: '1.25rem', fontWeight: 600 }}><CurrencyDisplay amount={revDigest.thisWeek} /></span>
-              <span style={{ fontSize: '0.875rem', color: revDigest.thisWeek >= revDigest.lastWeek ? 'var(--success)' : 'var(--danger)', fontWeight: 500 }}>
-                {getTrend(revDigest.thisWeek, revDigest.lastWeek)}
-              </span>
-            </div>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>O'tgan hafta: <CurrencyDisplay amount={revDigest.lastWeek} /></div>
-          </div>
-          
-          <div style={{ padding: '1rem', borderLeft: '4px solid var(--success)', backgroundColor: 'var(--bg-surface)' }}>
-            <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Yangi mijozlar</div>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.75rem' }}>
-              <span style={{ fontSize: '1.25rem', fontWeight: 600 }}>{custDigest.thisWeek} nafar</span>
-              <span style={{ fontSize: '0.875rem', color: custDigest.thisWeek >= custDigest.lastWeek ? 'var(--success)' : 'var(--danger)', fontWeight: 500 }}>
-                {getTrend(custDigest.thisWeek, custDigest.lastWeek)}
-              </span>
-            </div>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>O'tgan hafta: {custDigest.lastWeek} nafar</div>
-          </div>
-
-          <div style={{ padding: '1rem', borderLeft: '4px solid var(--warning)', backgroundColor: 'var(--bg-surface)' }}>
-            <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Yangi hamkorlar</div>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.75rem' }}>
-              <span style={{ fontSize: '1.25rem', fontWeight: 600 }}>{partDigest.thisWeek} ta</span>
-              <span style={{ fontSize: '0.875rem', color: partDigest.thisWeek >= partDigest.lastWeek ? 'var(--success)' : 'var(--danger)', fontWeight: 500 }}>
-                {getTrend(partDigest.thisWeek, partDigest.lastWeek)}
-              </span>
-            </div>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>O'tgan hafta: {partDigest.lastWeek} ta</div>
-          </div>
-        </div>
-      </div>
-
-      {/* Target Setting Banner */}
-      <div className="glass-panel" style={{ padding: '2rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'var(--bg-main)', border: '1px solid var(--primary-light)' }}>
-        <div>
-          <h2 className="h2" style={{ marginBottom: '0.5rem' }}>Do'konda savdo maqsadlarini qo'ying va ularning bajarilishini kuzatib boring!</h2>
-          <p style={{ color: 'var(--text-secondary)', maxWidth: '600px' }}>Targetlar moduli yordamida siz do'kondagi sof tushum maqsadlarini belgilashingiz va kuzatishingiz mumkin.</p>
-        </div>
-        <button className="btn btn-primary" style={{ padding: '0.75rem 1.5rem', whiteSpace: 'nowrap' }} onClick={() => alert('Targetni o\'rnatish modali tez orada qo\'shiladi!')}>
-          Targetni o'rnatish
-        </button>
-      </div>
-
-      {/* Main Charts & Widgets */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
-        
-        {/* Area Chart */}
-        <div className="glass-panel flex-col" style={{ padding: '1.5rem', minHeight: '380px', gridColumn: 'span 2' }}>
-          <div className="flex-between" style={{ marginBottom: '1.5rem' }}>
-            <h2 className="h2" style={{ fontSize: '1.25rem' }}>Savdo dinamikasi</h2>
-            <div className="glass-panel" style={{ display: 'flex', gap: '0.25rem', padding: '0.25rem' }}>
-              {['day', 'week', 'month', 'year'].map(filter => (
-                <button
-                  key={filter}
-                  onClick={() => setTimeFilter(filter)}
-                  style={{
-                    padding: '0.5rem 1.25rem',
-                    borderRadius: 'var(--radius-md)',
-                    backgroundColor: timeFilter === filter ? 'var(--primary)' : 'transparent',
-                    color: timeFilter === filter ? '#fff' : 'var(--text-secondary)',
-                    fontWeight: timeFilter === filter ? 600 : 500,
-                    transition: 'all 0.2s ease',
-                    border: 'none',
-                    cursor: 'pointer'
-                  }}
-                >
-                  {filter === 'day' ? 'Bugun' : filter === 'week' ? 'Hafta' : filter === 'month' ? 'Oy' : 'Yil'}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div style={{ flex: 1, width: '100%' }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="colorJami" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="var(--primary)" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-color)" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: 'var(--text-secondary)'}} dy={10} style={{ fontFamily: 'monospace' }}/>
-                <YAxis axisLine={false} tickLine={false} tick={{fill: 'var(--text-secondary)'}} tickFormatter={v => formatCompact(v)} style={{ fontFamily: 'monospace' }}/>
-                <Tooltip 
-                  formatter={(v) => [formatCurrency(v, curr), "Savdo"]} 
-                  contentStyle={{ borderRadius: '12px', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-glass)', background: 'var(--bg-surface-glass)', backdropFilter: 'blur(8px)' }} 
-                  cursor={{ stroke: 'var(--primary)', strokeWidth: 1, strokeDasharray: '5 5' }} 
-                />
-                <Area type="monotone" dataKey="jami" stroke="var(--primary)" strokeWidth={3} fillOpacity={1} fill="url(#colorJami)" activeDot={{ r: 6, strokeWidth: 0, fill: 'var(--primary)' }}/>
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* Payment Types Widget */}
-        <div className="glass-panel flex-col" style={{ padding: '1.5rem', minHeight: '380px' }}>
-          <h2 className="h2" style={{ marginBottom: '1.5rem', fontSize: '1.25rem' }}>{timeFilter === 'day' ? 'Bugungi' : timeFilter === 'week' ? 'Shu haftadagi' : timeFilter === 'month' ? 'Shu oydagi' : 'Shu yildagi'} to'lovlar</h2>
-          
-          {periodRevenue > 0 ? (
-            <div className="flex-col" style={{ gap: '1.25rem', flex: 1, justifyContent: 'center' }}>
-              
-              {/* Naqd */}
-              <div className="flex-col" style={{ gap: '0.5rem' }}>
-                <div className="flex-between">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                    <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: '#10B98120', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem' }}>💵</div>
-                    <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>Naqd</span>
-                  </div>
-                  <span style={{ fontWeight: 700, fontFamily: 'monospace', fontSize: '1.1rem' }}>
-                    {formatCurrency(paymentData.cash, curr)}
-                  </span>
-                </div>
-                <div style={{ height: '4px', width: '100%', backgroundColor: 'var(--bg-main)', borderRadius: '2px', overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: `${(paymentData.cash / periodRevenue) * 100}%`, backgroundColor: '#10B981' }}></div>
-                </div>
-              </div>
-
-              {/* Karta */}
-              <div className="flex-col" style={{ gap: '0.5rem' }}>
-                <div className="flex-between">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                    <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: '#3B82F620', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem' }}>💳</div>
-                    <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>Karta</span>
-                  </div>
-                  <span style={{ fontWeight: 700, fontFamily: 'monospace', fontSize: '1.1rem' }}>
-                    {formatCurrency(paymentData.card, curr)}
-                  </span>
-                </div>
-                <div style={{ height: '4px', width: '100%', backgroundColor: 'var(--bg-main)', borderRadius: '2px', overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: `${(paymentData.card / periodRevenue) * 100}%`, backgroundColor: '#3B82F6' }}></div>
-                </div>
-              </div>
-
-              {/* Nasiya */}
-              <div className="flex-col" style={{ gap: '0.5rem' }}>
-                <div className="flex-between">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                    <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: '#EF444420', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem' }}>📅</div>
-                    <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>Nasiya</span>
-                  </div>
-                  <span style={{ fontWeight: 700, fontFamily: 'monospace', fontSize: '1.1rem' }}>
-                    {formatCurrency(paymentData.debt, curr)}
-                  </span>
-                </div>
-                <div style={{ height: '4px', width: '100%', backgroundColor: 'var(--bg-main)', borderRadius: '2px', overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: `${(paymentData.debt / periodRevenue) * 100}%`, backgroundColor: '#EF4444' }}></div>
-                </div>
-              </div>
-
-              {/* Jami */}
-              <div style={{ marginTop: 'auto', paddingTop: '1rem', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>Jami tushum:</span>
-                <span style={{ fontWeight: 700, color: 'var(--primary)', fontSize: '1.25rem', fontFamily: 'monospace' }}>
-                  {formatCurrency(paymentData.cash + paymentData.card + paymentData.debt, curr)}
-                </span>
-              </div>
-
-            </div>
-          ) : (
-             <div className="flex-center" style={{ height: '100%', color: 'var(--text-secondary)', textAlign: 'center', padding: '2rem' }}>Hozircha to'lovlar mavjud emas</div>
-          )}
-        </div>
-
-      </div>
-
-      {/* Bottom Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '1.5rem' }}>
-        
-        {/* Top 5 Products */}
-        <div className="glass-panel flex-col" style={{ padding: '1.5rem' }}>
-          <h2 className="h2" style={{ marginBottom: '1.5rem', fontSize: '1.25rem' }}>Eng ko'p sotilgan tovarlar (Top-5)</h2>
-          {topProducts.length > 0 ? (
-            <div className="flex-col" style={{ gap: '1rem' }}>
-              {topProducts.map((p, i) => (
-                <div key={i} className="flex-between" style={{ paddingBottom: '0.75rem', borderBottom: '1px solid var(--border-color)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                    <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: 'var(--primary-light)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600 }}>{i + 1}</div>
-                    <div>
-                      <div style={{ fontWeight: 600, color: 'var(--text-main)' }}>{p.name}</div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{p.qty} dona</div>
-                    </div>
-                  </div>
-                  <div style={{ fontWeight: 700, color: 'var(--success)', fontFamily: 'monospace' }}>
-                    {formatCurrency(p.revenue, curr)}
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="flex-center" style={{ height: '100%', color: 'var(--text-secondary)' }}>Ma'lumot yo'q</div>
-          )}
-        </div>
-
-        {/* Recent Transactions Feed */}
-        <div className="glass-panel flex-col" style={{ padding: '1.5rem' }}>
-          <h2 className="h2" style={{ marginBottom: '1.5rem', fontSize: '1.25rem' }}>So'nggi tranzaksiyalar</h2>
-          {sales.length > 0 ? (
-            <div className="flex-col" style={{ gap: '1rem' }}>
-              {sales.slice(0, 5).map((sale, i) => (
-                <div key={sale.id} className="flex-between" style={{ paddingBottom: '0.75rem', borderBottom: '1px solid var(--border-color)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                    <div style={{ padding: '0.5rem', backgroundColor: 'var(--bg-main)', borderRadius: 'var(--radius-md)' }}>
-                      {sale.paymentType === 'cash' ? <Banknote size={16} color="#10B981"/> : sale.paymentType === 'card' ? <CreditCard size={16} color="#3B82F6"/> : <Activity size={16} color="#F59E0B"/>}
-                    </div>
-                    <div>
-                      <div style={{ fontWeight: 600, color: 'var(--text-main)' }}>{sale.customerName || 'Xaridor'}</div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{new Date(sale.createdAt).toLocaleTimeString()} • {sale.cashierId}</div>
-                    </div>
-                  </div>
-                  <div style={{ fontWeight: 700, color: 'var(--text-main)', fontFamily: 'monospace' }}>
-                    {formatCurrency(sale.finalTotal, curr)}
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="flex-center" style={{ height: '100%', color: 'var(--text-secondary)' }}>Tranzaksiyalar yo'q</div>
-          )}
-        </div>
-        
-        {/* Pending Orders Widget */}
-        <div className="glass-panel flex-col" style={{ padding: '1.5rem' }}>
-          <div className="flex-between" style={{ marginBottom: '1.5rem' }}>
-            <h2 className="h2" style={{ fontSize: '1.25rem' }}>Kutilayotgan buyurtmalar</h2>
-            <span style={{ padding: '0.25rem 0.75rem', backgroundColor: 'var(--warning-light)', color: 'var(--warning)', borderRadius: '999px', fontSize: '0.875rem', fontWeight: 600 }}>{pendingOrders.length} ta</span>
-          </div>
-          {pendingOrders.length > 0 ? (
-            <div className="flex-col" style={{ gap: '1rem', flex: 1 }}>
-              <div style={{ marginBottom: '0.5rem' }}>
-                <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Umumiy summa</div>
-                <div className="h2" style={{ color: 'var(--primary)' }}>{formatCurrency(pendingOrdersTotal, curr)}</div>
-              </div>
-              {pendingOrders.slice(0, 3).map(o => {
-                const supplier = suppliers.find(s => s.id === o.supplierId);
-                return (
-                  <div key={o.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem', backgroundColor: 'var(--bg-main)', borderRadius: 'var(--radius-md)' }}>
-                    <div>
-                      <div style={{ fontWeight: 500, fontSize: '0.875rem' }}>{supplier?.fullName || 'Noma\'lum ta\'minotchi'}</div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{new Date(o.createdAt).toLocaleDateString()}</div>
-                    </div>
-                    <div style={{ fontWeight: 600, fontFamily: 'monospace' }}>{formatCurrency(o.totalAmount, curr)}</div>
-                  </div>
-                );
-              })}
-              <button className="btn btn-ghost" style={{ marginTop: 'auto', width: '100%' }} onClick={() => navigate('/orders')}>Barchasini ko'rish <ChevronRight size={16}/></button>
-            </div>
-          ) : (
-            <div className="flex-center" style={{ height: '100%', color: 'var(--text-secondary)' }}>Kutilayotgan buyurtmalar yo'q</div>
-          )}
-        </div>
-
+      <div style={{ fontSize: '15px', fontWeight: 700, color: TD, marginBottom: '6px' }}>{label}</div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span style={{ fontSize: '13px', color: TG, fontWeight: 600 }}>
+          {formatCompact(value)} / {unit}
+        </span>
+        <MiniRing pct={Math.min(p, 110)} bad={isAlert}/>
       </div>
     </div>
   );
 };
 
-// Internal KPI Card Component
-const KpiCard = ({ title, value, icon, color, trend, subtext, subtextColor, onClick }) => (
-  <div className="glass-panel" style={{ padding: '1.5rem', cursor: onClick ? 'pointer' : 'default', transition: 'transform 0.2s, box-shadow 0.2s' }} onMouseEnter={e => {if(onClick) { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = 'var(--shadow-lg)'; }}} onMouseLeave={e => {if(onClick) { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'var(--shadow-glass)'; }}} onClick={onClick}>
-    <div className="flex-between" style={{ marginBottom: '1rem' }}>
-      <div style={{ padding: '0.75rem', backgroundColor: `${color}20`, color: color, borderRadius: 'var(--radius-lg)' }}>
-        {icon}
-      </div>
-      {trend && (
-        <div style={{ fontSize: '0.875rem', fontWeight: 600, color: trend.startsWith('+') ? 'var(--success)' : 'var(--danger)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-          {trend.startsWith('+') ? <TrendingUp size={16}/> : <TrendingDown size={16}/>}
-          {trend}
-        </div>
-      )}
+/* ─────── List row (from .list-row) ─────── */
+const ListRow = ({ icon, label, right, onClick, isToggle, toggled }) => (
+  <div
+    onClick={onClick}
+    style={{
+      display: 'flex', alignItems: 'center', gap: '12px',
+      padding: '14px 16px',
+      borderBottom: `1px solid ${CARD_B}`,
+      cursor: onClick ? 'pointer' : 'default',
+      transition: 'background .15s',
+    }}
+    onMouseEnter={e => { if(onClick) e.currentTarget.style.background = '#F7FAFD'; }}
+    onMouseLeave={e => { e.currentTarget.style.background = '#fff'; }}
+  >
+    <div style={{ width: 36, height: 36, borderRadius: '50%', background: ACTIVE_TRACK, color: GD, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+      {icon}
     </div>
-    <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>{title}</div>
-    <div className="h2" style={{ fontFamily: 'monospace', letterSpacing: '-0.5px' }}>{value}</div>
-    {subtext && (
-      <div style={{ fontSize: '0.75rem', marginTop: '0.5rem', color: subtextColor || 'var(--text-secondary)', fontWeight: 500 }}>
-        {subtext}
+    <span style={{ flex: 1, fontSize: '15px', fontWeight: 600, color: TD }}>{label}</span>
+    {isToggle ? (
+      <div style={{ width: 36, height: 20, borderRadius: '12px', background: toggled ? GL : '#DDD', position: 'relative', flexShrink: 0 }}>
+        <div style={{ position: 'absolute', top: 2, [toggled?'right':'left']: 2, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'all .2s' }}/>
       </div>
+    ) : right || (
+      <svg style={{ color: '#C7CCC3' }} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M9 6l6 6-6 6"/></svg>
     )}
   </div>
 );
+
+
+
+/* ══════════════════════════════════════════════════════════════ */
+const Dashboard = () => {
+  const [sales, setSales]         = useState([]);
+  const [products, setProducts]   = useState([]);
+  const [customers, setCustomers] = useState([]);
+  const [debts, setDebts]         = useState([]);
+  const [orders, setOrders]       = useState([]);
+  const [loading, setLoading]     = useState(true);
+  const [timeFilter, setTimeFilter] = useState('bugun');
+
+  const { userProfile }         = useRoles();
+  const { settings }            = useSettings();
+  const { selectedWarehouseId } = useWarehouse();
+  const storeId  = userProfile?.storeOwnerId;
+  const navigate = useNavigate();
+  const curr     = settings?.currency || 'UZS';
+  const now      = useMemo(() => new Date(), []);
+
+  useEffect(() => {
+    if (!storeId) return;
+    const U = [];
+    U.push(onSnapshot(query(collection(db, `users/${storeId}/sales`), orderBy('createdAt','desc')), s => {
+      setSales(s.docs.map(d => ({ id: d.id, ...d.data() })));
+      setLoading(false);
+    }));
+    U.push(onSnapshot(collection(db, `users/${storeId}/customers`), s =>
+      setCustomers(s.docs.map(d => ({ id: d.id, ...d.data() })))))
+    U.push(onSnapshot(collection(db, `users/${storeId}/products`), s =>
+      setProducts(s.docs.map(d => ({ id: d.id, ...d.data() })))))
+    U.push(onSnapshot(collection(db, `users/${storeId}/customerDebts`), s =>
+      setDebts(s.docs.map(d => ({ id: d.id, ...d.data() })))))
+    U.push(onSnapshot(query(collection(db, `users/${storeId}/purchaseOrders`), orderBy('createdAt','desc')), s =>
+      setOrders(s.docs.map(d => ({ id: d.id, ...d.data() })))))
+    return () => U.forEach(u => u());
+  }, [storeId]);
+
+  /* filter */
+  const filterByDate = items => items.filter(s => {
+    if (!s.createdAt) return false;
+    const d = new Date(s.createdAt);
+    if (timeFilter === 'kecha') { const y = new Date(now); y.setDate(y.getDate()-1); return d.toDateString()===y.toDateString(); }
+    if (timeFilter === 'bugun') return d.toDateString() === now.toDateString();
+    if (timeFilter === 'hafta') return (now-d)/864e5 <= 7;
+    if (timeFilter === 'oy') return d.getMonth()===now.getMonth() && d.getFullYear()===now.getFullYear();
+    if (timeFilter === 'yil') return d.getFullYear()===now.getFullYear();
+    return true;
+  });
+
+  const filteredSales = filterByDate(sales);
+  const revenue       = filteredSales.reduce((a,s) => a + Number(s.finalTotal||0), 0);
+  const salesCount    = filteredSales.length;
+
+  // yesterday trend
+  const yest = new Date(now); yest.setDate(yest.getDate()-1);
+  const yesterdayRev  = sales.filter(s => s.createdAt && new Date(s.createdAt).toDateString()===yest.toDateString()).reduce((a,s)=>a+Number(s.finalTotal||0),0);
+  const yesterdayCnt  = sales.filter(s => s.createdAt && new Date(s.createdAt).toDateString()===yest.toDateString()).length;
+
+  // payment breakdown
+  const payDist = { cash:0, card:0, debt:0 };
+  filteredSales.forEach(s => {
+    if (s.paymentBreakdown?.length>0) s.paymentBreakdown.forEach(({method,amount})=>{ if(payDist[method]!==undefined) payDist[method]+=Number(amount||0); });
+    else { const t=s.paymentType||'cash'; if(payDist[t]!==undefined) payDist[t]+=Number(s.finalTotal||0); }
+  });
+
+  // alerts
+  const lowStock     = products.filter(p => Number(p.stockByWarehouse?.[selectedWarehouseId]||0) <= Number(p.minStock||5));
+  const activeDebts  = debts.filter(d => ['active','partial','partially_paid'].includes(d.status));
+  const totalDebt    = activeDebts.reduce((a,d)=>a+Number(d.remainingAmount||0),0);
+  const overdueDebts = activeDebts.filter(d=>new Date(d.dueDate)<now).length;
+  const pendingOrders = orders.filter(o=>o.status==='pending');
+
+  // top products
+  const topProducts = useMemo(() => {
+    const map = {};
+    filteredSales.forEach(sale => {
+      sale.items?.forEach(item => {
+        if (!map[item.productId]) map[item.productId] = { name: item.name, qty: 0, revenue: 0 };
+        map[item.productId].qty     += Number(item.qty||0);
+        map[item.productId].revenue += Number(item.qty||0)*Number(item.price||0);
+      });
+    });
+    return Object.values(map).sort((a,b)=>b.qty-a.qty).slice(0,5);
+  }, [filteredSales]);
+
+  // bar chart
+  const chartBars = useMemo(() => {
+    if (timeFilter==='hafta') {
+      const DAYS = ['Yak','Du','Se','Chor','Pay','Ju','Shan'];
+      const map = {}; DAYS.forEach(d=>map[d]=0);
+      filteredSales.forEach(s => { const k=DAYS[new Date(s.createdAt).getDay()]; if(map[k]!==undefined) map[k]+=Number(s.finalTotal||0); });
+      const today = DAYS[now.getDay()];
+      return DAYS.map(name => ({ name, jami: map[name], active: name===today }));
+    }
+    if (timeFilter==='oy') {
+      const dim = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
+      const map = {}; for(let i=1;i<=dim;i++) map[`${i}`]=0;
+      filteredSales.forEach(s=>{ const k=`${new Date(s.createdAt).getDate()}`; if(map[k]!==undefined) map[k]+=Number(s.finalTotal||0); });
+      const today = `${now.getDate()}`;
+      return Object.entries(map).sort((a,b)=>parseInt(a[0])-parseInt(b[0])).map(([name,jami])=>({ name, jami, active: name===today }));
+    }
+    if (timeFilter==='yil') {
+      const M = ['Yan','Fev','Mar','Apr','May','Iyn','Iyl','Avg','Sen','Okt','Noy','Dek'];
+      const map = {}; M.forEach(m=>map[m]=0);
+      filteredSales.forEach(s=>{ const k=M[new Date(s.createdAt).getMonth()]; if(map[k]!==undefined) map[k]+=Number(s.finalTotal||0); });
+      const cur = M[now.getMonth()];
+      return M.map(name=>({ name, jami:map[name], active: name===cur }));
+    }
+    // bugun / kecha — soatlar
+    const map = {}; for(let i=0;i<=23;i++) map[`${String(i).padStart(2,'0')}`]=0;
+    filteredSales.forEach(s=>{ const h=String(new Date(s.createdAt).getHours()).padStart(2,'0'); if(map[h]!==undefined) map[h]+=Number(s.finalTotal||0); });
+    const nowH = timeFilter==='bugun' ? String(now.getHours()).padStart(2,'0') : '23';
+    const entries = Object.entries(map).filter(([k])=>parseInt(k)<=parseInt(nowH));
+    return entries.map(([name,jami])=>({ name: `${name}:00`, jami, active: name===nowH }));
+  }, [filteredSales, timeFilter]);
+
+  const maxBar = Math.max(...chartBars.map(b=>b.jami), 1);
+
+  const filterLabels = { kecha:'Kecha', bugun:'Bugun', hafta:'Hafta', oy:'Oy', yil:'Yil' };
+
+  if (loading) return (
+    <div className="flex-center" style={{ height:'100%', flexDirection:'column', gap:'1rem' }}>
+      <div className="spinner"/>
+    </div>
+  );
+
+  const totalRevTrend = trendStr(revenue, yesterdayRev);
+  const cntTrend      = trendStr(salesCount, yesterdayCnt);
+  const trendPos      = parseFloat(totalRevTrend) >= 0;
+
+  return (
+    <div style={{ fontFamily:"'Poppins','Segoe UI',sans-serif", display:'flex', flexDirection:'column', gap:'1.25rem', paddingBottom:'2rem', color: TD }}>
+
+      {/* ══ HEADER ══ */}
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'flex-end' }}>
+        <div style={{ display:'flex', gap:'8px' }}>
+          {/* Filter pill */}
+          <div style={{ display:'flex', background:'#fff', border:`1px solid ${CARD_B}`, borderRadius:'30px', padding:'4px', gap:'4px', boxShadow:'0 4px 12px -6px rgba(0,0,0,.12)' }}>
+            {Object.entries(filterLabels).map(([key,label]) => (
+              <button key={key} onClick={()=>setTimeFilter(key)} style={{
+                padding:'8px 18px', borderRadius:'20px', border:'none', cursor:'pointer', fontSize:'14px', fontWeight: timeFilter===key?700:500,
+                background: timeFilter===key ? `linear-gradient(135deg,${GL},${GM})` : 'transparent',
+                color: timeFilter===key ? '#fff' : TG,
+                transition:'all .2s'
+              }}>{label}</button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ══ ALERTS ══ */}
+      {(lowStock.length>0 || overdueDebts>0 || pendingOrders.length>0) && (
+        <div style={{ display:'flex', gap:'8px', flexWrap:'wrap' }}>
+          {lowStock.length>0 && (
+            <button onClick={()=>navigate('/products')} style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 18px', borderRadius:'999px', border:'1px solid #F59E0B55', background:'#FEF9EC', color:'#B45309', fontSize:'14px', fontWeight:600, cursor:'pointer' }}>
+              <Package size={16}/> {lowStock.length} ta tovar kam <ChevronRight size={14}/>
+            </button>
+          )}
+          {overdueDebts>0 && (
+            <button onClick={()=>navigate('/customers/debts')} style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 18px', borderRadius:'999px', border:`1px solid ${RED}55`, background:'#FEF2F2', color: RED, fontSize:'14px', fontWeight:600, cursor:'pointer' }}>
+              <AlertCircle size={16}/> {overdueDebts} ta qarz muddati o'tgan <ChevronRight size={14}/>
+            </button>
+          )}
+          {pendingOrders.length>0 && (
+            <button onClick={()=>navigate('/orders')} style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 18px', borderRadius:'999px', border:`1px solid ${GL}66`, background:'#F0F6FC', color: GD, fontSize:'14px', fontWeight:600, cursor:'pointer' }}>
+              <ShoppingCart size={16}/> {pendingOrders.length} ta buyurtma <ChevronRight size={14}/>
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* ══ MAIN GRID ══ */}
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'1rem' }}>
+
+        {/* LEFT COLUMN */}
+        <div style={{ display:'flex', flexDirection:'column', gap:'1rem' }}>
+
+          {/* Revenue hero card */}
+          <div onClick={()=>navigate('/reports')} style={{
+            background: HERO_GRADIENT,
+            borderRadius:'20px', padding:'20px',
+            boxShadow:`0 16px 40px -12px ${GL}55`,
+            cursor:'pointer', position:'relative', overflow:'hidden'
+          }}>
+            <div style={{ position:'absolute', right:-20, top:-20, width:120, height:120, borderRadius:'50%', background:'rgba(255,255,255,.08)' }}/>
+            <div style={{ position:'absolute', right:30, bottom:-30, width:80, height:80, borderRadius:'50%', background:'rgba(255,255,255,.06)' }}/>
+            <div style={{ position:'relative' }}>
+              <div style={{ fontSize:'14px', color:'rgba(255,255,255,.8)', fontWeight:500, marginBottom:8 }}>{filterLabels[timeFilter]} tushum</div>
+              <div style={{ fontSize:'32px', fontWeight:800, color:'#fff', letterSpacing:'-0.5px' }}>
+                <CurrencyDisplay amount={revenue}/>
+              </div>
+              <div style={{ display:'flex', alignItems:'center', gap:10, marginTop:14 }}>
+                <span style={{ fontSize:'13px', fontWeight:700, color:'#fff', padding:'4px 10px', borderRadius:'8px', background: trendPos?'rgba(0,0,0,.25)':'rgba(239,75,75,.5)' }}>
+                  {trendPos?<TrendingUp size={12} style={{display:'inline',marginRight:4}}/>:<TrendingDown size={12} style={{display:'inline',marginRight:4}}/>}
+                  {totalRevTrend}%
+                </span>
+                <span style={{ fontSize:'13px', color:'rgba(255,255,255,.75)' }}>kechaga nisbatan</span>
+              </div>
+            </div>
+            <div style={{ marginTop:24, paddingTop:18, borderTop:'1px solid rgba(255,255,255,.2)', display:'flex', gap:24, position:'relative' }}>
+              <div>
+                <div style={{ fontSize:'12px', color:'rgba(255,255,255,.7)', marginBottom: 4 }}>Sotuvlar</div>
+                <div style={{ fontWeight:700, color:'#fff', fontSize:'18px' }}>{salesCount} ta</div>
+              </div>
+              <div>
+                <div style={{ fontSize:'12px', color:'rgba(255,255,255,.7)', marginBottom: 4 }}>Mijozlar</div>
+                <div style={{ fontWeight:700, color:'#fff', fontSize:'18px' }}>{customers.filter(c=>c.status!=='archived').length}</div>
+              </div>
+              <div style={{ marginLeft:'auto', display:'flex', alignItems:'center' }}>
+                <ArrowUpRight size={18} color="rgba(255,255,255,.6)"/>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ border:`1px solid ${CARD_B}`, borderRadius:'20px', padding:'20px', boxShadow:'0 8px 24px -18px rgba(0,0,0,.3)', background:'#fff' }}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
+              <div style={{ display:'flex', alignItems:'center', gap:10, fontWeight:700, fontSize:'16px', color: TD }}>
+                <div style={{ width:32, height:32, borderRadius:'50%', background:'#D1EDFB', display:'flex', alignItems:'center', justifyContent:'center', color: GL }}>
+                  <BarChart2 size={16}/>
+                </div>
+                Savdo grafigi
+              </div>
+              <span style={{ fontSize:'13px', color: TG, fontWeight:600 }}>{filterLabels[timeFilter]} ⌄</span>
+            </div>
+
+            {/* Recharts BarChart */}
+            <div style={{ height:'160px', marginTop:'10px' }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartBars} margin={{ top:10, right:0, left:-25, bottom:0 }} barCategoryGap="20%">
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB"/>
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: TG, fontSize:12 }} dy={8}/>
+                  <YAxis axisLine={false} tickLine={false} tick={{ fill: TG, fontSize:12 }} tickFormatter={v => formatCompact(v)}/>
+                  <Tooltip content={<CustomTooltip curr={curr}/>} cursor={{ fill: `${GL}15`, radius:8 }}/>
+                  <Bar dataKey="jami" radius={[6,6,0,0]} maxBarSize={36}>
+                    {chartBars.map((entry, index) => (
+                      <Cell key={index} fill={entry.active ? GL : `${GL}66`}/>
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Macro-style: payment types (from .macros) */}
+          <div style={{ display:'flex', gap:'8px' }}>
+            <MacroCard
+              label="Naqd"
+              value={payDist.cash}
+              maxValue={revenue}
+              unit={formatCompact(revenue) + ' ' + curr}
+              trend={`${pct(payDist.cash,revenue)}%`}
+              isAlert={false}
+            />
+            <MacroCard
+              label="Karta"
+              value={payDist.card}
+              maxValue={revenue}
+              unit={formatCompact(revenue) + ' ' + curr}
+              trend={`${pct(payDist.card,revenue)}%`}
+              isAlert={false}
+            />
+            <MacroCard
+              label="Nasiya"
+              value={payDist.debt}
+              maxValue={revenue}
+              unit={formatCompact(revenue) + ' ' + curr}
+              trend={`${pct(payDist.debt,revenue)}%`}
+              isAlert={payDist.debt > revenue * 0.4}
+            />
+          </div>
+        </div>
+
+        {/* RIGHT COLUMN */}
+        <div style={{ display:'flex', flexDirection:'column', gap:'1rem' }}>
+
+          <div style={{ border:`1px solid ${CARD_B}`, borderRadius:'20px', background:'#fff', overflow:'hidden', boxShadow:'0 8px 24px -18px rgba(0,0,0,.3)' }}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'20px 20px 0' }}>
+              <div style={{ fontWeight:700, fontSize:'16px', color: TD }}>Top mahsulotlar</div>
+              <span style={{ fontSize:'13px', color: GD, fontWeight:700 }}>{filterLabels[timeFilter]}</span>
+            </div>
+            <div style={{ marginTop:14 }}>
+              {topProducts.length > 0 ? topProducts.map((p, i) => (
+                <div key={i} style={{ display:'flex', alignItems:'center', gap:14, padding:'14px 20px', borderBottom: i<topProducts.length-1?`1px solid ${CARD_B}`:'none' }}>
+                  <div style={{
+                    width:44, height:44, borderRadius:'14px', flexShrink:0,
+                    background: i===0?`linear-gradient(135deg,${GL},${GD})`:'#F0F5FC',
+                    color: i===0?'#fff': TG,
+                    display:'flex', alignItems:'center', justifyContent:'center',
+                    fontWeight:800, fontSize:'14px'
+                  }}>{i+1}</div>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontWeight:700, fontSize:'15px', color: TD, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{p.name}</div>
+                    <div style={{ fontSize:'13px', color: TG, marginTop:2 }}>{p.qty} dona sotildi</div>
+                  </div>
+                  <div style={{ background: GL, color:'#fff', fontSize:'13px', fontWeight:700, padding:'6px 14px', borderRadius:'20px', flexShrink:0 }}>
+                    {formatCompact(p.revenue)}
+                  </div>
+                </div>
+              )) : (
+                <div style={{ padding:'2rem', textAlign:'center', color: TG, fontSize:'15px' }}>Ma'lumot yo'q</div>
+              )}
+            </div>
+          </div>
+
+          {/* Recent Sales (from .list-card .list-row) */}
+          <div style={{ border:`1px solid ${CARD_B}`, borderRadius:'20px', background:'#fff', overflow:'hidden', boxShadow:'0 8px 24px -18px rgba(0,0,0,.3)', flex:1 }}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'20px 20px 8px' }}>
+              <div style={{ fontWeight:700, fontSize:'16px', color: TD }}>So'nggi sotuvlar</div>
+              <button onClick={()=>navigate('/reports')} style={{ fontSize:'13px', color: GL, fontWeight:700, background:'none', border:'none', cursor:'pointer', display:'flex', alignItems:'center', gap:4 }}>
+                Barchasi <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M9 6l6 6-6 6"/></svg>
+              </button>
+            </div>
+            <div>
+              {sales.slice(0,6).map((sale, i) => (
+                <div key={sale.id} style={{ display:'flex', alignItems:'center', gap:14, padding:'14px 20px', borderBottom: i<5&&i<sales.length-1?`1px solid ${CARD_B}`:'none' }}>
+                  <div style={{ width:44, height:44, borderRadius:'14px', background:'#F0F5FC', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                    {sale.paymentType==='cash'
+                      ? <Banknote size={18} color="#10B981"/>
+                      : sale.paymentType==='card'
+                      ? <CreditCard size={18} color={GL}/>
+                      : <Wallet size={18} color="#F59E0B"/>}
+                  </div>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontWeight:700, fontSize:'15px', color: TD, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                      {sale.customerName || 'Anonim xaridor'}
+                    </div>
+                    <div style={{ fontSize:'12px', color: TG, marginTop:2 }}>
+                      {new Date(sale.createdAt).toLocaleTimeString('uz-UZ',{hour:'2-digit',minute:'2-digit'})} • {sale.items?.length||0} mahsulot
+                    </div>
+                  </div>
+                  <div style={{ fontWeight:700, fontSize:'15px', color: GL, flexShrink:0 }}>
+                    <CurrencyDisplay amount={sale.finalTotal}/>
+                  </div>
+                </div>
+              ))}
+              {sales.length===0 && (
+                <div style={{ padding:'3rem', textAlign:'center', color: TG, fontSize:'15px' }}>Hozircha sotuvlar yo'q</div>
+              )}
+            </div>
+          </div>
+
+          {/* Quick Actions (from .list-card) */}
+          <div style={{ border:`1px solid ${CARD_B}`, borderRadius:'20px', background:'#fff', overflow:'hidden', boxShadow:'0 8px 24px -18px rgba(0,0,0,.3)' }}>
+            <div style={{ padding:'18px 20px 8px', fontWeight:700, fontSize:'16px', color: TD }}>Tezkor harakatlar</div>
+            <ListRow icon={<ShoppingCart size={16}/>} label="Yangi sotuv" onClick={()=>navigate('/sales')}/>
+            <ListRow icon={<Package size={16}/>} label="Mahsulot qo'shish" onClick={()=>navigate('/products')}/>
+            <ListRow icon={<Users size={16}/>} label="Mijozlar" onClick={()=>navigate('/customers')}/>
+            <ListRow icon={<Wallet size={16}/>} label="Qarzlar" onClick={()=>navigate('/customers/debts')}
+              right={overdueDebts>0 && <span style={{ fontSize:'12px', fontWeight:700, color:'#fff', background: RED, padding:'2px 10px', borderRadius:'999px' }}>{overdueDebts}</span>}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export default Dashboard;

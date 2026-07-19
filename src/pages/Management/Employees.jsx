@@ -30,8 +30,10 @@ const Employees = () => {
   useEffect(() => {
     if (!storeId) return;
 
-    const unsub = onSnapshot(query(collection(db, `users/${storeId}/staff`), orderBy('createdAt', 'desc')), (snapshot) => {
-      setStaff(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+    const unsub = onSnapshot(collection(db, `users/${storeId}/staff`), (snapshot) => {
+      const docs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+      docs.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+      setStaff(docs);
       setLoading(false);
     }, (error) => {
       addToast(error.message, 'error');
@@ -205,53 +207,74 @@ const Employees = () => {
   };
 
   return (
-    <div className="flex-col" style={{ gap: '1.5rem', height: '100%' }}>
-      <div className="flex-between">
-        <h1 className="h1">Xodimlar va Boshqaruv</h1>
-        <button className="btn btn-primary" onClick={() => openModal()}><UserPlus size={18} /> Yangi xodim</button>
+    <div className="page-wrapper">
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">Xodimlar va Boshqaruv</h1>
+          <p className="page-subtitle">Do'kondagi xodimlar ro'yxati va ularning ruxsatnomalari</p>
+        </div>
+        <button className="btn btn-primary" onClick={() => openModal()}>
+          <UserPlus size={18} /> Yangi xodim
+        </button>
       </div>
 
-      <div className="glass-panel" style={{ padding: '1.5rem', flex: 1, overflowY: 'auto' }}>
+      <div className="page-card" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
         <div style={{ flex: 1, overflowY: 'auto' }}>
-          <div className="table-responsive">
-<table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-            <thead>
-              <tr style={{ borderBottom: '2px solid var(--border-color)', color: 'var(--text-secondary)' }}>
-                <th style={{ padding: '1rem' }}>F.I.O</th>
-                <th style={{ padding: '1rem' }}>Telefon / Login</th>
-                <th style={{ padding: '1rem' }}>Rol</th>
-                <th style={{ padding: '1rem' }}>Holati</th>
-                <th style={{ padding: '1rem' }}>Amallar</th>
+          <table className="page-table">
+            <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
+              <tr>
+                <th>F.I.O</th>
+                <th>Telefon / Login</th>
+                <th>Rol</th>
+                <th>Holati</th>
+                <th style={{ textAlign: 'right' }}>Amallar</th>
               </tr>
             </thead>
             <tbody>
-              {staff.length === 0 ? <tr><td colSpan="5" style={{textAlign: 'center', padding: '2rem'}}>Xodimlar yo'q</td></tr> : null}
-              {staff.map(s => (
-                <tr key={s.id} style={{ borderBottom: '1px solid var(--border-color)', opacity: s.isActive ? 1 : 0.6 }}>
-                  <td style={{ padding: '1rem', fontWeight: 500 }}>{s.fullName}</td>
-                  <td style={{ padding: '1rem' }}>
-                    <div style={{ color: 'var(--text-main)' }}>{s.phone}</div>
-                    <div style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>{s.loginEmail || '-'}</div>
+              {staff.length === 0 ? (
+                <tr>
+                  <td colSpan="5" style={{ textAlign: 'center', padding: '3rem', color: '#8A9BB5' }}>
+                    Xodimlar topilmadi
                   </td>
-                  <td style={{ padding: '1rem' }}>
-                    <span style={{ padding: '0.25rem 0.5rem', backgroundColor: s.role === 'admin' ? 'var(--danger-light)' : 'var(--primary-light)', color: s.role === 'admin' ? 'var(--danger)' : 'var(--primary)', borderRadius: 'var(--radius-sm)', fontSize: '0.75rem', fontWeight: 600 }}>
+                </tr>
+              ) : null}
+              {staff.map(s => (
+                <tr key={s.id} style={{ opacity: s.isActive ? 1 : 0.6 }}>
+                  <td>
+                    <div style={{ fontWeight: 600, color: '#1A2538' }}>{s.fullName}</div>
+                  </td>
+                  <td>
+                    <div style={{ color: '#1A2538', fontWeight: 500 }}>{s.phone}</div>
+                    <div style={{ color: '#8A9BB5', fontSize: 13, fontFamily: 'monospace' }}>{s.loginEmail || '-'}</div>
+                  </td>
+                  <td>
+                    <span style={{ 
+                      display: 'inline-block', 
+                      padding: '4px 10px', 
+                      borderRadius: '20px', 
+                      fontSize: 12, 
+                      fontWeight: 600, 
+                      backgroundColor: s.role === 'admin' ? '#FEE2E2' : '#E0F2FE', 
+                      color: s.role === 'admin' ? '#EF4B4B' : '#0284C7' 
+                    }}>
                       {s.role.toUpperCase()}
                     </span>
                   </td>
-                  <td style={{ padding: '1rem' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-                      <input type="checkbox" checked={s.isActive} onChange={() => toggleActive(s)} />
-                      <span style={{ fontSize: '0.875rem' }}>Aktiv</span>
+                  <td>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                      <input type="checkbox" checked={s.isActive} onChange={() => toggleActive(s)} style={{ accentColor: '#4A90E2', width: 16, height: 16 }} />
+                      <span style={{ fontSize: 14, color: s.isActive ? '#10B981' : '#8A9BB5', fontWeight: 500 }}>{s.isActive ? 'Aktiv' : 'Nofaol'}</span>
                     </label>
                   </td>
-                  <td style={{ padding: '1rem', display: 'flex', gap: '0.5rem' }}>
-                    <button className="btn btn-outline" style={{ padding: '0.5rem' }} onClick={() => openModal(s)}><Edit size={16} /></button>
+                  <td style={{ textAlign: 'right' }}>
+                    <button className="btn btn-outline" style={{ padding: '6px 12px', fontSize: 13 }} onClick={() => openModal(s)}>
+                      <Edit size={14} /> Tahrirlash
+                    </button>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-</div>
         </div>
       </div>
 

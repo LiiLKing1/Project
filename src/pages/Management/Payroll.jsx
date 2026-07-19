@@ -5,6 +5,7 @@ import { collection, onSnapshot, doc, query, where, getDocs, setDoc, addDoc } fr
 import { useToast } from '../../context/ToastContext';
 import { useRoles } from '../../context/RolesContext';
 import { useSettings } from '../../context/SettingsContext';
+import { useConfirm } from '../../context/ConfirmContext';
 import CurrencyDisplay from '../../components/CurrencyDisplay';
 import FormInput from '../../components/FormInput';
 import Modal from '../../components/Modal';
@@ -23,6 +24,7 @@ const Payroll = () => {
   const { addToast } = useToast();
   const { userProfile } = useRoles();
   const { settings } = useSettings();
+  const { confirm } = useConfirm();
   const storeId = userProfile?.storeOwnerId;
   const curr = settings?.currency || 'UZS';
 
@@ -154,7 +156,7 @@ const Payroll = () => {
     
     const finalAmount = data.finalAmount !== undefined ? data.finalAmount : (data.fixedPart + data.percentagePart + data.bonuses - data.deductions);
 
-    if (window.confirm(`${employee.fullName} uchun ${new Intl.NumberFormat('uz-UZ').format(finalAmount)} ${curr} ish haqini to'langan deb belgilaysizmi? Bu summa Xarajatlar bo'limiga ham qo'shiladi.`)) {
+    if (await confirm({ message: `${employee.fullName} uchun ${new Intl.NumberFormat('uz-UZ').format(finalAmount)} ${curr} ish haqini to'langan deb belgilaysizmi? Bu summa Xarajatlar bo'limiga ham qo'shiladi.` })) {
       try {
         const payload = {
           ...data,
@@ -200,85 +202,108 @@ const Payroll = () => {
   if (loading && staff.length === 0) return <div className="flex-center" style={{ height: '100%' }}>Yuklanmoqda...</div>;
 
   return (
-    <div className="flex-col" style={{ gap: '1.5rem', height: '100%', overflowY: 'auto' }}>
-      <div className="flex-between">
+    <div className="page-wrapper">
+      <div className="page-header">
         <div>
-          <h1 className="h1" style={{ marginBottom: '0.25rem' }}>Ish Haqi va KPI</h1>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>Xodimlarning oylik maoshlari va bonuslarini hisoblash tizimi</p>
+          <h1 className="page-title">Ish Haqi va KPI</h1>
+          <p className="page-subtitle">Xodimlarning oylik maoshlari va bonuslarini hisoblash tizimi</p>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <Calendar size={18} color="var(--text-secondary)" />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Calendar size={18} color="#8A9BB5" />
           <input 
             type="month" 
             value={selectedPeriod}
             onChange={(e) => setSelectedPeriod(e.target.value)}
-            style={{ padding: '0.5rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-surface)' }}
+            style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #DCE8F5', backgroundColor: '#fff', outline: 'none', color: '#1A2538', fontWeight: 500 }}
           />
         </div>
       </div>
 
-      <div className="glass-panel" style={{ flex: 1, padding: '1.5rem' }}>
-        <div className="table-responsive">
-<table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-          <thead>
-            <tr style={{ borderBottom: '2px solid var(--border-color)', color: 'var(--text-secondary)' }}>
-              <th style={{ padding: '1rem' }}>Xodim</th>
-              <th style={{ padding: '1rem' }}>Savdo hajmi</th>
-              <th style={{ padding: '1rem' }}>Fixed qism</th>
-              <th style={{ padding: '1rem' }}>Foiz (%) qism</th>
-              <th style={{ padding: '1rem' }}>Bonus/Jarima</th>
-              <th style={{ padding: '1rem' }}>Yakuniy summa</th>
-              <th style={{ padding: '1rem' }}>Holat</th>
-              <th style={{ padding: '1rem' }}>Amallar</th>
-            </tr>
-          </thead>
-          <tbody>
-            {staff.map(emp => {
-              const calc = getCalculatedPayroll(emp);
-              const isPaid = calc.status === 'paid';
-              const finalAmt = calc.finalAmount !== undefined ? calc.finalAmount : (calc.fixedPart + calc.percentagePart + calc.bonuses - calc.deductions);
-
-              return (
-                <tr key={emp.id} style={{ borderBottom: '1px solid var(--border-color)', opacity: isPaid ? 0.7 : 1 }}>
-                  <td style={{ padding: '1rem', fontWeight: 500 }}>
-                    {emp.fullName}
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'capitalize' }}>{emp.salaryType}</div>
-                  </td>
-                  <td style={{ padding: '1rem', color: 'var(--text-main)' }}><CurrencyDisplay amount={calc.totalSales} /></td>
-                  <td style={{ padding: '1rem' }}><CurrencyDisplay amount={calc.fixedPart} /></td>
-                  <td style={{ padding: '1rem' }}><CurrencyDisplay amount={calc.percentagePart} /></td>
-                  <td style={{ padding: '1rem' }}>
-                    <div style={{ color: 'var(--success)' }}>+{new Intl.NumberFormat('uz-UZ').format(calc.bonuses || 0)}</div>
-                    <div style={{ color: 'var(--danger)', fontSize: '0.875rem' }}>-{new Intl.NumberFormat('uz-UZ').format(calc.deductions || 0)}</div>
-                  </td>
-                  <td style={{ padding: '1rem', fontWeight: 700, color: 'var(--primary)', fontSize: '1.1rem' }}>
-                    <CurrencyDisplay amount={finalAmt} />
-                  </td>
-                  <td style={{ padding: '1rem' }}>
-                    {isPaid ? (
-                      <span style={{ padding: '0.25rem 0.5rem', backgroundColor: 'var(--success-light)', color: 'var(--success)', borderRadius: '999px', fontSize: '0.75rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.25rem', width: 'fit-content' }}>
-                        <CheckCircle2 size={14}/> To'langan
-                      </span>
-                    ) : (
-                      <span style={{ padding: '0.25rem 0.5rem', backgroundColor: 'var(--warning-light)', color: 'var(--warning)', borderRadius: '999px', fontSize: '0.75rem', fontWeight: 600 }}>
-                        Kutilmoqda
-                      </span>
-                    )}
-                  </td>
-                  <td style={{ padding: '1rem', display: 'flex', gap: '0.5rem' }}>
-                    {!isPaid && (
-                      <>
-                        <button className="btn btn-outline" style={{ padding: '0.5rem' }} onClick={() => handleOpenAdjust(emp)} title="Bonus/Jarima qo'shish"><Calculator size={16}/></button>
-                        <button className="btn btn-primary" style={{ padding: '0.5rem 1rem' }} onClick={() => handleMarkAsPaid(emp)}>To'lash</button>
-                      </>
-                    )}
+      <div className="page-card" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+        <div style={{ flex: 1, overflowY: 'auto' }}>
+          <table className="page-table">
+            <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
+              <tr>
+                <th>Xodim</th>
+                <th>Savdo hajmi</th>
+                <th>Fixed qism</th>
+                <th>Foiz (%) qism</th>
+                <th>Bonus/Jarima</th>
+                <th>Yakuniy summa</th>
+                <th>Holat</th>
+                <th style={{ textAlign: 'right' }}>Amallar</th>
+              </tr>
+            </thead>
+            <tbody>
+              {staff.length === 0 ? (
+                <tr>
+                  <td colSpan="8" style={{ textAlign: 'center', padding: '3rem', color: '#8A9BB5' }}>
+                    Xodimlar topilmadi
                   </td>
                 </tr>
-              )
-            })}
-          </tbody>
-        </table>
-</div>
+              ) : null}
+              {staff.map(emp => {
+                const calc = getCalculatedPayroll(emp);
+                const isPaid = calc.status === 'paid';
+                const finalAmt = calc.finalAmount !== undefined ? calc.finalAmount : (calc.fixedPart + calc.percentagePart + calc.bonuses - calc.deductions);
+
+                return (
+                  <tr key={emp.id} style={{ opacity: isPaid ? 0.7 : 1 }}>
+                    <td>
+                      <div style={{ fontWeight: 600, color: '#1A2538' }}>{emp.fullName}</div>
+                      <div style={{ fontSize: 13, color: '#8A9BB5', textTransform: 'capitalize' }}>{emp.salaryType}</div>
+                    </td>
+                    <td>
+                      <div style={{ fontWeight: 600, color: '#1A2538' }}><CurrencyDisplay amount={calc.totalSales} /></div>
+                    </td>
+                    <td style={{ color: '#1A2538' }}><CurrencyDisplay amount={calc.fixedPart} /></td>
+                    <td style={{ color: '#1A2538' }}><CurrencyDisplay amount={calc.percentagePart} /></td>
+                    <td>
+                      <div style={{ color: '#10B981', fontWeight: 600, fontSize: 13 }}>+{new Intl.NumberFormat('uz-UZ').format(calc.bonuses || 0)}</div>
+                      <div style={{ color: '#EF4B4B', fontSize: 13 }}>-{new Intl.NumberFormat('uz-UZ').format(calc.deductions || 0)}</div>
+                    </td>
+                    <td>
+                      <div style={{ fontWeight: 700, color: '#4A90E2', fontSize: 16 }}>
+                        <CurrencyDisplay amount={finalAmt} />
+                      </div>
+                    </td>
+                    <td>
+                      {isPaid ? (
+                        <span style={{ 
+                          display: 'inline-flex', alignItems: 'center', gap: '4px',
+                          padding: '4px 10px', borderRadius: '20px', fontSize: 12, fontWeight: 600, backgroundColor: '#D1FAE5', color: '#10B981'
+                        }}>
+                          <CheckCircle2 size={14}/> To'langan
+                        </span>
+                      ) : (
+                        <span style={{ 
+                          display: 'inline-block', 
+                          padding: '4px 10px', borderRadius: '20px', fontSize: 12, fontWeight: 600, backgroundColor: '#FEF3C7', color: '#F59E0B'
+                        }}>
+                          Kutilmoqda
+                        </span>
+                      )}
+                    </td>
+                    <td style={{ textAlign: 'right' }}>
+                      <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                        {!isPaid && (
+                          <>
+                            <button className="btn btn-outline" style={{ padding: '6px' }} onClick={() => handleOpenAdjust(emp)} title="Bonus/Jarima qo'shish">
+                              <Calculator size={16}/>
+                            </button>
+                            <button className="btn btn-primary" style={{ padding: '6px 12px', fontSize: 13 }} onClick={() => handleMarkAsPaid(emp)}>
+                              To'lash
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={`${selectedStaff?.staffName} uchun hisob-kitob`}>

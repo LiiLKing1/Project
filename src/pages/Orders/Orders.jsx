@@ -5,6 +5,7 @@ import { db } from '../../firebase';
 import { collection, onSnapshot, query, orderBy, doc, runTransaction, getDocs } from 'firebase/firestore';
 import { useToast } from '../../context/ToastContext';
 import { useRoles } from '../../context/RolesContext';
+import { useConfirm } from '../../context/ConfirmContext';
 import Drawer from '../../components/Drawer';
 import FormInput from '../../components/FormInput';
 import CurrencyDisplay from '../../components/CurrencyDisplay';
@@ -20,6 +21,7 @@ const Orders = () => {
   
   const { addToast } = useToast();
   const { userProfile } = useRoles();
+  const { confirm } = useConfirm();
   const { selectedWarehouseId } = useWarehouse();
   const storeId = userProfile?.storeOwnerId;
 
@@ -165,7 +167,7 @@ const Orders = () => {
   };
 
   const handleReceiveOrder = async (order) => {
-    if (!window.confirm('Buyurtmani qabul qilishni tasdiqlaysizmi? Qoldiqlar oshadi.')) return;
+    if (!(await confirm({ message: 'Buyurtmani qabul qilishni tasdiqlaysizmi? Qoldiqlar oshadi.' }))) return;
 
     try {
       await runTransaction(db, async (transaction) => {
@@ -221,7 +223,7 @@ const Orders = () => {
   };
 
   const handleCancelOrder = async (order) => {
-    if (!window.confirm('Buyurtmani bekor qilishni tasdiqlaysizmi?')) return;
+    if (!(await confirm({ message: 'Buyurtmani bekor qilishni tasdiqlaysizmi?', confirmStyle: 'danger' }))) return;
 
     try {
       const orderRef = doc(db, `users/${storeId}/purchaseOrders`, order.id);
@@ -250,97 +252,112 @@ const Orders = () => {
   const filteredProdSearch = products.filter(p => p.status === 'active' && p.name.toLowerCase().includes(productSearch.toLowerCase())).slice(0, 50);
 
   return (
-    <div className="flex-col" style={{ gap: '1.5rem', height: '100%' }}>
-      <div className="flex-between">
-        <h1 className="h1">Tovar Buyurtmalari</h1>
+    <div className="page-wrapper">
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">Tovar Buyurtmalari</h1>
+          <p className="page-subtitle">Yetkazib beruvchilardan tovarlarni buyurtma qilish va qabul qilish</p>
+        </div>
         <button className="btn btn-primary" onClick={() => setIsOrderDrawerOpen(true)}>
           <Plus size={18} /> Yangi buyurtma
         </button>
       </div>
 
-      <div className="glass-panel flex-col" style={{ flex: 1, overflow: 'hidden' }}>
-        <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border-color)' }}>
-          <div style={{ position: 'relative', width: '350px' }}>
-            <Search size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
+      <div className="page-card" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+        <div className="page-card-header">
+          <div className="search-wrap" style={{ maxWidth: '350px' }}>
+            <Search size={16} className="search-icon" />
             <input 
               type="text" 
               placeholder="Qidirish (yetkazib beruvchi, holat)..." 
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              style={{ width: '100%', paddingLeft: '2.5rem' }}
             />
           </div>
         </div>
 
         <div style={{ flex: 1, overflowY: 'auto' }}>
-          <div className="table-responsive">
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-            <thead>
-              <tr style={{ borderBottom: '2px solid var(--border-color)', color: 'var(--text-secondary)' }}>
-                <th style={{ padding: '1rem' }}>Sana</th>
-                <th style={{ padding: '1rem' }}>Yetkazib beruvchi</th>
-                <th style={{ padding: '1rem' }}>Summa</th>
-                <th style={{ padding: '1rem' }}>Holat</th>
-                <th style={{ padding: '1rem' }}>Amallar</th>
+          <table className="page-table">
+            <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
+              <tr>
+                <th>Sana</th>
+                <th>Yetkazib beruvchi</th>
+                <th>Summa</th>
+                <th>Holat</th>
+                <th>Amallar</th>
               </tr>
             </thead>
             <tbody>
               {filteredOrders.length === 0 ? (
-                <tr><td colSpan="5" style={{ textAlign: 'center', padding: '2rem' }}>Buyurtmalar yo'q</td></tr>
+                <tr>
+                  <td colSpan="5" style={{ textAlign: 'center', padding: '3rem', color: '#8A9BB5' }}>
+                    Buyurtmalar topilmadi
+                  </td>
+                </tr>
               ) : filteredOrders.map(order => {
                 const supplier = suppliers.find(s => s.id === order.supplierId);
                 return (
                   <React.Fragment key={order.id}>
-                    <tr style={{ borderBottom: '1px solid var(--border-color)', cursor: 'pointer', backgroundColor: expandedId === order.id ? 'var(--bg-main)' : 'transparent' }} onClick={() => setExpandedId(expandedId === order.id ? null : order.id)}>
-                      <td style={{ padding: '1rem' }}>{new Date(order.createdAt).toLocaleDateString()}</td>
-                      <td style={{ padding: '1rem', fontWeight: 500 }}>{supplier?.fullName || 'Noma\'lum'}</td>
-                      <td style={{ padding: '1rem', fontWeight: 600 }}><CurrencyDisplay amount={order.totalAmount} /></td>
-                      <td style={{ padding: '1rem' }}>
-                        <span className="badge" style={{ backgroundColor: order.status === 'received' ? 'var(--success)' : order.status === 'cancelled' ? 'var(--danger)' : 'var(--warning)', color: '#fff' }}>
-                          {order.status === 'received' ? 'Qabul qilingan' : order.status === 'cancelled' ? 'Bekor qilingan' : 'Kutilmoqda'}
-                        </span>
+                    <tr style={{ backgroundColor: expandedId === order.id ? '#F4F8FF' : 'transparent', cursor: 'pointer' }} onClick={() => setExpandedId(expandedId === order.id ? null : order.id)}>
+                      <td style={{ color: '#8A9BB5', fontSize: 14 }}>{new Date(order.createdAt).toLocaleDateString()}</td>
+                      <td>
+                        <div style={{ fontWeight: 600, color: '#1A2538' }}>{supplier?.fullName || 'Noma\'lum'}</div>
                       </td>
-                      <td style={{ padding: '1rem', display: 'flex', gap: '0.5rem' }}>
-                        {order.status === 'pending' && (
-                          <>
-                            <button className="btn btn-success" style={{ padding: '0.5rem 1rem' }} onClick={(e) => { e.stopPropagation(); handleReceiveOrder(order); }}>
-                              <CheckCircle size={16} /> Qabul qilish
-                            </button>
-                            <button className="btn btn-outline" style={{ padding: '0.5rem 1rem', color: 'var(--danger)' }} onClick={(e) => { e.stopPropagation(); handleCancelOrder(order); }}>
-                              <Trash2 size={16} /> Bekor qilish
-                            </button>
-                          </>
-                        )}
-                        {expandedId === order.id ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                      <td>
+                        <div style={{ fontWeight: 700, color: '#1A2538' }}><CurrencyDisplay amount={order.totalAmount} /></div>
+                      </td>
+                      <td>
+                        {order.status === 'received' && <span style={{ display: 'inline-block', padding: '4px 10px', borderRadius: '20px', fontSize: 12, fontWeight: 600, backgroundColor: '#D1FAE5', color: '#10B981' }}>Qabul qilingan</span>}
+                        {order.status === 'cancelled' && <span style={{ display: 'inline-block', padding: '4px 10px', borderRadius: '20px', fontSize: 12, fontWeight: 600, backgroundColor: '#FEE2E2', color: '#EF4B4B' }}>Bekor qilingan</span>}
+                        {order.status === 'pending' && <span style={{ display: 'inline-block', padding: '4px 10px', borderRadius: '20px', fontSize: 12, fontWeight: 600, backgroundColor: '#FEF3C7', color: '#F59E0B' }}>Kutilmoqda</span>}
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                          {order.status === 'pending' && (
+                            <>
+                              <button className="btn btn-outline" style={{ padding: '6px 12px', fontSize: 13, borderColor: '#10B981', color: '#10B981' }} onClick={(e) => { e.stopPropagation(); handleReceiveOrder(order); }}>
+                                <CheckCircle size={14} /> Qabul qilish
+                              </button>
+                              <button className="action-btn delete" onClick={(e) => { e.stopPropagation(); handleCancelOrder(order); }}>
+                                <Trash2 size={16} />
+                              </button>
+                            </>
+                          )}
+                          <div style={{ color: '#8A9BB5', marginLeft: '8px' }}>
+                            {expandedId === order.id ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                          </div>
+                        </div>
                       </td>
                     </tr>
                     {expandedId === order.id && (
                       <tr>
                         <td colSpan="5" style={{ padding: 0 }}>
-                          <div style={{ backgroundColor: 'var(--bg-main)', padding: '1.5rem', borderBottom: '2px solid var(--primary)' }}>
-                            <h4 style={{ marginBottom: '1rem', color: 'var(--text-secondary)' }}>Buyurtma tarkibi:</h4>
-                            <table style={{ width: '100%', borderCollapse: 'collapse', backgroundColor: 'var(--bg-surface)' }}>
-                              <thead>
-                                <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
-                                  <th style={{ padding: '0.75rem' }}>Mahsulot</th>
-                                  <th style={{ padding: '0.75rem' }}>Soni</th>
-                                  <th style={{ padding: '0.75rem' }}>Tannarx</th>
-                                  <th style={{ padding: '0.75rem' }}>Jami</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {order.items.map((item, idx) => (
-                                  <tr key={idx} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                                    <td style={{ padding: '0.75rem' }}>
-                                      {item.name} {item.isNewProduct && <span className="badge" style={{ backgroundColor: 'var(--primary)', color: '#fff', fontSize: '0.65rem' }}>Yangi</span>}
-                                    </td>
-                                    <td style={{ padding: '0.75rem' }}>{item.qty} <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{item.unit || 'dona'}</span></td>
-                                    <td style={{ padding: '0.75rem' }}><CurrencyDisplay amount={item.costPrice} /></td>
-                                    <td style={{ padding: '0.75rem', fontWeight: 600 }}><CurrencyDisplay amount={item.qty * item.costPrice} /></td>
+                          <div style={{ backgroundColor: '#F9FAFB', padding: '20px', borderBottom: '1px solid #DCE8F5' }}>
+                            <h4 style={{ margin: '0 0 16px 0', color: '#1A2538', fontSize: 14, fontWeight: 600 }}>Buyurtma tarkibi:</h4>
+                            <div style={{ borderRadius: '12px', overflow: 'hidden', border: '1px solid #DCE8F5', backgroundColor: '#fff' }}>
+                              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                                <thead>
+                                  <tr style={{ backgroundColor: '#F4F8FF', borderBottom: '1px solid #DCE8F5' }}>
+                                    <th style={{ padding: '12px 16px', fontSize: 13, color: '#8A9BB5', fontWeight: 600 }}>Mahsulot</th>
+                                    <th style={{ padding: '12px 16px', fontSize: 13, color: '#8A9BB5', fontWeight: 600 }}>Soni</th>
+                                    <th style={{ padding: '12px 16px', fontSize: 13, color: '#8A9BB5', fontWeight: 600 }}>Tannarx</th>
+                                    <th style={{ padding: '12px 16px', fontSize: 13, color: '#8A9BB5', fontWeight: 600 }}>Jami</th>
                                   </tr>
-                                ))}
-                              </tbody>
-                            </table>
+                                </thead>
+                                <tbody>
+                                  {order.items.map((item, idx) => (
+                                    <tr key={idx} style={{ borderBottom: idx < order.items.length - 1 ? '1px solid #DCE8F5' : 'none' }}>
+                                      <td style={{ padding: '12px 16px', color: '#1A2538', fontWeight: 500 }}>
+                                        {item.name} {item.isNewProduct && <span style={{ display: 'inline-block', padding: '2px 6px', borderRadius: '4px', fontSize: 10, fontWeight: 600, backgroundColor: '#4A90E2', color: '#fff', marginLeft: 8 }}>Yangi</span>}
+                                      </td>
+                                      <td style={{ padding: '12px 16px', color: '#1A2538' }}>{item.qty} <span style={{ fontSize: 12, color: '#8A9BB5' }}>{item.unit || 'dona'}</span></td>
+                                      <td style={{ padding: '12px 16px', color: '#8A9BB5' }}><CurrencyDisplay amount={item.costPrice} /></td>
+                                      <td style={{ padding: '12px 16px', color: '#1A2538', fontWeight: 600 }}><CurrencyDisplay amount={item.qty * item.costPrice} /></td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
                           </div>
                         </td>
                       </tr>
@@ -350,7 +367,6 @@ const Orders = () => {
               })}
             </tbody>
           </table>
-          </div>
         </div>
       </div>
 

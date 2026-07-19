@@ -5,6 +5,7 @@ import { collection, onSnapshot, doc, query, orderBy } from 'firebase/firestore'
 import { saveDoc, editDoc, removeDoc } from '../../utils/firebaseUtils';
 import { useToast } from '../../context/ToastContext';
 import { useRoles } from '../../context/RolesContext';
+import { useConfirm } from '../../context/ConfirmContext';
 import Drawer from '../../components/Drawer';
 import FormInput from '../../components/FormInput';
 
@@ -14,6 +15,7 @@ const Suppliers = () => {
   
   const { addToast } = useToast();
   const { userProfile } = useRoles();
+  const { confirm } = useConfirm();
   const storeId = userProfile?.storeOwnerId;
 
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -62,7 +64,7 @@ const Suppliers = () => {
 
   const handleDelete = async (id) => {
     if (!storeId) return;
-    if (window.confirm('Haqiqatan ham bu yetkazib beruvchini arxivlamoqchimisiz?')) {
+    if (await confirm({ message: 'Haqiqatan ham bu yetkazib beruvchini arxivlamoqchimisiz?', confirmStyle: 'danger' })) {
       try {
         await editDoc(doc(db, `users/${storeId}/suppliers`, id), { status: 'archived' });
         addToast('Yetkazib beruvchi arxivlandi', 'info');
@@ -97,59 +99,68 @@ const Suppliers = () => {
   ));
 
   return (
-    <div className="flex-col" style={{ gap: '1.5rem', height: '100%' }}>
-      <div style={{ display: 'flex', gap: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem' }}>
-        <button className="btn btn-outline" onClick={() => window.history.back()}>← Orqaga</button>
-        <h1 className="h1" style={{ margin: 0 }}>Yetkazib beruvchilar</h1>
-      </div>
-      
-      <div className="flex-between">
-        <h2 className="h2">Ro'yxat</h2>
-        <button className="btn btn-primary" onClick={() => openDrawer()}><UserPlus size={18} /> Yangi qo'shish</button>
+    <div className="page-wrapper">
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">Yetkazib beruvchilar</h1>
+          <p className="page-subtitle">{filteredSuppliers.length} ta yetkazib beruvchi ro'yxatda</p>
+        </div>
+        <div style={{ display: 'flex', gap: '12px' }}>
+          <button className="btn btn-primary" onClick={() => openDrawer()}>
+            <UserPlus size={18} /> Yangi qo'shish
+          </button>
+        </div>
       </div>
 
-      <div className="glass-panel" style={{ padding: '1.5rem', flex: 1, display: 'flex', flexDirection: 'column' }}>
-        <div style={{ position: 'relative', width: '350px', marginBottom: '1.5rem' }}>
-          <Search size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
-          <input 
-            type="text" 
-            placeholder="Ism, kompaniya yoki telefon..." 
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            style={{ width: '100%', paddingLeft: '2.5rem' }}
-          />
+      <div className="page-card">
+        <div className="page-card-header">
+          <div className="search-wrap">
+            <Search size={16} className="search-icon" />
+            <input 
+              type="text" 
+              placeholder="Ism, kompaniya yoki telefon..." 
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
         </div>
 
-        <div style={{ flex: 1, overflow: 'auto' }}>
-          <div className="table-responsive">
-<table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-              <thead>
-                <tr style={{ borderBottom: '2px solid var(--border-color)', color: 'var(--text-secondary)' }}>
-                  <th style={{ padding: '1rem' }}>Ism/Familiya</th>
-                  <th style={{ padding: '1rem' }}>Kompaniya</th>
-                  <th style={{ padding: '1rem' }}>Telefon</th>
-                  <th style={{ padding: '1rem' }}>Manzil</th>
-                  <th style={{ padding: '1rem' }}>Amallar</th>
+        <div style={{ overflowX: 'auto' }}>
+          <table className="page-table">
+            <thead>
+              <tr>
+                <th>Ism/Familiya</th>
+                <th>Kompaniya</th>
+                <th>Telefon</th>
+                <th>Manzil</th>
+                <th style={{ textAlign: 'right' }}>Amallar</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredSuppliers.length === 0 ? (
+                <tr>
+                  <td colSpan="5" style={{ textAlign: 'center', padding: '3rem', color: '#8A9BB5' }}>
+                    Yetkazib beruvchilar topilmadi
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {filteredSuppliers.length === 0 ? (
-                  <tr><td colSpan="5" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>Yetkazib beruvchilar topilmadi</td></tr>
-                ) : filteredSuppliers.map(s => (
-                  <tr key={s.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                    <td style={{ padding: '1rem', fontWeight: '500' }}>{s.fullName}</td>
-                    <td style={{ padding: '1rem' }}>{s.companyName || '-'}</td>
-                    <td style={{ padding: '1rem', color: 'var(--text-secondary)' }}>{s.phone}</td>
-                    <td style={{ padding: '1rem' }}>{s.address || '-'}</td>
-                    <td style={{ padding: '1rem', display: 'flex', gap: '0.5rem' }}>
-                      <button className="btn btn-outline" style={{ padding: '0.5rem', color: 'var(--primary)' }} onClick={() => openDrawer(s)}><Edit size={16} /></button>
-                      <button className="btn btn-outline" style={{ padding: '0.5rem', color: 'var(--danger)' }} onClick={() => handleDelete(s.id)}><Trash2 size={16} /></button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-</div>
+              ) : filteredSuppliers.map(s => (
+                <tr key={s.id}>
+                  <td>
+                    <div style={{ fontWeight: 600, color: '#1A2538' }}>{s.fullName}</div>
+                  </td>
+                  <td>{s.companyName || <span style={{ color: '#8A9BB5' }}>-</span>}</td>
+                  <td style={{ color: '#8A9BB5', fontFamily: 'monospace', fontSize: 13 }}>{s.phone}</td>
+                  <td>{s.address || <span style={{ color: '#8A9BB5' }}>-</span>}</td>
+                  <td>
+                    <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                      <button className="action-btn edit" onClick={() => openDrawer(s)} title="Tahrirlash"><Edit size={14} /></button>
+                      <button className="action-btn delete" onClick={() => handleDelete(s.id)} title="O'chirish"><Trash2 size={14} /></button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
 

@@ -8,6 +8,7 @@ import { useToast } from '../../context/ToastContext';
 import { useRoles } from '../../context/RolesContext';
 import { useSettings } from '../../context/SettingsContext';
 import { useWarehouse } from '../../context/WarehouseContext';
+import { useConfirm } from '../../context/ConfirmContext';
 import Drawer from '../../components/Drawer';
 import FormInput from '../../components/FormInput';
 import CurrencyDisplay from '../../components/CurrencyDisplay';
@@ -21,6 +22,7 @@ const Partners = () => {
   const { userProfile } = useRoles();
   const { settings } = useSettings();
   const { selectedWarehouseId } = useWarehouse();
+  const { confirm } = useConfirm();
   const storeId = userProfile?.storeOwnerId;
   const curr = settings?.currency || 'UZS';
 
@@ -95,7 +97,7 @@ const Partners = () => {
   };
 
   const handleDeletePartner = async (partner) => {
-    if (window.confirm(`Haqiqatan ham ${partner.companyName}ni o'chirmoqchimisiz?`)) {
+    if (await confirm({ message: `Haqiqatan ham ${partner.companyName}ni o'chirmoqchimisiz?`, confirmStyle: 'danger' })) {
       try {
         const auditData = { storeId, userProfile, resource: 'partners', details: partner.companyName };
         await softDeleteDoc(doc(db, `users/${storeId}/partners`, partner.id), auditData);
@@ -320,61 +322,103 @@ const Partners = () => {
   const filteredPartners = partners.filter(p => p.status !== 'archived' && (p.companyName.toLowerCase().includes(search.toLowerCase()) || p.contactPerson.toLowerCase().includes(search.toLowerCase())));
   const filteredProducts = products.filter(p => p.status !== 'archived' && (p.name.toLowerCase().includes(productSearch.toLowerCase()) || p.barcode?.includes(productSearch))).slice(0, 30);
 
+  const totalPartners = partners.filter(p => p.status !== 'archived').length;
+  const totalPayable = partners.filter(p => p.status !== 'archived').reduce((acc, p) => acc + (p.currentPayable || 0), 0);
+  const partnersWithDebt = partners.filter(p => p.status !== 'archived' && (p.currentPayable || 0) > 0).length;
+
   return (
-    <div className="flex-col" style={{ gap: '1.5rem', height: '100%' }}>
-      <div className="flex-between">
-        <h1 className="h1">Hamkorlar</h1>
-        <div style={{ display: 'flex', gap: '1rem' }}>
-          <button className="btn btn-outline" onClick={() => openDeliveryDrawer()}><PackagePlus size={18} /> Yetkazma qabul qilish</button>
-          <button className="btn btn-primary" onClick={() => openPartnerModal()}><Plus size={18} /> Hamkor qo'shish</button>
+    <div className="page-wrapper">
+      {/* Header */}
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">Hamkorlar</h1>
+          <p className="page-subtitle">{totalPartners} ta hamkor ro'yxatda</p>
+        </div>
+        <div style={{ display: 'flex', gap: '12px' }}>
+          <button className="btn btn-outline" onClick={() => openDeliveryDrawer()}>
+            <PackagePlus size={18} /> Yetkazma qabul qilish
+          </button>
+          <button className="btn btn-primary" onClick={() => openPartnerModal()}>
+            <Plus size={18} /> Yangi hamkor
+          </button>
         </div>
       </div>
 
-      <div className="glass-panel" style={{ padding: '1.5rem', flex: 1, display: 'flex', flexDirection: 'column' }}>
-        <div style={{ position: 'relative', width: '350px', marginBottom: '1.5rem' }}>
-          <Search size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
-          <input 
-            type="text" 
-            placeholder="Kompaniya yoki mas'ul shaxs..." 
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            style={{ width: '100%', paddingLeft: '2.5rem' }}
-          />
+      {/* Stats */}
+      <div className="stat-row">
+        <div className="stat-card">
+          <span className="stat-card-label">Jami hamkorlar</span>
+          <span className="stat-card-value blue">{totalPartners}</span>
+          <span className="stat-card-sub">Faol ro'yxat</span>
+        </div>
+        <div className="stat-card">
+          <span className="stat-card-label">Sizning qarzingiz (Jami)</span>
+          <span className="stat-card-value red"><CurrencyDisplay amount={totalPayable} /></span>
+          <span className="stat-card-sub">Barcha hamkorlarga</span>
+        </div>
+        <div className="stat-card">
+          <span className="stat-card-label">Qarz hamkorlar soni</span>
+          <span className="stat-card-value amber">{partnersWithDebt}</span>
+          <span className="stat-card-sub">To'lanmagan qarzlar</span>
+        </div>
+      </div>
+
+      {/* Table Card */}
+      <div className="page-card">
+        <div className="page-card-header">
+          <div className="search-wrap">
+            <Search size={16} className="search-icon" />
+            <input
+              type="text"
+              placeholder="Kompaniya yoki mas'ul shaxs..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
         </div>
 
-        <div style={{ flex: 1, overflow: 'auto' }}>
-          <div className="table-responsive">
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-              <thead>
-                <tr style={{ borderBottom: '2px solid var(--border-color)', color: 'var(--text-secondary)' }}>
-                  <th style={{ padding: '1rem' }}>Kompaniya</th>
-                  <th style={{ padding: '1rem' }}>Mas'ul shaxs</th>
-                  <th style={{ padding: '1rem' }}>Telefon</th>
-                  <th style={{ padding: '1rem' }}>Sizning qarzingiz</th>
-                  <th style={{ padding: '1rem' }}>Amallar</th>
+        <div style={{ overflowX: 'auto' }}>
+          <table className="page-table">
+            <thead>
+              <tr>
+                <th>Kompaniya</th>
+                <th>Mas'ul shaxs</th>
+                <th>Telefon</th>
+                <th>Sizning qarzingiz</th>
+                <th style={{ textAlign: 'right' }}>Amallar</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredPartners.length === 0 ? (
+                <tr>
+                  <td colSpan="5" style={{ textAlign: 'center', padding: '3rem', color: '#8A9BB5' }}>
+                    Hamkorlar topilmadi
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {filteredPartners.length === 0 ? (
-                  <tr><td colSpan="5" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>Hamkorlar topilmadi</td></tr>
-                ) : filteredPartners.map(p => (
-                  <tr key={p.id} style={{ borderBottom: '1px solid var(--border-color)', transition: 'background-color 0.2s' }} onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--bg-main)'} onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}>
-                    <td style={{ padding: '1rem', fontWeight: '600' }}>{p.companyName}</td>
-                    <td style={{ padding: '1rem' }}>{p.contactPerson}</td>
-                    <td style={{ padding: '1rem', color: 'var(--text-secondary)' }}>{p.phone}</td>
-                    <td style={{ padding: '1rem', fontWeight: '600', color: p.currentPayable > 0 ? 'var(--danger)' : 'var(--text-main)' }}>
-                      <CurrencyDisplay amount={p.currentPayable} />
-                    </td>
-                    <td style={{ padding: '1rem', display: 'flex', gap: '0.5rem' }}>
-                      <button className="btn btn-outline" style={{ padding: '0.5rem', color: 'var(--primary)', borderColor: 'var(--border-color)' }} onClick={() => openDeliveryDrawer(p.id)} title="Yetkazma qabul qilish"><PackagePlus size={16} /></button>
-                      <button className="btn btn-outline" style={{ padding: '0.5rem', color: 'var(--primary)', borderColor: 'var(--border-color)' }} onClick={() => openPartnerModal(p)}><Edit size={16} /></button>
-                      <button className="btn btn-outline" style={{ padding: '0.5rem', color: 'var(--danger)', borderColor: 'var(--border-color)' }} onClick={() => handleDeletePartner(p)}><Trash2 size={16} /></button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              ) : filteredPartners.map(p => (
+                <tr key={p.id}>
+                  <td>
+                    <div style={{ fontWeight: 600, color: '#1A2538' }}>{p.companyName}</div>
+                  </td>
+                  <td>{p.contactPerson}</td>
+                  <td style={{ color: '#8A9BB5', fontFamily: 'monospace', fontSize: 13 }}>{p.phone}</td>
+                  <td>
+                    {p.currentPayable > 0
+                      ? <span style={{ fontWeight: 700, color: '#EF4B4B' }}><CurrencyDisplay amount={p.currentPayable} /></span>
+                      : <span className="badge badge-green">Yo'q</span>
+                    }
+                  </td>
+                  <td>
+                    <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                      <button className="action-btn edit" style={{ background: '#F0FDF4', borderColor: '#D1FAE5', color: '#059669' }} onClick={() => openDeliveryDrawer(p.id)} title="Yetkazma qabul qilish"><PackagePlus size={14}/></button>
+                      <button className="action-btn edit" onClick={() => openPartnerModal(p)} title="Tahrirlash"><Edit size={14}/></button>
+                      <button className="action-btn delete" onClick={() => handleDeletePartner(p)} title="O'chirish"><Trash2 size={14}/></button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
 

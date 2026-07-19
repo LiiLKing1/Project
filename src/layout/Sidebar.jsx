@@ -4,6 +4,7 @@ import { LayoutDashboard, ShoppingCart, Tag, Users, Settings, ShieldCheck, Megap
 import { useRoles } from '../context/RolesContext';
 import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
+import { useConfirm } from '../context/ConfirmContext';
 import ErrorBoundary from '../components/ErrorBoundary';
 import Drawer from '../components/Drawer';
 import { useTranslation } from '../hooks/useTranslation';
@@ -13,6 +14,7 @@ const Sidebar = ({ isOpen, closeSidebar }) => {
   const { hasPermission, loadingRoles, userProfile } = useRoles();
   const { logout } = useAuth();
   const { settings, updateSettings } = useSettings();
+  const { confirm } = useConfirm();
   const navigate = useNavigate();
   const location = useLocation();
   const { t } = useTranslation();
@@ -60,7 +62,6 @@ const Sidebar = ({ isOpen, closeSidebar }) => {
       title: 'Mahsulotlar',
       items: [
         { path: '/products', name: 'Katalog', desc: 'Barcha tovarlar ro\'yxati' },
-        { path: '/products/import', name: 'Import', desc: 'Excel orqali yuklash' },
         { path: '/orders', name: 'Buyurtmalar', desc: 'Ta\'minotchiga buyurtma' },
         { path: '/products/inventory', name: 'Inventarizatsiya', desc: 'Ombor nazorati' },
         { path: '/products/transfer', name: 'Transfer', desc: 'Omborlararo ko\'chirish' },
@@ -168,7 +169,7 @@ const Sidebar = ({ isOpen, closeSidebar }) => {
             <button 
               className="btn btn-outline" 
               style={{ width: '100%', color: 'var(--danger)', borderColor: 'var(--border-color)', padding: '0.5rem', display: 'flex', justifyContent: 'center', gap: '0.5rem' }} 
-              onClick={() => { if(window.confirm("Tizimdan chiqmoqchimisiz?")) logout(); }}
+              onClick={async () => { if(await confirm({ message: "Tizimdan chiqmoqchimisiz?", confirmStyle: 'danger' })) logout(); }}
             >
               <LogOut size={16} /> Chiqish
             </button>
