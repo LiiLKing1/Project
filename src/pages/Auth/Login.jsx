@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { motion } from 'framer-motion';
+import { APP_NAME } from '../../config/appConfig';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -57,9 +58,9 @@ const Login = () => {
       >
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
           <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '60px', height: '60px', borderRadius: '16px', backgroundColor: 'var(--primary)', color: 'white', fontSize: '24px', fontWeight: 'bold', marginBottom: '1rem', boxShadow: '0 8px 16px rgba(99, 102, 241, 0.25)' }}>
-            POS
+            {APP_NAME.charAt(0)}
           </div>
-          <h1 className="h1" style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>Xush kelibsiz</h1>
+          <h1 className="h1" style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>{APP_NAME} ga Xush kelibsiz</h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>Tizimga kirish uchun usulni tanlang</p>
         </div>
 

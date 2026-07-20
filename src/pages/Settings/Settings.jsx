@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Settings as SettingsIcon, Save, Store, Globe, LogOut, Gift } from 'lucide-react';
 import CustomSelect from '../../components/CustomSelect';
 import { db } from '../../firebase';
-import { doc, onSnapshot, collection, getDocs, writeBatch, setDoc } from 'firebase/firestore';
+import { doc, onSnapshot, collection, getDocs, writeBatch, setDoc } from '../../services/firebaseMock';
 import { putDoc } from '../../utils/firebaseUtils';
 import { useToast } from '../../context/ToastContext';
 import { useRoles } from '../../context/RolesContext';

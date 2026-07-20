@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { LayoutDashboard, ShoppingCart, Tag, Users, Settings, ShieldCheck, Megaphone, BarChart3, Wallet, PackageOpen, Handshake, LogOut, Sun, Moon } from 'lucide-react';
 import { useRoles } from '../context/RolesContext';
+import { APP_NAME } from '../config/appConfig';
 import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
 import { useConfirm } from '../context/ConfirmContext';
@@ -113,8 +114,8 @@ const Sidebar = ({ isOpen, closeSidebar }) => {
       <aside className={`sidebar ${isOpen ? 'open' : ''}`}>
         <div className="sidebar-header">
           <div className="logo">
-            <div className="logo-icon">B</div>
-            BILLZ ERP
+            <div className="logo-icon">{APP_NAME.charAt(0)}</div>
+            {APP_NAME} ERP
           </div>
         </div>
         <nav className="nav-menu">

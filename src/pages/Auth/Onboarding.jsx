@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useRoles } from '../../context/RolesContext';
 import { useToast } from '../../context/ToastContext';
 import { db } from '../../firebase';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc } from '../../services/firebaseMock';
 import { motion } from 'framer-motion';
 import { Store, MapPin, Tag } from 'lucide-react';
 

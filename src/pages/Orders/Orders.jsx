@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { PackageOpen, Search, Plus, Trash2, CheckCircle, ChevronDown, ChevronUp, X } from 'lucide-react';
 import CustomSelect from '../../components/CustomSelect';
 import { db } from '../../firebase';
-import { collection, onSnapshot, query, orderBy, doc, runTransaction, getDocs } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, doc, runTransaction, getDocs } from '../../services/firebaseMock';
 import { useToast } from '../../context/ToastContext';
 import { useRoles } from '../../context/RolesContext';
 import { useConfirm } from '../../context/ConfirmContext';

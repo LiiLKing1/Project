@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { db } from '../../firebase';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc } from '../../services/firebaseMock';
 import Receipt from '../../components/Receipt';
 import { useAuth } from '../../context/AuthContext';
 

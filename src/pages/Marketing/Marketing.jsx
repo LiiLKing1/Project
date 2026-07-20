@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Megaphone, Plus, Percent, Check, Send } from 'lucide-react';
 import CustomSelect from '../../components/CustomSelect';
 import { db } from '../../firebase';
-import { collection, onSnapshot, query, orderBy, doc } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, doc } from '../../services/firebaseMock';
 import { saveDoc, editDoc } from '../../utils/firebaseUtils';
 import { useToast } from '../../context/ToastContext';
 import { useRoles } from '../../context/RolesContext';

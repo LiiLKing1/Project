@@ -9,7 +9,7 @@ import {
   ResponsiveContainer, Cell
 } from 'recharts';
 import { db } from '../../firebase';
-import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy } from '../../services/firebaseMock';
 import { useRoles } from '../../context/RolesContext';
 import { formatCurrency, formatCompact } from '../../utils/formatters';
 import { useNavigate } from 'react-router-dom';

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Search, Plus, Filter, Edit, Trash2, Download, Upload, CheckCircle2, AlertTriangle, XCircle, FileSpreadsheet, Package, LayoutGrid, List, Grid3x3, Rows3 } from 'lucide-react';
 import CustomSelect from '../../components/CustomSelect';
 import { db } from '../../firebase';
-import { collection, onSnapshot, doc, query, orderBy, writeBatch } from 'firebase/firestore';
+import { collection, onSnapshot, doc, query, orderBy, writeBatch } from '../../services/firebaseMock';
 import * as XLSX from 'xlsx';
 import { saveDoc, editDoc, softDeleteDoc, generateDiff } from '../../utils/firebaseUtils';
 import { useToast } from '../../context/ToastContext';

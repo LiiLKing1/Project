@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc } from '../services/firebaseMock';
 import { db } from '../firebase';
 import CurrencyDisplay from './CurrencyDisplay';
+import { APP_NAME } from '../config/appConfig';
 
 const PAYMENT_LABELS = {
   cash: 'Naqd',
@@ -49,7 +50,7 @@ const Receipt = ({ sale, storeId }) => {
         color: '#fff',
       }}>
         <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-0.5px', fontFamily: 'Poppins, sans-serif' }}>
-          {storeName || 'Do\'kon'}
+          {storeName || APP_NAME}
         </div>
         <div style={{ fontSize: 12, opacity: 0.85, marginTop: 4, fontFamily: 'monospace' }}>
           {sale.saleNumber ? `#${sale.saleNumber}` : '#PREVIEW'} · {date}

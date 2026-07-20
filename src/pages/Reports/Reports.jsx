@@ -1,8 +1,9 @@
+import { dataService } from '../../services/dataService';
 import React, { useState, useEffect } from 'react';
 import { BarChart3, Download, Calendar, DollarSign, ShoppingBag, Trash2 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { db } from '../../firebase';
-import { collection, onSnapshot, query, orderBy, runTransaction, doc, getDocs, where } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, runTransaction, doc, getDocs, where } from '../../services/firebaseMock';
 import { useRoles } from '../../context/RolesContext';
 import { useToast } from '../../context/ToastContext';
 import Modal from '../../components/Modal';
@@ -428,7 +429,7 @@ const Reports = () => {
             <Receipt sale={selectedSale} storeId={storeId} />
             <div style={{ display: 'flex', gap: '1rem', width: '100%', maxWidth: '350px' }}>
               <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => setIsReceiptModalOpen(false)}>Yopish</button>
-              <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => window.print()}>Chop etish</button>
+              <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => dataService.printReceipt()}>Chop etish</button>
             </div>
           </div>
         )}

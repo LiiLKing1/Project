@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import MainLayout from './layout/MainLayout';
 import ProtectedRoute from './components/ProtectedRoute';
 import PermissionRoute from './components/PermissionRoute';
+import TitleBar from './components/TitleBar';
 
 import Dashboard from './pages/Dashboard/Dashboard';
 import POS from './pages/Sales/POS';
@@ -32,11 +33,18 @@ import PartnerDebts from './pages/Partners/PartnerDebts';
 import Login from './pages/Auth/Login';
 import Onboarding from './pages/Auth/Onboarding';
 import ReceiptView from './pages/Public/ReceiptView';
+import Landing from './pages/Landing/Landing';
 
 function App() {
+  const isElectron = window.electronAPI && window.electronAPI.isElectron;
+  
   return (
-    <BrowserRouter>
+    <>
+      <TitleBar />
+      <div style={isElectron ? { paddingTop: '40px', height: '100vh', display: 'flex', flexDirection: 'column' } : { height: '100vh', display: 'flex', flexDirection: 'column' }}>
+        <BrowserRouter>
       <Routes>
+        <Route path="/landing" element={<Landing />} />
         <Route path="/login" element={<Login />} />
         <Route path="/onboarding" element={<Onboarding />} />
         <Route path="/receipt/:storeId/:saleId" element={<ReceiptView />} />
@@ -89,6 +97,8 @@ function App() {
         </Route>
       </Routes>
     </BrowserRouter>
+      </div>
+    </>
   );
 }
 

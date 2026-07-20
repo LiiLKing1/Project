@@ -1,7 +1,8 @@
+import { dataService } from '../../services/dataService';
 import React, { useState, useEffect } from 'react';
 import { Search, Plus, Minus, Trash2, CreditCard, Banknote, User, FileText, ChevronDown, Percent, Calendar, X, CheckCircle } from 'lucide-react';
 import { db } from '../../firebase';
-import { collection, onSnapshot, query, where, writeBatch, increment, doc, orderBy, getDoc } from 'firebase/firestore';
+import { collection, onSnapshot, query, where, writeBatch, increment, doc, orderBy, getDoc, runTransaction } from '../../services/firebaseMock';
 import { useToast } from '../../context/ToastContext';
 import { useRoles } from '../../context/RolesContext';
 import { useSettings } from '../../context/SettingsContext';
@@ -215,7 +216,7 @@ const POS = () => {
     try {
       let finalSaleData = null;
       
-      const batch = writeBatch(db);
+      await runTransaction(db, async (transaction) => {
       
       // Calculate actual cash and card received
       let finalCashReceived = 0;
@@ -269,7 +270,7 @@ const POS = () => {
       // 1. Update product stocks
       cart.forEach(item => {
         const productRef = doc(db, `users/${storeId}/products`, item.id);
-        batch.update(productRef, {
+        transaction.update(productRef, {
           [`stockByWarehouse.${selectedWarehouseId}`]: increment(-item.qty)
         });
       });
@@ -292,13 +293,13 @@ const POS = () => {
         status: 'completed',
         createdAt: new Date().toISOString()
       };
-      batch.set(saleRef, saleData);
+      transaction.set(saleRef, saleData);
       finalSaleData = { id: saleRef.id, ...saleData };
 
       // 3. Create Debt Document if needed
       if (finalDebtAmount > 0 && selectedCustomer) {
         const debtRef = doc(collection(db, `users/${storeId}/customerDebts`));
-        batch.set(debtRef, { 
+        transaction.set(debtRef, { 
           customerId: selectedCustomer.id, 
           relatedSaleId: saleRef.id,
           amount: finalDebtAmount, 
@@ -328,10 +329,9 @@ const POS = () => {
           updates.bonusBalance = increment(netBonusChange);
         }
         
-        batch.update(custRef, updates);
+        transaction.update(custRef, updates);
       }
-
-      await batch.commit();
+      });
 
       addToast('Sotuv muvaffaqiyatli amalga oshirildi', 'success');
       setLastSale({ ...finalSaleData, customerName: selectedCustomer?.fullName });
@@ -856,7 +856,7 @@ const POS = () => {
 
             <div style={{ display: 'flex', gap: '1rem', width: '100%', maxWidth: '350px' }}>
               <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => setIsReceiptModalOpen(false)}>Yopish</button>
-              <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => window.print()}>Chop etish</button>
+              <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => dataService.printReceipt()}>Chop etish</button>
             </div>
           </div>
         )}

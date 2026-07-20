@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { db } from '../../firebase';
-import { collection, getDocs, writeBatch, doc } from 'firebase/firestore';
+import { collection, getDocs, writeBatch, doc } from '../../services/firebaseMock';
+
 import { useRoles } from '../../context/RolesContext';
 import { useToast } from '../../context/ToastContext';
 import { Download, Upload, CloudLightning, FileJson, FileSpreadsheet, AlertCircle } from 'lucide-react';
@@ -118,6 +119,7 @@ const Backup = () => {
       setLoading(false);
     }
   };
+
 
   const handleFileChange = (e) => {
     if (e.target.files.length > 0) {
@@ -246,6 +248,7 @@ const Backup = () => {
               <Download size={18} /> Yuklab olish
             </button>
           </div>
+
         </div>
 
         <hr style={{ border: 'none', borderBottom: '1px solid var(--border-color)', margin: '1rem 0' }} />

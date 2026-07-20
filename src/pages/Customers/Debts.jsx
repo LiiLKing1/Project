@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../../firebase';
-import { collection, onSnapshot, query, where, doc, getDocs, writeBatch, increment, orderBy, serverTimestamp } from 'firebase/firestore';
+import { collection, onSnapshot, query, where, doc, getDocs, writeBatch, increment, orderBy, serverTimestamp } from '../../services/firebaseMock';
 import { useToast } from '../../context/ToastContext';
 import { useRoles } from '../../context/RolesContext';
 import { useSettings } from '../../context/SettingsContext';

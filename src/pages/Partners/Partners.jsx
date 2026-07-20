@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Search, Plus, Edit, Trash2, Phone, MapPin, Calendar, Clock, CheckCircle2, AlertCircle, ShoppingBag, FileText, ChevronDown, RefreshCw, AlertTriangle, ArrowLeft, Handshake, ArrowRight, PackagePlus, Check, Banknote, CreditCard } from 'lucide-react';
 import CustomSelect from '../../components/CustomSelect';
 import { db } from '../../firebase';
-import { collection, onSnapshot, query, orderBy, doc, writeBatch, increment } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, doc, writeBatch, increment } from '../../services/firebaseMock';
 import { saveDoc, editDoc, softDeleteDoc, generateDiff } from '../../utils/firebaseUtils';
 import { useToast } from '../../context/ToastContext';
 import { useRoles } from '../../context/RolesContext';

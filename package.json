@@ -1,18 +1,55 @@
 {
-  "name": "project",
+  "name": "savdogar",
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "main": "electron/main.js",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "electron:dev": "cross-env VITE_DEV_SERVER_URL=http://localhost:5173 electron .",
+    "dev:electron": "concurrently -k \"npm run dev\" \"wait-on tcp:5173 && npm run electron:dev\"",
+    "build:win": "npm run build && electron-builder --win"
+  },
+  "build": {
+    "appId": "com.savdogar.pos",
+    "productName": "Savdogar",
+    "directories": {
+      "output": "C:/Temp/ProjectRelease"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "public/favicon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
   },
   "dependencies": {
     "@tailwindcss/postcss": "^4.3.2",
     "@tailwindcss/vite": "^4.3.2",
     "autoprefixer": "^10.5.2",
+    "better-sqlite3": "^12.11.1",
     "firebase": "^12.16.0",
     "framer-motion": "^12.42.2",
     "lucide-react": "^1.24.0",
@@ -26,11 +63,17 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@electron/rebuild": "^4.2.0",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.3",
+    "concurrently": "^10.0.3",
+    "cross-env": "^10.1.0",
+    "electron": "^43.1.1",
+    "electron-builder": "^26.15.3",
     "oxlint": "^1.71.0",
     "playwright": "^1.61.1",
-    "vite": "^8.1.1"
+    "vite": "^8.1.1",
+    "wait-on": "^9.0.10"
   }
 }

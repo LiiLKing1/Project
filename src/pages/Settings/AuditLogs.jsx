@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../../firebase';
-import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot } from '../../services/firebaseMock';
 import { useRoles } from '../../context/RolesContext';
 import { useToast } from '../../context/ToastContext';
 import { Search } from 'lucide-react';

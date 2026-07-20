@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Bell, User, Menu } from 'lucide-react';
 import { useRoles } from '../context/RolesContext';
 import { db } from '../firebase';
-import { collection, doc, onSnapshot, query } from 'firebase/firestore';
+import { collection, doc, onSnapshot, query } from '../services/firebaseMock';
 import { useNavigate } from 'react-router-dom';
 import { useSettings } from '../context/SettingsContext';
 import { useWarehouse } from '../context/WarehouseContext';

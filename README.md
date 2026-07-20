@@ -1,16 +1,17 @@
-# React + Vite
+# Savdogar POS & ERP
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Savdogar - bu do'kon va savdo nuqtalari uchun mo'ljallangan zamonaviy POS (kassa) va ERP (boshqaruv) tizimi. Loyiha chakana savdoni avtomatlashtirish, ombor hisobini yuritish, CRM, moliya va hisobotlarni bitta joyda birlashtiradi.
 
-Currently, two official plugins are available:
+## Xususiyatlar
+- Offline va Online ishlash imkoniyati
+- Kassa apparatlari (POS) bilan integratsiya
+- Ombor boshqaruvi
+- Xodimlar ruxsatlarini boshqarish
+- Chek chiqarish va mahsulot shtrix kodlarini o'qish
+- Va boshqalar...
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+## O'rnatish
+1. `npm install`
+2. `npm run dev` (Veb versiya)
+3. `npm run dev:electron` (Desktop versiya)
+4. `npm run build:win` (Windows uchun .exe yig'ish)

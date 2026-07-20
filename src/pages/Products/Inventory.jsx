@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ClipboardList, PlusCircle, Search, Save, CheckCircle, XCircle } from 'lucide-react';
 import { db } from '../../firebase';
-import { collection, onSnapshot, query, doc, writeBatch, serverTimestamp } from 'firebase/firestore';
+import { collection, onSnapshot, query, doc, writeBatch, serverTimestamp } from '../../services/firebaseMock';
 import { useRoles } from '../../context/RolesContext';
 import { useWarehouse } from '../../context/WarehouseContext';
 import { useToast } from '../../context/ToastContext';

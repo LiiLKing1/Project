@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Download, FileSpreadsheet, CheckCircle2, AlertTriangle, XCircle } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { db } from '../firebase';
-import { writeBatch, doc, collection, getDocs, query } from 'firebase/firestore';
+import { writeBatch, doc, collection, getDocs, query } from '../services/firebaseMock';
 import { useRoles } from '../context/RolesContext';
 import { useToast } from '../context/ToastContext';
 import { useWarehouse } from '../context/WarehouseContext';

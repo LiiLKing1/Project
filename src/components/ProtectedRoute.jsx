@@ -8,7 +8,8 @@ const ProtectedRoute = ({ children }) => {
   const { loadingRoles, hasOnboarded } = useRoles();
 
   if (!currentUser) {
-    return <Navigate to="/login" replace />;
+    const isElectron = window.electronAPI && window.electronAPI.isElectron;
+    return <Navigate to={isElectron ? "/login" : "/landing"} replace />;
   }
 
   if (loadingRoles) {

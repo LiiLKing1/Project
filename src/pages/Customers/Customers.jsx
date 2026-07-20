@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { UserPlus, Search, Edit, Trash2, CreditCard } from 'lucide-react';
 import { db } from '../../firebase';
-import { collection, onSnapshot, doc, query, orderBy, where, getDocs } from 'firebase/firestore';
+import { collection, onSnapshot, doc, query, orderBy, where, getDocs } from '../../services/firebaseMock';
 import { saveDoc, editDoc, softDeleteDoc, generateDiff } from '../../utils/firebaseUtils';
 import { useToast } from '../../context/ToastContext';
 import { useRoles } from '../../context/RolesContext';

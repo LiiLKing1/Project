@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { UserPlus, Edit, Trash2 } from 'lucide-react';
 import CustomSelect from '../../components/CustomSelect';
 import { db, firebaseConfig } from '../../firebase';
-import { collection, onSnapshot, query, orderBy, doc, setDoc } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, doc, setDoc } from '../../services/firebaseMock';
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, createUserWithEmailAndPassword, signOut } from 'firebase/auth';
 import { saveDoc, editDoc, logAudit, generateDiff } from '../../utils/firebaseUtils';

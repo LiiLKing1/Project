@@ -3,7 +3,7 @@ import { useWarehouse } from '../../context/WarehouseContext';
 import { useRoles } from '../../context/RolesContext';
 import { useToast } from '../../context/ToastContext';
 import { db } from '../../firebase';
-import { collection, query, where, getDocs, doc, runTransaction } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, runTransaction } from '../../services/firebaseMock';
 import Drawer from '../../components/Drawer';
 import FormInput from '../../components/FormInput';
 import { ArrowRight, Search, CheckCircle2, AlertTriangle } from 'lucide-react';

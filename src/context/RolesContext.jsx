@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { db } from '../firebase';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from '../services/firebaseMock';
 import { useAuth } from './AuthContext';
 
 const RolesContext = createContext();
@@ -31,9 +31,9 @@ export const RolesProvider = ({ children }) => {
     if (currentUser) {
       loadUserProfile();
     } else {
-      setUserProfile(null);
+      setUserProfile({ role: 'admin', storeOwnerId: 'demo-store', name: 'Demo User' });
       setRoles(DEFAULT_ROLES);
-      setHasOnboarded(false);
+      setHasOnboarded(true);
       setLoadingRoles(false);
     }
   }, [currentUser]);

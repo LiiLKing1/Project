@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { PackageMinus, Search, SearchX } from 'lucide-react';
 import { db } from '../../firebase';
-import { collection, onSnapshot, query, doc, runTransaction, serverTimestamp } from 'firebase/firestore';
+import { collection, onSnapshot, query, doc, runTransaction, serverTimestamp } from '../../services/firebaseMock';
 import { useRoles } from '../../context/RolesContext';
 import { useWarehouse } from '../../context/WarehouseContext';
 import { useToast } from '../../context/ToastContext';

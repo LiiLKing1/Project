@@ -1,7 +1,7 @@
-import { getDoc, getDocs, doc, setDoc, updateDoc, deleteDoc, collection } from 'firebase/firestore';
+import { getDoc, getDocs, doc, setDoc, updateDoc, deleteDoc, collection } from '../services/firebaseMock';
 import { db } from '../firebase';
 
-const TIMEOUT_MS = 15000; 
+const TIMEOUT_MS = 8000; 
 
 export const withTimeout = (promise, actionName = 'Amal') => {
   const timeoutPromise = new Promise((_, reject) => {
@@ -38,7 +38,7 @@ export const logAudit = async (storeId, userProfile, action, resource, details =
 // Instant writes (Optimistic UI)
 export const saveDoc = async (collectionRef, data, auditData = null) => {
   const newDocRef = doc(collectionRef);
-  await setDoc(newDocRef, { ...data, createdAt: new Date().toISOString() });
+  await withTimeout(setDoc(newDocRef, { ...data, createdAt: new Date().toISOString() }), "Ma'lumotni saqlash");
   if (auditData) {
     await logAudit(auditData.storeId, auditData.userProfile, 'CREATE', auditData.resource, auditData.details);
   }
@@ -46,7 +46,7 @@ export const saveDoc = async (collectionRef, data, auditData = null) => {
 };
 
 export const editDoc = async (docRef, data, auditData = null) => {
-  await updateDoc(docRef, { ...data, updatedAt: new Date().toISOString() });
+  await withTimeout(updateDoc(docRef, { ...data, updatedAt: new Date().toISOString() }), "Ma'lumotni tahrirlash");
   if (auditData) {
     await logAudit(auditData.storeId, auditData.userProfile, 'UPDATE', auditData.resource, auditData.details);
   }
@@ -54,7 +54,7 @@ export const editDoc = async (docRef, data, auditData = null) => {
 };
 
 export const softDeleteDoc = async (docRef, auditData = null) => {
-  await updateDoc(docRef, { status: 'archived', archivedAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
+  await withTimeout(updateDoc(docRef, { status: 'archived', archivedAt: new Date().toISOString(), updatedAt: new Date().toISOString() }), "Ma'lumotni arxivlash");
   if (auditData) {
     await logAudit(auditData.storeId, auditData.userProfile, 'ARCHIVE', auditData.resource, auditData.details);
   }
@@ -62,7 +62,7 @@ export const softDeleteDoc = async (docRef, auditData = null) => {
 };
 
 export const removeDoc = async (docRef, auditData = null) => {
-  await deleteDoc(docRef);
+  await withTimeout(deleteDoc(docRef), "Ma'lumotni o'chirish");
   if (auditData) {
     await logAudit(auditData.storeId, auditData.userProfile, 'DELETE', auditData.resource, auditData.details);
   }
@@ -70,7 +70,7 @@ export const removeDoc = async (docRef, auditData = null) => {
 };
 
 export const putDoc = async (docRef, data, auditData = null) => {
-  await setDoc(docRef, data);
+  await withTimeout(setDoc(docRef, data), "Ma'lumotni yozish");
   if (auditData) {
     await logAudit(auditData.storeId, auditData.userProfile, 'PUT', auditData.resource, auditData.details);
   }

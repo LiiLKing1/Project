@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Calculator, CheckCircle2, DollarSign, Calendar, Info } from 'lucide-react';
 import { db } from '../../firebase';
-import { collection, onSnapshot, doc, query, where, getDocs, setDoc, addDoc } from 'firebase/firestore';
+import { collection, onSnapshot, doc, query, where, getDocs, setDoc, addDoc } from '../../services/firebaseMock';
 import { useToast } from '../../context/ToastContext';
 import { useRoles } from '../../context/RolesContext';
 import { useSettings } from '../../context/SettingsContext';
