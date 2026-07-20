@@ -9,5 +9,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   minimize: () => ipcRenderer.send('window-minimize'),
   maximize: () => ipcRenderer.send('window-maximize'),
   close: () => ipcRenderer.send('window-close'),
+  
+  // Auth
+  startGoogleLogin: () => ipcRenderer.send('start-google-login'),
+  onGoogleLoginSuccess: (callback) => ipcRenderer.on('google-login-success', (event, token) => callback(token)),
+  removeGoogleLoginListener: () => ipcRenderer.removeAllListeners('google-login-success'),
+  
   isElectron: true,
 });
