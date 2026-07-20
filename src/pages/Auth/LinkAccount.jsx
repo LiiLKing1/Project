@@ -4,6 +4,8 @@ import { useAuth } from '../../context/AuthContext';
 import { motion } from 'framer-motion';
 import { CheckCircle2, Laptop } from 'lucide-react';
 import TitleBar from '../../components/TitleBar';
+import { APP_NAME } from '../../config/appConfig';
+import './Login.css';
 
 const LinkAccount = () => {
   const { currentUser } = useAuth();
@@ -48,28 +50,53 @@ const LinkAccount = () => {
   if (!currentUser) return null;
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+    <div className="login-container">
       <TitleBar transparent hideLogo />
       
-      <motion.div 
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="bg-white rounded-2xl p-8 max-w-md w-full shadow-lg text-center"
+      {/* Background Video */}
+      <video 
+        autoPlay 
+        loop 
+        muted 
+        playsInline
+        className="login-video-bg"
       >
-        <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
-          <Laptop className="text-primary w-8 h-8" />
+        <source src="https://assets.mixkit.co/videos/preview/mixkit-white-clouds-in-a-blue-sky-time-lapse-954-large.mp4" type="video/mp4" />
+      </video>
+      <div className="login-overlay"></div>
+
+      {/* Top Left Logo */}
+      <div className="login-logo">
+         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 2L2 22H22L12 2Z" stroke="#111" strokeWidth="2.5" strokeLinejoin="round"/>
+         </svg>
+         <span className="login-logo-text">{APP_NAME}</span>
+      </div>
+
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95, y: 10 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{ duration: 0.5, ease: "easeOut" }}
+        className="login-card"
+      >
+        <div className="login-header">
+          <div className="login-icon-box">
+            <Laptop size={22} strokeWidth={2.5} />
+          </div>
+          <h1 className="login-title">Desktop ilovasiga bog'lash</h1>
+          <p className="login-subtitle">
+            Dasturga xavfsiz kirish uchun hisobingizni ulang.
+          </p>
         </div>
-        
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">Desktop ilovasi bilan bog'lash</h1>
         
         {status === 'waiting' && (
           <>
-            <p className="text-gray-500 mb-8">
-              Siz <b>{currentUser.email}</b> hisobi orqali tizimga kirgansiz. Desktop ilovaga ulanish uchun quyidagi tugmani bosing.
+            <p style={{marginBottom: '2rem', color: '#6b7280', fontSize: '0.95rem'}}>
+              Siz <b>{currentUser.email}</b> hisobi orqali tizimga kirgansiz. Davom etish uchun quyidagi tugmani bosing.
             </p>
             <button 
               onClick={handleLink}
-              className="w-full bg-[#8052ff] hover:bg-[#6b46d9] text-white font-medium py-3 px-4 rounded-xl transition-colors"
+              className="login-submit-btn"
             >
               Ilovaga ulanish
             </button>
@@ -77,31 +104,31 @@ const LinkAccount = () => {
         )}
 
         {status === 'linking' && (
-          <div className="py-8">
-            <div className="w-8 h-8 border-4 border-[#8052ff]/30 border-t-[#8052ff] rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-gray-600">Ulanmoqda, iltimos kuting...</p>
+          <div style={{padding: '2rem 0'}}>
+            <div className="login-spinner"></div>
+            <p style={{color: '#6b7280'}}>Ulanmoqda, iltimos kuting...</p>
           </div>
         )}
 
         {status === 'success' && (
-          <div className="py-6">
-            <CheckCircle2 className="w-16 h-16 text-green-500 mx-auto mb-4" />
-            <h2 className="text-xl font-bold text-gray-900 mb-2">Muvaffaqiyatli ulandi!</h2>
-            <p className="text-gray-500">
-              Bu oynani yopib, kompyuteringizdagi Savdogar dasturiga qaytishingiz mumkin.
+          <div style={{padding: '1.5rem 0'}}>
+            <CheckCircle2 size={48} color="#10b981" style={{margin: '0 auto 1rem'}} />
+            <h2 style={{fontSize: '1.25rem', fontWeight: 'bold', marginBottom: '0.5rem', color: '#111827'}}>Muvaffaqiyatli ulandi!</h2>
+            <p style={{color: '#6b7280', fontSize: '0.9rem'}}>
+              Bu oynani yopib, kompyuteringizdagi dasturga qaytishingiz mumkin.
             </p>
           </div>
         )}
 
         {status === 'error' && (
-          <div className="py-6">
-            <h2 className="text-xl font-bold text-red-600 mb-2">Xatolik yuz berdi</h2>
-            <p className="text-gray-500 mb-6">
+          <div style={{padding: '1.5rem 0'}}>
+            <h2 style={{fontSize: '1.25rem', fontWeight: 'bold', marginBottom: '0.5rem', color: '#ef4444'}}>Xatolik yuz berdi</h2>
+            <p style={{color: '#6b7280', fontSize: '0.9rem', marginBottom: '1.5rem'}}>
               Desktop ilovasiga ulanib bo'lmadi. Dastur ochiq ekanligiga ishonch hosil qiling.
             </p>
             <button 
               onClick={() => setStatus('waiting')}
-              className="text-[#8052ff] font-medium hover:underline"
+              className="login-submit-btn" style={{background: 'transparent', color: '#8052ff', border: '1px solid #8052ff'}}
             >
               Qaytadan urinish
             </button>

@@ -1,5 +1,5 @@
 import { dataService } from '../../services/dataService';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Search, Plus, Minus, Trash2, CreditCard, Banknote, User, FileText, ChevronDown, Percent, Calendar, X, CheckCircle } from 'lucide-react';
 import { db } from '../../firebase';
 import { collection, onSnapshot, query, where, writeBatch, increment, doc, orderBy, getDoc, runTransaction } from '../../services/firebaseMock';

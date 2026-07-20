@@ -116,6 +116,19 @@ function startLocalServer(distPath) {
         return;
       }
 
+      // CORS Headers for Vercel -> Localhost fetch
+      const corsHeaders = {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'OPTIONS, POST',
+        'Access-Control-Allow-Headers': 'Content-Type'
+      };
+
+      if (urlPath === '/auth-token' && req.method === 'OPTIONS') {
+        res.writeHead(204, corsHeaders);
+        res.end();
+        return;
+      }
+
       if (urlPath === '/auth-token' && req.method === 'POST') {
         let body = '';
         req.on('data', chunk => { body += chunk.toString(); });
@@ -126,7 +139,7 @@ function startLocalServer(distPath) {
               mainWindow.webContents.send('google-login-success', parsed.idToken);
             }
           } catch(e) {}
-          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.writeHead(200, { ...corsHeaders, 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ success: true }));
         });
         return;
