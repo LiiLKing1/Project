@@ -68,7 +68,6 @@ const Login = () => {
     }
   };
 
-  const isElectron = window.electronAPI && window.electronAPI.isElectron;
 
   return (
     <div className="login-container">
