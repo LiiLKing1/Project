@@ -32,23 +32,8 @@ export const AuthProvider = ({ children }) => {
   const login = (email, password) => signInWithEmailAndPassword(auth, email, password);
   
   const loginWithGoogle = () => {
-    return new Promise((resolve, reject) => {
-      if (window.electronAPI && window.electronAPI.isElectron) {
-        // Open Google Login in external default browser
-        window.electronAPI.onGoogleLoginSuccess((idToken) => {
-          window.electronAPI.removeGoogleLoginListener();
-          const credential = GoogleAuthProvider.credential(idToken);
-          signInWithCredential(auth, credential)
-            .then(resolve)
-            .catch(reject);
-        });
-        window.electronAPI.startGoogleLogin();
-      } else {
-        // Standard web popup
-        const provider = new GoogleAuthProvider();
-        signInWithPopup(auth, provider).then(resolve).catch(reject);
-      }
-    });
+    const provider = new GoogleAuthProvider();
+    return signInWithPopup(auth, provider);
   };
   
   const logout = () => signOut(auth);

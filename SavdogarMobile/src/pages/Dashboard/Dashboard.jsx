@@ -323,7 +323,7 @@ const Dashboard = () => {
       )}
 
       {/* ══ MAIN GRID ══ */}
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'1rem' }}>
+      <div style={{ display:'flex', flexDirection:'column', gap:'1rem' }}>
 
         {/* LEFT COLUMN */}
         <div style={{ display:'flex', flexDirection:'column', gap:'1rem' }}>

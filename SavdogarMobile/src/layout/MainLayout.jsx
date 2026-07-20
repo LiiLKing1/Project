@@ -1,42 +1,28 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Outlet } from 'react-router-dom';
-import Sidebar from './Sidebar';
 import Topbar from './Topbar';
+import MobileBottomNav from './MobileBottomNav';
 import TitleBar from '../components/TitleBar';
 import './layout.css';
 
 const MainLayout = () => {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const isElectron = window.electronAPI && window.electronAPI.isElectron;
 
-  const toggleSidebar = () => {
-    setIsSidebarOpen(!isSidebarOpen);
-  };
-
-  const closeSidebar = () => {
-    setIsSidebarOpen(false);
-  };
-
   return (
-    <>
+    <div className="flex flex-col h-screen bg-gray-50 overflow-hidden relative">
       <TitleBar />
-      <div className="app-container" style={{ paddingTop: isElectron ? '40px' : '0' }}>
-        {/* Sidebar overlay for mobile */}
-        <div 
-          className={`sidebar-overlay ${isSidebarOpen ? 'visible' : ''}`} 
-          onClick={closeSidebar}
-        ></div>
+      <div className="flex flex-col flex-1" style={{ paddingTop: isElectron ? '40px' : '0' }}>
+        <Topbar />
         
-        <Sidebar isOpen={isSidebarOpen} closeSidebar={closeSidebar} />
+        {/* Main Content Area (Scrollable) */}
+        <main className="flex-1 overflow-y-auto pb-[70px]">
+          <Outlet />
+        </main>
         
-        <div className="main-content">
-          <Topbar toggleSidebar={toggleSidebar} />
-          <main className="page-content">
-            <Outlet />
-          </main>
-        </div>
+        {/* Bottom Navigation */}
+        <MobileBottomNav />
       </div>
-    </>
+    </div>
   );
 };
 

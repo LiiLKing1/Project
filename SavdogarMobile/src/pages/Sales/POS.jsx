@@ -20,6 +20,7 @@ const POS = () => {
   const [customers, setCustomers] = useState([]);
   const [cart, setCart] = useState([]);
   const [search, setSearch] = useState('');
+  const [isCartDrawerOpen, setIsCartDrawerOpen] = useState(false);
   
   // Customer selection
   const [customerSearch, setCustomerSearch] = useState('');
@@ -372,499 +373,283 @@ const POS = () => {
   const canDiscount = userProfile?.role === 'admin' || userProfile?.role === 'manager';
 
   return (
-    <div className="pos-layout">
-      {/* Products Section */}
-      <div className="flex-col" style={{ gap: '1.5rem', overflow: 'hidden' }}>
-        <div className="flex-between">
-          <h1 className="h1">Sotuv Oynasi</h1>
-          <div style={{ position: 'relative', width: '100%', maxWidth: '350px' }}>
-            <Search size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
-            <input 
-              type="text" 
-              placeholder="Shtrix-kod yoki nom..." 
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              style={{ width: '100%', paddingLeft: '2.5rem', fontSize: '1rem', padding: '1rem 1rem 1rem 2.5rem' }}
-              autoFocus
-            />
-          </div>
+    <div className="flex flex-col h-full bg-gray-50 pb-[80px]">
+      {/* 1. Header & Search */}
+      <div className="bg-white p-4 shadow-sm z-10">
+        <h1 className="text-xl font-bold text-gray-800 mb-3">Sotuv oynasi</h1>
+        <div className="relative">
+          <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input 
+            type="text" 
+            placeholder="Katalogdan qidirish..." 
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full bg-gray-100 border-transparent focus:bg-white focus:border-blue-500 rounded-xl py-3 pl-10 pr-4 text-sm"
+          />
         </div>
+      </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1rem', overflowY: 'auto', paddingRight: '1rem', paddingBottom: '2rem' }}>
+      {/* 2. Products Grid */}
+      <div className="flex-1 overflow-y-auto p-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           {filteredProducts.map(p => (
-            <div key={p.id} className="glass-panel" onClick={() => addToCart(p)} style={{ padding: '1rem', cursor: p.stock > 0 ? 'pointer' : 'not-allowed', opacity: p.stock > 0 ? 1 : 0.5, transition: 'transform 0.1s' }} onMouseDown={e => p.stock > 0 && (e.currentTarget.style.transform = 'scale(0.98)')} onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'}>
-              <div style={{ fontWeight: '600', marginBottom: '0.5rem', fontSize: '1rem' }}>{p.name}</div>
-              <div style={{ color: 'var(--primary)', fontWeight: '700', fontSize: '1.125rem' }}><CurrencyDisplay amount={p.sellPrice} /></div>
-              <div className="flex-between" style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
-                <span>{p.barcode}</span>
-                <span style={{ fontWeight: 600, color: p.stock <= p.minStock ? 'var(--danger)' : 'var(--success)' }}>
-                  Qoldiq: {p.stock}
-                </span>
+            <div 
+              key={p.id} 
+              onClick={() => p.stock > 0 && addToCart(p)}
+              className={`bg-white rounded-xl p-3 border shadow-sm transition-transform active:scale-95 flex flex-col ${p.stock > 0 ? 'border-gray-200 cursor-pointer' : 'border-gray-100 opacity-60'}`}
+            >
+              <div className="text-sm font-semibold text-gray-800 line-clamp-2 min-h-[40px] mb-2">{p.name}</div>
+              <div className="mt-auto flex flex-col gap-1">
+                <div className="text-blue-600 font-bold"><CurrencyDisplay amount={p.sellPrice} /></div>
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-gray-400">{p.barcode || 'Kod yo\'q'}</span>
+                  <span className={`font-medium ${p.stock <= p.minStock ? 'text-red-500' : 'text-green-500'}`}>Qoldiq: {p.stock}</span>
+                </div>
               </div>
             </div>
           ))}
         </div>
+        {filteredProducts.length === 0 && (
+          <div className="text-center text-gray-400 py-10">
+            Mahsulot topilmadi
+          </div>
+        )}
       </div>
 
-      {/* Cart Section */}
-      <div className="glass-panel flex-col" style={{ height: '100%', display: 'flex' }}>
-        <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <h2 className="h2">Savat</h2>
+      {/* 3. Floating Bottom Bar */}
+      <div className="fixed bottom-[65px] left-0 right-0 bg-white border-t border-gray-200 p-3 flex justify-between items-center shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.05)] z-20">
+        <div className="flex flex-col">
+          <span className="text-xs text-gray-500 font-medium">{cart.length} xil mahsulot</span>
+          <span className="font-bold text-lg text-gray-900"><CurrencyDisplay amount={finalTotal}/></span>
+        </div>
+        <button 
+          onClick={() => setIsCartDrawerOpen(true)}
+          className="bg-blue-600 text-white px-5 py-2.5 rounded-full font-semibold flex items-center gap-2 shadow-lg shadow-blue-200 active:scale-95 transition-transform"
+        >
+          <ShoppingCart size={18} /> 
+          Savatchani ochish
+          {cart.length > 0 && (
+            <span className="bg-white text-blue-600 w-5 h-5 rounded-full flex items-center justify-center text-xs ml-1">
+              {cart.length}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* 4. Cart Drawer */}
+      <Drawer isOpen={isCartDrawerOpen} onClose={() => setIsCartDrawerOpen(false)} title="Savatcha" position="bottom" width="100%">
+        <div className="flex flex-col gap-4 pb-4">
           
-          <div style={{ position: 'relative' }}>
+          {/* Customer Selection */}
+          <div className="bg-gray-50 p-3 rounded-xl border border-gray-100">
             {selectedCustomer ? (
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem 1rem', backgroundColor: 'var(--primary-light)', borderRadius: 'var(--radius-md)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--primary)', fontWeight: 600 }}>
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-2 text-blue-600 font-medium">
                   <User size={18} /> {selectedCustomer.fullName}
                   {selectedCustomer.bonusBalance > 0 && (
-                    <span style={{ marginLeft: '0.5rem', fontSize: '0.75rem', padding: '0.2rem 0.5rem', backgroundColor: '#fbbf24', color: '#000', borderRadius: '1rem' }}>
+                    <span className="ml-2 text-xs py-0.5 px-2 bg-yellow-400 text-yellow-900 rounded-full">
                       Bonus: <CurrencyDisplay amount={selectedCustomer.bonusBalance} />
                     </span>
                   )}
                 </div>
-                <button onClick={() => setSelectedCustomer(null)} style={{ color: 'var(--danger)' }}>✕</button>
+                <button onClick={() => setSelectedCustomer(null)} className="text-red-500 p-1"><X size={18}/></button>
               </div>
             ) : (
-              <>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <div style={{ position: 'relative', flex: 1 }}>
-                    <User size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
-                    <input 
-                      type="text" 
-                      placeholder="Mijoz qidirish (telefon yoki ism)..." 
-                      value={customerSearch}
-                      onChange={(e) => { setCustomerSearch(e.target.value); setShowCustomerDropdown(true); }}
-                      onFocus={() => setShowCustomerDropdown(true)}
-                      style={{ width: '100%', paddingLeft: '2.5rem' }}
-                    />
-                  </div>
-                  <button 
-                    className="btn btn-outline" 
-                    onClick={() => setShowCustomerDropdown(!showCustomerDropdown)}
-                    style={{ padding: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                  >
-                    <ChevronDown size={18} />
-                  </button>
-                </div>
-                {showCustomerDropdown && (customerSearch.trim() ? filteredCustomers.length > 0 : customers.length > 0) && (
-                  <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', zIndex: 10, marginTop: '0.5rem', boxShadow: 'var(--shadow-md)', maxHeight: '250px', overflowY: 'auto' }}>
-                    {(customerSearch.trim() ? filteredCustomers : customers.slice(0, 10)).map(c => (
-                      <div key={c.id} onClick={() => { setSelectedCustomer(c); setCustomerSearch(''); setShowCustomerDropdown(false); }} style={{ padding: '0.75rem 1rem', cursor: 'pointer', borderBottom: '1px solid var(--border-color)' }}>
-                        <div style={{ fontWeight: 600 }}>{c.fullName}</div>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{c.phone}</div>
+              <div className="relative">
+                <User size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input 
+                  type="text" 
+                  placeholder="Mijoz qidirish..." 
+                  value={customerSearch}
+                  onChange={(e) => { setCustomerSearch(e.target.value); setShowCustomerDropdown(true); }}
+                  onFocus={() => setShowCustomerDropdown(true)}
+                  className="w-full bg-white border border-gray-200 focus:border-blue-500 rounded-lg py-2 pl-9 pr-3 text-sm"
+                />
+                {showCustomerDropdown && customerSearch && (
+                  <div className="absolute top-full left-0 right-0 bg-white border border-gray-200 shadow-lg rounded-lg mt-1 max-h-48 overflow-y-auto z-30">
+                    {filteredCustomers.map(c => (
+                      <div key={c.id} className="p-3 border-b border-gray-50 flex justify-between items-center" onClick={() => { setSelectedCustomer(c); setShowCustomerDropdown(false); setCustomerSearch(''); }}>
+                        <div>
+                          <div className="font-medium text-sm text-gray-800">{c.fullName}</div>
+                          <div className="text-xs text-gray-500">{c.phone}</div>
+                        </div>
+                        <button className="text-blue-600 text-xs font-medium px-3 py-1 bg-blue-50 rounded-full">Tanlash</button>
                       </div>
                     ))}
+                    {filteredCustomers.length === 0 && (
+                      <div className="p-4 text-center text-sm text-gray-500">Mijoz topilmadi</div>
+                    )}
                   </div>
                 )}
-              </>
+              </div>
             )}
           </div>
-        </div>
-        
-        <div style={{ flex: 1, overflowY: 'auto', padding: '1rem' }}>
-          {cart.length === 0 ? (
-            <div className="flex-center" style={{ height: '100%', color: 'var(--text-secondary)' }}>Savat bo'sh</div>
-          ) : (
-            <div className="flex-col" style={{ gap: '1rem' }}>
-              {cart.map(item => (
-                <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '1rem', borderBottom: '1px solid var(--border-color)' }}>
-                  <div>
-                    <div style={{ fontWeight: '500' }}>{item.name}</div>
-                    <div style={{ color: 'var(--primary)', fontWeight: '600', fontSize: '0.875rem' }}><CurrencyDisplay amount={item.sellPrice * item.qty} /></div>
-                  </div>
-                  <div className="flex-center" style={{ gap: '0.5rem' }}>
-                    <button className="btn btn-outline" style={{ padding: '0.25rem' }} onClick={() => updateQty(item.id, -1, item.stock)}><Minus size={16} /></button>
-                    <input 
-                      type="text" 
-                      inputMode="numeric"
-                      value={item.qty} 
-                      onChange={(e) => {
-                        const val = e.target.value.replace(/\D/g, '');
-                        if (val === '') {
-                          setCart(prev => prev.map(p => p.id === item.id ? { ...p, qty: '' } : p));
-                        } else {
-                          const num = parseInt(val, 10);
-                          if (!isNaN(num)) setCart(prev => prev.map(p => p.id === item.id ? { ...p, qty: Math.min(item.stock, num) } : p));
-                        }
-                      }}
-                      onBlur={(e) => {
-                        let num = parseInt(e.target.value.replace(/\D/g, ''), 10);
-                        if (isNaN(num) || num < 1) num = 1;
-                        setCart(prev => prev.map(p => p.id === item.id ? { ...p, qty: Math.min(item.stock, num) } : p));
-                      }}
-                      style={{ width: '65px', textAlign: 'center', fontWeight: '600', padding: '0.25rem', border: '1px solid var(--border-color)', borderRadius: '4px', background: 'transparent', color: 'var(--text-main)' }}
-                    />
-                    <button className="btn btn-outline" style={{ padding: '0.25rem' }} onClick={() => updateQty(item.id, 1, item.stock)}><Plus size={16} /></button>
-                    <button className="btn btn-ghost" style={{ color: 'var(--danger)', padding: '0.25rem', marginLeft: '0.5rem' }} onClick={() => removeFromCart(item.id)}><Trash2 size={16} /></button>
-                  </div>
+
+          {/* Cart Items List */}
+          <div className="flex flex-col gap-2 max-h-[40vh] overflow-y-auto pr-1">
+            {cart.map(item => (
+              <div key={item.id} className="bg-white border border-gray-100 rounded-xl p-3 shadow-sm flex items-center justify-between gap-2">
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-semibold text-gray-800 truncate mb-1">{item.name}</div>
+                  <div className="text-xs text-gray-500"><CurrencyDisplay amount={item.sellPrice}/> x {item.qty}</div>
                 </div>
-              ))}
+                
+                <div className="flex items-center gap-2 bg-gray-50 rounded-lg p-1 border border-gray-200">
+                  <button onClick={() => updateQuantity(item.id, -1, item.stock)} className="w-7 h-7 flex items-center justify-center text-gray-600 bg-white rounded shadow-sm">
+                    {item.qty <= 1 ? <Trash2 size={14} className="text-red-500"/> : <Minus size={14} />}
+                  </button>
+                  <span className="w-6 text-center text-sm font-semibold">{item.qty}</span>
+                  <button onClick={() => updateQuantity(item.id, 1, item.stock)} className="w-7 h-7 flex items-center justify-center text-gray-600 bg-white rounded shadow-sm">
+                    <Plus size={14} />
+                  </button>
+                </div>
+              </div>
+            ))}
+            {cart.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-10 text-gray-400">
+                <ShoppingCart size={48} className="mb-3 opacity-20" />
+                <p>Savatcha bo'sh</p>
+              </div>
+            )}
+          </div>
+
+          {/* Checkout Totals */}
+          {cart.length > 0 && (
+            <div className="bg-gray-50 rounded-xl p-4 mt-2">
+              <div className="flex justify-between text-sm text-gray-600 mb-2">
+                <span>Jami summa:</span>
+                <span><CurrencyDisplay amount={subtotal}/></span>
+              </div>
+              <div className="flex justify-between items-center text-sm mb-3">
+                <span className="text-gray-600">Chegirma:</span>
+                <div className="flex items-center gap-2">
+                  <input 
+                    type="number" 
+                    value={discountValue} 
+                    onChange={e => setDiscountValue(e.target.value)}
+                    disabled={!canDiscount}
+                    className="w-20 px-2 py-1 text-right border border-gray-200 rounded text-sm disabled:bg-gray-100"
+                    placeholder="0"
+                  />
+                  <select 
+                    value={discountType} 
+                    onChange={e => setDiscountType(e.target.value)}
+                    disabled={!canDiscount}
+                    className="border border-gray-200 rounded p-1 text-sm bg-white disabled:bg-gray-100"
+                  >
+                    <option value="fixed">So'm</option>
+                    <option value="percent">%</option>
+                  </select>
+                </div>
+              </div>
+              
+              <div className="border-t border-gray-200 my-2 pt-2 flex justify-between items-end">
+                <span className="text-gray-800 font-medium">To'lov summasi:</span>
+                <span className="text-xl font-bold text-blue-600"><CurrencyDisplay amount={finalTotal}/></span>
+              </div>
+
+              <button 
+                onClick={() => { setIsCartDrawerOpen(false); openPaymentDrawer(); }}
+                className="w-full bg-blue-600 text-white rounded-xl py-3 mt-4 font-bold text-base shadow-lg shadow-blue-200 active:scale-95 transition-transform"
+              >
+                To'lovga o'tish
+              </button>
             </div>
           )}
         </div>
+      </Drawer>
 
-        <div style={{ padding: '1.5rem', borderTop: '1px solid var(--border-color)', backgroundColor: 'var(--bg-main)' }}>
-          <div className="flex-between" style={{ marginBottom: '1.5rem' }}>
-            <span style={{ fontSize: '1.25rem', color: 'var(--text-secondary)', fontWeight: 500 }}>Jami summa:</span>
-            <span className="h1" style={{ color: 'var(--primary)', fontSize: '2rem' }}><CurrencyDisplay amount={subtotal} /></span>
+      {/* 5. Payment Drawer */}
+      <Drawer isOpen={isPaymentDrawerOpen} onClose={() => setIsPaymentDrawerOpen(false)} title="To'lovni tasdiqlash" position="bottom" width="100%">
+        <div className="flex flex-col gap-4 pb-4">
+          <div className="bg-blue-50 text-blue-800 p-4 rounded-xl text-center">
+            <div className="text-sm opacity-80 mb-1">To'lanishi kerak:</div>
+            <div className="text-2xl font-bold"><CurrencyDisplay amount={finalTotal}/></div>
           </div>
-          <button className="btn btn-primary" disabled={cart.length === 0} onClick={openPaymentDrawer} style={{ width: '100%', padding: '1rem', fontSize: '1.125rem' }}>
-             To'lash
+
+          <div className="grid grid-cols-3 gap-2">
+            <button 
+              onClick={() => setPaymentType('cash')}
+              className={`flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-colors ${paymentType === 'cash' ? 'border-green-500 bg-green-50 text-green-700' : 'border-gray-200 text-gray-500'}`}
+            >
+              <Banknote size={24} />
+              <span className="text-xs font-semibold">Naqd</span>
+            </button>
+            <button 
+              onClick={() => setPaymentType('card')}
+              className={`flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-colors ${paymentType === 'card' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-500'}`}
+            >
+              <CreditCard size={24} />
+              <span className="text-xs font-semibold">Karta</span>
+            </button>
+            <button 
+              onClick={() => setPaymentType('debt')}
+              className={`flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-colors ${paymentType === 'debt' ? 'border-red-500 bg-red-50 text-red-700' : 'border-gray-200 text-gray-500'}`}
+            >
+              <Calendar size={24} />
+              <span className="text-xs font-semibold">Nasiya</span>
+            </button>
+          </div>
+
+          {paymentType === 'cash' && (
+            <div className="mt-2">
+              <label className="text-xs text-gray-500 mb-1 block">Mijoz bergan summa:</label>
+              <input 
+                type="number" 
+                value={cashAmount} 
+                onChange={(e) => setCashAmount(e.target.value)}
+                className="w-full text-lg p-3 border border-gray-300 rounded-xl focus:border-blue-500"
+                placeholder={finalTotal.toString()}
+              />
+              {Number(cashAmount) > finalTotal && (
+                <div className="mt-2 text-sm text-green-600 bg-green-50 p-2 rounded-lg flex justify-between">
+                  <span>Qaytim:</span>
+                  <span className="font-bold"><CurrencyDisplay amount={Number(cashAmount) - finalTotal}/></span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {paymentType === 'debt' && (
+            <div className="mt-2 flex flex-col gap-3">
+              {!selectedCustomer && (
+                <div className="text-xs text-red-500 bg-red-50 p-2 rounded">Nasiya uchun mijoz tanlash majburiy!</div>
+              )}
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block">To'lash muddati (Qaytarish sanasi):</label>
+                <input 
+                  type="date" 
+                  value={dueDate} 
+                  onChange={(e) => setDueDate(e.target.value)}
+                  className="w-full p-3 border border-gray-300 rounded-xl"
+                />
+              </div>
+            </div>
+          )}
+
+          <button 
+            disabled={isProcessing || (paymentType === 'debt' && !selectedCustomer)}
+            onClick={handleCheckout}
+            className="w-full bg-green-600 disabled:bg-gray-400 text-white rounded-xl py-4 mt-2 font-bold text-lg shadow-lg active:scale-95 transition-transform flex items-center justify-center gap-2"
+          >
+            {isProcessing ? <div className="spinner w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : <CheckCircle size={20} />}
+            Tasdiqlash va Sotish
           </button>
         </div>
-      </div>
+      </Drawer>
 
-      {/* ══ Fullscreen Payment Overlay ══ */}
-      <AnimatePresence>
-        {isPaymentDrawerOpen && (
-          <>
-            {/* Backdrop */}
-            <motion.div
-              key="pay-backdrop"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.25 }}
-              onClick={() => !isProcessing && setIsPaymentDrawerOpen(false)}
-              style={{
-                position: 'fixed', top: isElectron ? '40px' : 0, left: 0, right: 0, bottom: 0,
-                background: 'rgba(10,20,40,0.55)',
-                backdropFilter: 'blur(6px)',
-                zIndex: 1100,
-              }}
-            />
-
-            {/* Panel */}
-            <motion.div
-              key="pay-panel"
-              initial={{ opacity: 0, scale: 0.94, y: 32 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.94, y: 32 }}
-              transition={{ type: 'spring', damping: 28, stiffness: 280 }}
-              style={{
-                position: 'fixed',
-                top: isElectron ? '40px' : 0, left: 0, right: 0, bottom: 0,
-                zIndex: 1101,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                padding: '20px',
-                pointerEvents: 'none',
-              }}
-            >
-              <div style={{
-                width: '100%',
-                maxWidth: '960px',
-                height: 'calc(100vh - 40px)',
-                maxHeight: '700px',
-                background: '#F4F8FF',
-                borderRadius: '28px',
-                boxShadow: '0 40px 100px -20px rgba(0,0,0,0.45)',
-                display: 'flex',
-                overflow: 'hidden',
-                pointerEvents: 'all',
-              }}>
-
-                {/* ── LEFT: Receipt ── */}
-                <div style={{
-                  width: '380px',
-                  flexShrink: 0,
-                  background: 'linear-gradient(160deg, #1A2538 0%, #2C4A7C 100%)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  padding: '24px 20px',
-                  gap: '16px',
-                  position: 'relative',
-                  overflow: 'hidden',
-                }}>
-                  {/* Decorative circles */}
-                  <div style={{ position: 'absolute', top: -60, right: -60, width: 200, height: 200, borderRadius: '50%', background: 'rgba(74,144,226,0.12)' }} />
-                  <div style={{ position: 'absolute', bottom: -40, left: -40, width: 150, height: 150, borderRadius: '50%', background: 'rgba(123,206,235,0.1)' }} />
-
-                  <div style={{ position: 'relative', zIndex: 1, color: '#fff', textAlign: 'center', marginBottom: 4 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, opacity: 0.6, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Chek namunasi</div>
-                    <div style={{ fontSize: 12, opacity: 0.4 }}>Tasdiqlashdan avval tekshiring</div>
-                  </div>
-
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.15, duration: 0.4 }}
-                    style={{ position: 'relative', zIndex: 1, width: '100%', overflowY: 'auto', maxHeight: 'calc(100% - 80px)',
-                      scrollbarWidth: 'none',
-                    }}
-                  >
-                    <style>{`.receipt-scroll::-webkit-scrollbar{display:none}`}</style>
-                    <div className="receipt-scroll">
-                      <Receipt sale={{
-                        id: 'PREVIEW',
-                        items: cart,
-                        subtotal,
-                        discountAmount,
-                        usedBonusAmount,
-                        finalTotal,
-                        paymentType,
-                        customerName: selectedCustomer ? selectedCustomer.fullName : 'Xaridor',
-                        createdAt: new Date().toISOString(),
-                        cashierId: userProfile?.name || 'Kassir',
-                        storeId,
-                      }} storeId={storeId} />
-                    </div>
-                  </motion.div>
-                </div>
-
-                {/* ── RIGHT: Payment Form ── */}
-                <div style={{
-                  flex: 1,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  overflow: 'hidden',
-                  background: '#fff',
-                }}>
-                  {/* Header */}
-                  <div style={{
-                    padding: '20px 24px',
-                    borderBottom: '1px solid #DCE8F5',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    flexShrink: 0,
-                  }}>
-                    <div>
-                      <div style={{ fontSize: 18, fontWeight: 800, color: '#1A2538', letterSpacing: '-0.5px' }}>To'lovni qabul qilish</div>
-                      <div style={{ fontSize: 13, color: '#8A9BB5', marginTop: 2 }}>
-                        {cart.reduce((a, c) => a + c.qty, 0)} ta mahsulot · Oraliq: <CurrencyDisplay amount={subtotal} />
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => !isProcessing && setIsPaymentDrawerOpen(false)}
-                      style={{ width: 36, height: 36, borderRadius: '10px', border: '1.5px solid #DCE8F5', background: '#F7FAFF', color: '#8A9BB5', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 0.2s' }}
-                      onMouseEnter={e => { e.currentTarget.style.background = '#FCE8E8'; e.currentTarget.style.color = '#EF4B4B'; e.currentTarget.style.borderColor = '#FFE0E0'; }}
-                      onMouseLeave={e => { e.currentTarget.style.background = '#F7FAFF'; e.currentTarget.style.color = '#8A9BB5'; e.currentTarget.style.borderColor = '#DCE8F5'; }}
-                    ><X size={16}/></button>
-                  </div>
-
-                  {/* Scrollable body */}
-                  <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-
-                    {/* Final Total */}
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
-                      style={{
-                        background: 'linear-gradient(135deg, #4A90E2, #7BCEEB)',
-                        borderRadius: '18px',
-                        padding: '18px 20px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        color: '#fff',
-                      }}
-                    >
-                      <div>
-                        <div style={{ fontSize: 12, opacity: 0.8, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Yakuniy summa</div>
-                        <div style={{ fontSize: 28, fontWeight: 900, letterSpacing: '-1px', marginTop: 2 }}>
-                          <CurrencyDisplay amount={finalTotal} />
-                        </div>
-                      </div>
-                      <div style={{ width: 52, height: 52, borderRadius: '16px', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <Banknote size={26} color="#fff" />
-                      </div>
-                    </motion.div>
-
-                    {/* Discount Block */}
-                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
-                      style={{ border: '1.5px solid #DCE8F5', borderRadius: '16px', padding: '16px' }}
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
-                        <span style={{ fontWeight: 700, fontSize: 14, color: '#1A2538' }}>Chegirma</span>
-                        {!canDiscount && <span style={{ fontSize: 11, color: '#F59E0B', fontWeight: 600 }}>Faqat admin ruxsati bilan</span>}
-                      </div>
-                      <div style={{ display: 'flex', gap: '8px' }}>
-                        <div style={{ display: 'flex', background: '#F0F5FC', borderRadius: '10px', padding: '3px', gap: '2px' }}>
-                          {[{ val: 'percent', label: '%' }, { val: 'amount', label: curr }].map(t => (
-                            <button key={t.val} disabled={!canDiscount} onClick={() => setDiscountType(t.val)}
-                              style={{ padding: '6px 14px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 700, transition: 'all 0.2s',
-                                background: discountType === t.val ? '#4A90E2' : 'transparent',
-                                color: discountType === t.val ? '#fff' : '#8A9BB5',
-                              }}
-                            >{t.label}</button>
-                          ))}
-                        </div>
-                        <input
-                          type="number" disabled={!canDiscount} value={discountValue}
-                          onChange={e => setDiscountValue(e.target.value)} placeholder="Chegirma miqdori"
-                          style={{ flex: 1, padding: '9px 14px', borderRadius: '10px', border: '1.5px solid #DCE8F5', fontSize: 14, fontFamily: 'inherit', outline: 'none' }}
-                          onFocus={e => e.target.style.borderColor = '#4A90E2'}
-                          onBlur={e => e.target.style.borderColor = '#DCE8F5'}
-                        />
-                      </div>
-                    </motion.div>
-
-                    {/* Bonus */}
-                    {selectedCustomer && selectedCustomer.bonusBalance > 0 && (
-                      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.18 }}
-                        style={{ border: '1.5px solid #D1FAE5', borderRadius: '16px', padding: '16px', background: '#F0FDF4' }}
-                      >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
-                          <span style={{ fontWeight: 700, fontSize: 14, color: '#059669' }}>Bonus ishlatish</span>
-                          <span style={{ fontSize: 12, color: '#059669', fontWeight: 600 }}>Mavjud: <CurrencyDisplay amount={selectedCustomer.bonusBalance} /></span>
-                        </div>
-                        <div style={{ display: 'flex', gap: '8px' }}>
-                          <input type="number" value={bonusToUse}
-                            onChange={e => { const val = Number(e.target.value); if (val <= selectedCustomer.bonusBalance) setBonusToUse(e.target.value); }}
-                            placeholder="Qancha ishlatmoqchisiz?"
-                            style={{ flex: 1, padding: '9px 14px', borderRadius: '10px', border: '1.5px solid #A7F3D0', fontSize: 14, fontFamily: 'inherit', outline: 'none', background: '#fff' }}
-                          />
-                          <button onClick={() => setBonusToUse(selectedCustomer.bonusBalance)}
-                            style={{ padding: '9px 16px', borderRadius: '10px', border: '1.5px solid #A7F3D0', background: '#fff', color: '#059669', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}
-                          >Barchasi</button>
-                        </div>
-                      </motion.div>
-                    )}
-
-                    {/* Expected Bonus */}
-                    {selectedCustomer && selectedCustomer.bonusPercent > 0 && (
-                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 14px', background: '#F0FDF4', borderRadius: '12px', border: '1.5px solid #D1FAE5' }}>
-                        <span style={{ color: '#059669', fontWeight: 600, fontSize: 13 }}>Ushbu xariddan tushadigan bonus:</span>
-                        <span style={{ color: '#059669', fontWeight: 800, fontSize: 13 }}>
-                          <CurrencyDisplay amount={finalTotal * (Number(selectedCustomer.bonusPercent) / 100)} />
-                        </span>
-                      </div>
-                    )}
-
-                    {/* Payment Methods */}
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: '#8A9BB5', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>To'lov usuli</div>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
-                        {[
-                          { id: 'cash', label: "Naqd pul", icon: <Banknote size={20}/>, color: '#10B981' },
-                          { id: 'card', label: 'Plastik karta', icon: <CreditCard size={20}/>, color: '#4A90E2' },
-                          { id: 'mixed', label: 'Aralash', icon: <FileText size={20}/>, color: '#8B5CF6' },
-                          { id: 'debt', label: 'Nasiya', icon: <Calendar size={20}/>, color: '#F59E0B' },
-                        ].map((type, i) => {
-                          const active = paymentType === type.id;
-                          return (
-                            <motion.button
-                              key={type.id}
-                              whileHover={{ scale: 1.02 }}
-                              whileTap={{ scale: 0.97 }}
-                              onClick={() => setPaymentType(type.id)}
-                              style={{
-                                display: 'flex', alignItems: 'center', gap: '10px',
-                                padding: '12px 14px', borderRadius: '14px', cursor: 'pointer',
-                                border: active ? `2px solid ${type.color}` : '2px solid #DCE8F5',
-                                background: active ? `${type.color}12` : '#F7FAFF',
-                                color: active ? type.color : '#8A9BB5',
-                                fontWeight: active ? 700 : 500,
-                                fontSize: 14,
-                                transition: 'all 0.2s',
-                                fontFamily: 'inherit',
-                              }}
-                            >
-                              <div style={{
-                                width: 36, height: 36, borderRadius: '10px',
-                                background: active ? `${type.color}20` : '#F0F5FC',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                flexShrink: 0, color: active ? type.color : '#8A9BB5',
-                                transition: 'all 0.2s',
-                              }}>
-                                {type.icon}
-                              </div>
-                              {type.label}
-                            </motion.button>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    {/* Mixed inputs */}
-                    {paymentType === 'mixed' && (
-                      <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}
-                        style={{ border: '1.5px solid #DCE8F5', borderRadius: '16px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}
-                      >
-                        <FormInput label={`Naqd (${curr})`} type="number" value={mixedCash} onChange={e => setMixedCash(e.target.value)} placeholder="0" />
-                        <FormInput label={`Karta (${curr})`} type="number" value={mixedCard} onChange={e => setMixedCard(e.target.value)} placeholder="0" />
-                        {mDebt > 0 && (
-                          <div style={{ color: '#F59E0B', fontWeight: 700, fontSize: 13, padding: '10px 14px', background: '#FFFBEB', borderRadius: '10px' }}>
-                            Nasiyaga o'tmoqda: <CurrencyDisplay amount={mDebt} />
-                          </div>
-                        )}
-                        {mChange > 0 && (
-                          <div style={{ color: '#10B981', fontWeight: 700, fontSize: 13, padding: '10px 14px', background: '#F0FDF4', borderRadius: '10px' }}>
-                            Qaytim: <CurrencyDisplay amount={mChange} />
-                          </div>
-                        )}
-                      </motion.div>
-                    )}
-
-                    {/* Debt warning */}
-                    {(paymentType === 'debt' || (paymentType === 'mixed' && mDebt > 0)) && (
-                      <>
-                        {!selectedCustomer && (
-                          <div style={{ color: '#EF4B4B', fontSize: 13, fontWeight: 600, padding: '12px 14px', background: '#FFF5F5', borderRadius: '12px', border: '1.5px solid #FFE0E0' }}>
-                            ⚠ Nasiyaga sotish uchun kassa oynasidan mijozni tanlashingiz shart!
-                          </div>
-                        )}
-                        <FormInput label="Qaytarish muddati *" type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} required />
-                      </>
-                    )}
-                  </div>
-
-                  {/* Footer CTA */}
-                  <div style={{ padding: '16px 24px', borderTop: '1px solid #DCE8F5', flexShrink: 0, background: '#fff' }}>
-                    <motion.button
-                      whileHover={{ scale: isProcessing ? 1 : 1.01 }}
-                      whileTap={{ scale: isProcessing ? 1 : 0.98 }}
-                      onClick={handleCheckout}
-                      disabled={isProcessing || ((paymentType === 'debt' || (paymentType === 'mixed' && mDebt > 0)) && !selectedCustomer)}
-                      style={{
-                        width: '100%',
-                        padding: '15px',
-                        borderRadius: '16px',
-                        border: 'none',
-                        background: isProcessing ? '#8A9BB5' : 'linear-gradient(135deg, #10B981, #34D399)',
-                        color: '#fff',
-                        fontWeight: 800,
-                        fontSize: '16px',
-                        cursor: isProcessing ? 'not-allowed' : 'pointer',
-                        fontFamily: 'inherit',
-                        boxShadow: isProcessing ? 'none' : '0 6px 20px -6px rgba(16,185,129,0.5)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '8px',
-                        transition: 'all 0.2s',
-                        letterSpacing: '-0.3px',
-                      }}
-                    >
-                      <CheckCircle size={20} />
-                      {isProcessing ? 'Bajarilmoqda...' : "To'lovni yakunlash"}
-                    </motion.button>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
-
-
-
-      {/* Chek (Receipt) Modali */}
+      {/* 6. Receipt Modal */}
       <Modal isOpen={isReceiptModalOpen} onClose={() => setIsReceiptModalOpen(false)} title="Xarid cheki">
         {lastSale && (
-          <div className="flex-col" style={{ gap: '1.5rem', alignItems: 'center' }}>
+          <div className="flex flex-col items-center gap-6">
             <Receipt sale={lastSale} storeId={storeId} />
-
-            <div style={{ display: 'flex', gap: '1rem', width: '100%', maxWidth: '350px' }}>
-              <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => setIsReceiptModalOpen(false)}>Yopish</button>
-              <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => dataService.printReceipt()}>Chop etish</button>
+            <div className="w-full max-w-sm flex gap-3">
+              <button className="flex-1 py-3 border border-gray-300 rounded-xl text-gray-700 font-semibold active:bg-gray-50" onClick={() => setIsReceiptModalOpen(false)}>Yopish</button>
             </div>
           </div>
         )}
       </Modal>
+
     </div>
   );
 };
