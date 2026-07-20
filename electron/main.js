@@ -35,6 +35,17 @@ function startLocalServer(distPath) {
       let urlPath = req.url.split('?')[0];
       if (urlPath === '/') urlPath = '/index.html';
 
+      if (urlPath === '/auth-success') {
+        const urlParams = new URLSearchParams(req.url.split('?')[1]);
+        const token = urlParams.get('token');
+        if (token && mainWindow) {
+          mainWindow.webContents.send('google-login-success', token);
+        }
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.end('<html><body style="font-family:sans-serif;text-align:center;padding:50px;background:#f9fafb;"><h2>Muvaffaqiyatli ulandi!</h2><p>Bu oynani yopishingiz va ilovaga qaytishingiz mumkin.</p><script>setTimeout(()=>window.close(), 3000)</script></body></html>');
+        return;
+      }
+
       // Strip leading slash so path.join doesn't treat it as absolute root on Windows
       const relativePath = urlPath.startsWith('/') ? urlPath.slice(1) : urlPath;
       const safePath = path.normalize(relativePath).replace(/^(\.\.[/\\])+/, '');
@@ -150,6 +161,12 @@ ipcMain.handle('open-external', async (event, url) => {
 });
 
 // ── IPC: Window Controls ─────────────────────────────────────────────────────
+ipcMain.on('start-google-login', async () => {
+  if (serverPort) {
+    const authUrl = `https://project-three-brown-18.vercel.app/link-account?desktopPort=${serverPort}`;
+    await shell.openExternal(authUrl);
+  }
+});
 
 ipcMain.on('window-minimize', () => {
   if (mainWindow) mainWindow.minimize();

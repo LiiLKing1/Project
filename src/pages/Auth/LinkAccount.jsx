@@ -29,18 +29,12 @@ const LinkAccount = () => {
       const { getAuth } = await import('firebase/auth');
       const token = await getAuth().currentUser.getIdToken(true);
       
-      const response = await fetch(`http://127.0.0.1:${desktopPort}/auth-token`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idToken: token })
-      });
-
-      if (response.ok) {
-        setStatus('success');
-        setTimeout(() => window.close(), 3000);
-      } else {
-        setStatus('error');
-      }
+      // Navigate browser back to the local Electron app server. 
+      // This completely bypasses CORS since it's a top level navigation, not an XHR fetch.
+      window.location.href = `http://127.0.0.1:${desktopPort}/auth-success?token=${encodeURIComponent(token)}`;
+      
+      // Optimistically show success as navigation happens
+      setTimeout(() => setStatus('success'), 1000);
     } catch (err) {
       console.error(err);
       setStatus('error');

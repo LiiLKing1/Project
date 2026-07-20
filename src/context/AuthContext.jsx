@@ -31,7 +31,25 @@ export const AuthProvider = ({ children }) => {
 
   const login = (email, password) => signInWithEmailAndPassword(auth, email, password);
   
+  useEffect(() => {
+    if (window.electronAPI) {
+      window.electronAPI.onGoogleLoginSuccess((token) => {
+        const credential = GoogleAuthProvider.credential(token);
+        signInWithCredential(auth, credential).catch(err => {
+          console.error("Desktop Google Login Error:", err);
+        });
+      });
+      return () => {
+        window.electronAPI.removeGoogleLoginListener();
+      };
+    }
+  }, []);
+
   const loginWithGoogle = () => {
+    if (window.electronAPI) {
+      window.electronAPI.startGoogleLogin();
+      return Promise.resolve(); // Resolves immediately, actual login happens via IPC
+    }
     const provider = new GoogleAuthProvider();
     return signInWithPopup(auth, provider);
   };
