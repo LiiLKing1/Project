@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import './Dashboard.css';
 import {
   ShoppingCart, Users, Package, TrendingUp, TrendingDown,
   CreditCard, Banknote, Wallet, ChevronRight, BarChart2,
@@ -190,6 +191,39 @@ const Dashboard = () => {
   const revenue       = filteredSales.reduce((a,s) => a + Number(s.finalTotal||0), 0);
   const salesCount    = filteredSales.length;
 
+  // Products map for cost lookup
+  const productsMap = useMemo(() => {
+    const map = {};
+    products.forEach(p => { map[p.id] = p; });
+    return map;
+  }, [products]);
+
+  // Profit calculation (sellPrice - costPrice) * qty
+  const { totalCost, grossProfit } = useMemo(() => {
+    let costAcc = 0;
+    let profitAcc = 0;
+    filteredSales.forEach(sale => {
+      if (sale.items && sale.items.length > 0) {
+        sale.items.forEach(item => {
+          const qty = Number(item.qty || 0);
+          const sellP = Number(item.price || item.sellPrice || 0);
+          const prod = productsMap[item.productId];
+          const costP = Number(item.costPrice !== undefined && item.costPrice !== '' ? item.costPrice : (prod?.costPrice || 0));
+          
+          const itemCost = costP * qty;
+          const itemRevenue = sellP * qty;
+          const itemProfit = itemRevenue - itemCost;
+
+          costAcc += itemCost;
+          profitAcc += itemProfit;
+        });
+      }
+    });
+    return { totalCost: costAcc, grossProfit: profitAcc };
+  }, [filteredSales, productsMap]);
+
+  const profitMarginPct = revenue > 0 ? Math.round((grossProfit / revenue) * 100) : 0;
+
   // yesterday trend
   const yest = new Date(now); yest.setDate(yest.getDate()-1);
   const yesterdayRev  = sales.filter(s => s.createdAt && new Date(s.createdAt).toDateString()===yest.toDateString()).reduce((a,s)=>a+Number(s.finalTotal||0),0);
@@ -278,232 +312,282 @@ const Dashboard = () => {
   );
 
   const totalRevTrend = trendStr(revenue, yesterdayRev);
-  const cntTrend      = trendStr(salesCount, yesterdayCnt);
   const trendPos      = parseFloat(totalRevTrend) >= 0;
 
   return (
-    <div style={{ fontFamily:"'Poppins','Segoe UI',sans-serif", display:'flex', flexDirection:'column', gap:'1.25rem', paddingBottom:'2rem', color: TD }}>
+    <div className="dashboard-wrapper">
 
-      {/* ══ HEADER ══ */}
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'flex-end' }}>
-        <div style={{ display:'flex', gap:'8px' }}>
-          {/* Filter pill */}
-          <div style={{ display:'flex', background:'#fff', border:`1px solid ${CARD_B}`, borderRadius:'30px', padding:'4px', gap:'4px', boxShadow:'0 4px 12px -6px rgba(0,0,0,.12)' }}>
-            {Object.entries(filterLabels).map(([key,label]) => (
-              <button key={key} onClick={()=>setTimeFilter(key)} style={{
-                padding:'8px 18px', borderRadius:'20px', border:'none', cursor:'pointer', fontSize:'14px', fontWeight: timeFilter===key?700:500,
-                background: timeFilter===key ? `linear-gradient(135deg,${GL},${GM})` : 'transparent',
-                color: timeFilter===key ? '#fff' : TG,
-                transition:'all .2s'
-              }}>{label}</button>
-            ))}
+      {/* ══ HEADER & FILTERS ══ */}
+      <div className="dashboard-header-row">
+        {/* Filter pills */}
+        <div className="filter-pills-container">
+          {Object.entries(filterLabels).map(([key, label]) => (
+            <button
+              key={key}
+              onClick={() => setTimeFilter(key)}
+              className={`filter-pill-btn ${timeFilter === key ? 'active' : ''}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ══ ALERTS STRIP ══ */}
+      {(lowStock.length > 0 || overdueDebts > 0 || pendingOrders.length > 0) && (
+        <div className="alert-banner-strip">
+          <div className="alert-strip-left">
+            <AlertCircle size={15} color="#D97706" />
+            <span>
+              {lowStock.length > 0 && `${lowStock.length} ta tovar qoldig'i kamaygan. `}
+              {overdueDebts > 0 && `${overdueDebts} ta qarz muddati o'tgan. `}
+              {pendingOrders.length > 0 && `${pendingOrders.length} ta buyurtma kutilmoqda.`}
+            </span>
+          </div>
+          <button
+            className="alert-strip-btn"
+            onClick={() => navigate(lowStock.length > 0 ? '/products' : overdueDebts > 0 ? '/customers/debts' : '/orders')}
+          >
+            Barchasini ko'rish <ChevronRight size={12} />
+          </button>
+        </div>
+      )}
+
+      {/* ══ TOP 4-STAT GRID ══ */}
+      <div className="dash-stats-grid">
+        {/* Card 1: Revenue */}
+        <div className="dash-card dash-card-hero-revenue" onClick={() => navigate('/reports')} style={{ cursor: 'pointer' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '8px' }}>
+            <span className="dash-card-title">{filterLabels[timeFilter]} Tushum</span>
+            <span style={{ fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: '6px', background: trendPos ? 'rgba(16,185,129,0.3)' : 'rgba(239,75,75,0.4)', color: '#fff' }}>
+              {totalRevTrend}%
+            </span>
+          </div>
+          <div className="dash-card-val">
+            <CurrencyDisplay amount={revenue} />
+          </div>
+          <div className="dash-card-sub">
+            <TrendingUp size={12} /> Kechaga nisbatan
+          </div>
+        </div>
+
+        {/* Card 2: Sof Foyda (Gross Profit) */}
+        <div className="dash-card dash-card-hero-profit">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '8px' }}>
+            <span className="dash-card-title">Sof Foyda (Marja)</span>
+            <span style={{ fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: '6px', background: 'rgba(255,255,255,0.25)', color: '#fff' }}>
+              {profitMarginPct}% marja
+            </span>
+          </div>
+          <div className="dash-card-val">
+            +<CurrencyDisplay amount={grossProfit} />
+          </div>
+          <div className="dash-card-sub">
+            Tannarx ustiga marja
+          </div>
+        </div>
+
+        {/* Card 3: Sotuvlar Soni */}
+        <div className="dash-card">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '8px' }}>
+            <span className="dash-card-title" style={{ color: TG }}>Sotuvlar</span>
+            <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#EFF6FF', color: GL, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <ShoppingCart size={14} />
+            </div>
+          </div>
+          <div className="dash-card-val" style={{ color: TD }}>
+            {salesCount} <span style={{ fontSize: '13px', fontWeight: 600, color: TG }}>ta</span>
+          </div>
+          <div className="dash-card-sub" style={{ color: TG }}>
+            Mijozlar: {customers.filter(c => c.status !== 'archived').length}
+          </div>
+        </div>
+
+        {/* Card 4: Tovarlar Tannarxi */}
+        <div className="dash-card">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '8px' }}>
+            <span className="dash-card-title" style={{ color: TG }}>Tovarlar Tannarxi</span>
+            <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#F8FAFC', color: TG, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Package size={14} />
+            </div>
+          </div>
+          <div className="dash-card-val" style={{ color: TD }}>
+            <CurrencyDisplay amount={totalCost} />
+          </div>
+          <div className="dash-card-sub" style={{ color: TG }}>
+            Mahsulotlar tannarxi
           </div>
         </div>
       </div>
 
-      {/* ══ ALERTS ══ */}
-      {(lowStock.length>0 || overdueDebts>0 || pendingOrders.length>0) && (
-        <div style={{ display:'flex', gap:'8px', flexWrap:'wrap' }}>
-          {lowStock.length>0 && (
-            <button onClick={()=>navigate('/products')} style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 18px', borderRadius:'999px', border:'1px solid #F59E0B55', background:'#FEF9EC', color:'#B45309', fontSize:'14px', fontWeight:600, cursor:'pointer' }}>
-              <Package size={16}/> {lowStock.length} ta tovar kam <ChevronRight size={14}/>
-            </button>
-          )}
-          {overdueDebts>0 && (
-            <button onClick={()=>navigate('/customers/debts')} style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 18px', borderRadius:'999px', border:`1px solid ${RED}55`, background:'#FEF2F2', color: RED, fontSize:'14px', fontWeight:600, cursor:'pointer' }}>
-              <AlertCircle size={16}/> {overdueDebts} ta qarz muddati o'tgan <ChevronRight size={14}/>
-            </button>
-          )}
-          {pendingOrders.length>0 && (
-            <button onClick={()=>navigate('/orders')} style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 18px', borderRadius:'999px', border:`1px solid ${GL}66`, background:'#F0F6FC', color: GD, fontSize:'14px', fontWeight:600, cursor:'pointer' }}>
-              <ShoppingCart size={16}/> {pendingOrders.length} ta buyurtma <ChevronRight size={14}/>
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* ══ MAIN GRID ══ */}
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'1rem' }}>
+      {/* ══ MAIN GRID (2 columns) ══ */}
+      <div className="dashboard-main-grid">
 
         {/* LEFT COLUMN */}
-        <div style={{ display:'flex', flexDirection:'column', gap:'1rem' }}>
+        <div className="dashboard-col">
 
-          {/* Revenue hero card */}
-          <div onClick={()=>navigate('/reports')} style={{
-            background: HERO_GRADIENT,
-            borderRadius:'20px', padding:'20px',
-            boxShadow:`0 16px 40px -12px ${GL}55`,
-            cursor:'pointer', position:'relative', overflow:'hidden'
-          }}>
-            <div style={{ position:'absolute', right:-20, top:-20, width:120, height:120, borderRadius:'50%', background:'rgba(255,255,255,.08)' }}/>
-            <div style={{ position:'absolute', right:30, bottom:-30, width:80, height:80, borderRadius:'50%', background:'rgba(255,255,255,.06)' }}/>
-            <div style={{ position:'relative' }}>
-              <div style={{ fontSize:'14px', color:'rgba(255,255,255,.8)', fontWeight:500, marginBottom:8 }}>{filterLabels[timeFilter]} tushum</div>
-              <div style={{ fontSize:'32px', fontWeight:800, color:'#fff', letterSpacing:'-0.5px' }}>
-                <CurrencyDisplay amount={revenue}/>
-              </div>
-              <div style={{ display:'flex', alignItems:'center', gap:10, marginTop:14 }}>
-                <span style={{ fontSize:'13px', fontWeight:700, color:'#fff', padding:'4px 10px', borderRadius:'8px', background: trendPos?'rgba(0,0,0,.25)':'rgba(239,75,75,.5)' }}>
-                  {trendPos?<TrendingUp size={12} style={{display:'inline',marginRight:4}}/>:<TrendingDown size={12} style={{display:'inline',marginRight:4}}/>}
-                  {totalRevTrend}%
-                </span>
-                <span style={{ fontSize:'13px', color:'rgba(255,255,255,.75)' }}>kechaga nisbatan</span>
-              </div>
-            </div>
-            <div style={{ marginTop:24, paddingTop:18, borderTop:'1px solid rgba(255,255,255,.2)', display:'flex', gap:24, position:'relative' }}>
-              <div>
-                <div style={{ fontSize:'12px', color:'rgba(255,255,255,.7)', marginBottom: 4 }}>Sotuvlar</div>
-                <div style={{ fontWeight:700, color:'#fff', fontSize:'18px' }}>{salesCount} ta</div>
-              </div>
-              <div>
-                <div style={{ fontSize:'12px', color:'rgba(255,255,255,.7)', marginBottom: 4 }}>Mijozlar</div>
-                <div style={{ fontWeight:700, color:'#fff', fontSize:'18px' }}>{customers.filter(c=>c.status!=='archived').length}</div>
-              </div>
-              <div style={{ marginLeft:'auto', display:'flex', alignItems:'center' }}>
-                <ArrowUpRight size={18} color="rgba(255,255,255,.6)"/>
-              </div>
-            </div>
-          </div>
-
-          <div style={{ border:`1px solid ${CARD_B}`, borderRadius:'20px', padding:'20px', boxShadow:'0 8px 24px -18px rgba(0,0,0,.3)', background:'#fff' }}>
-            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
-              <div style={{ display:'flex', alignItems:'center', gap:10, fontWeight:700, fontSize:'16px', color: TD }}>
-                <div style={{ width:32, height:32, borderRadius:'50%', background:'#D1EDFB', display:'flex', alignItems:'center', justifyContent:'center', color: GL }}>
-                  <BarChart2 size={16}/>
+          {/* Savdo Grafigi */}
+          <div style={{ border: `1px solid ${CARD_B}`, borderRadius: '16px', padding: '16px', boxShadow: '0 4px 16px -10px rgba(0,0,0,0.08)', background: '#fff' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 700, fontSize: '15px', color: TD }}>
+                <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#D1EDFB', display: 'flex', alignItems: 'center', justifyContent: 'center', color: GL }}>
+                  <BarChart2 size={14} />
                 </div>
                 Savdo grafigi
               </div>
-              <span style={{ fontSize:'13px', color: TG, fontWeight:600 }}>{filterLabels[timeFilter]} ⌄</span>
+              <span style={{ fontSize: '12px', color: TG, fontWeight: 600 }}>{filterLabels[timeFilter]}</span>
             </div>
 
-            {/* Recharts AreaChart */}
-            <div style={{ height:'180px', marginTop:'15px' }}>
+            {/* AreaChart */}
+            <div style={{ height: '160px' }}>
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={chartBars} margin={{ top:10, right:0, left:-25, bottom:0 }}>
+                <AreaChart data={chartBars} margin={{ top: 10, right: 0, left: -25, bottom: 0 }}>
                   <defs>
                     <linearGradient id="colorJami" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor={GL} stopOpacity={0.4}/>
-                      <stop offset="95%" stopColor={GL} stopOpacity={0}/>
+                      <stop offset="5%" stopColor={GL} stopOpacity={0.35} />
+                      <stop offset="95%" stopColor={GL} stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB"/>
-                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: TG, fontSize:12 }} dy={10} minTickGap={15}/>
-                  <YAxis axisLine={false} tickLine={false} tick={{ fill: TG, fontSize:12 }} tickFormatter={v => formatCompact(v)}/>
-                  <Tooltip content={<CustomTooltip curr={curr}/>} cursor={{ stroke: `${GL}55`, strokeWidth: 2, strokeDasharray: '4 4' }}/>
-                  <Area type="monotone" dataKey="jami" stroke={GL} strokeWidth={3} fillOpacity={1} fill="url(#colorJami)" activeDot={{ r: 6, strokeWidth: 0, fill: GD }} />
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: TG, fontSize: 11 }} dy={6} minTickGap={15} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fill: TG, fontSize: 11 }} tickFormatter={v => formatCompact(v)} />
+                  <Tooltip content={<CustomTooltip curr={curr} />} cursor={{ stroke: `${GL}55`, strokeWidth: 1.5, strokeDasharray: '4 4' }} />
+                  <Area type="monotone" dataKey="jami" stroke={GL} strokeWidth={2.5} fillOpacity={1} fill="url(#colorJami)" activeDot={{ r: 5, strokeWidth: 0, fill: GD }} />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
           </div>
 
-          {/* Macro-style: payment types (from .macros) */}
-          <div style={{ display:'flex', gap:'8px' }}>
-            <MacroCard
-              label="Naqd"
-              value={payDist.cash}
-              maxValue={revenue}
-              unit={formatCompact(revenue) + ' ' + curr}
-              trend={`${pct(payDist.cash,revenue)}%`}
-              isAlert={false}
-            />
-            <MacroCard
-              label="Karta"
-              value={payDist.card}
-              maxValue={revenue}
-              unit={formatCompact(revenue) + ' ' + curr}
-              trend={`${pct(payDist.card,revenue)}%`}
-              isAlert={false}
-            />
-            <MacroCard
-              label="Nasiya"
-              value={payDist.debt}
-              maxValue={revenue}
-              unit={formatCompact(revenue) + ' ' + curr}
-              trend={`${pct(payDist.debt,revenue)}%`}
-              isAlert={payDist.debt > revenue * 0.4}
-            />
+          {/* Payment Breakdown (3-Grid) */}
+          <div className="pay-breakdown-grid">
+            <div className="pay-card">
+              <div className="pay-card-header">
+                <span className="pay-card-title">Naqd</span>
+                <Banknote size={14} color="#10B981" />
+              </div>
+              <div className="pay-card-val"><CurrencyDisplay amount={payDist.cash} /></div>
+              <div className="pay-progress-bg">
+                <div className="pay-progress-bar" style={{ width: `${pct(payDist.cash, revenue)}%`, background: '#10B981' }} />
+              </div>
+            </div>
+
+            <div className="pay-card">
+              <div className="pay-card-header">
+                <span className="pay-card-title">Karta</span>
+                <CreditCard size={14} color={GL} />
+              </div>
+              <div className="pay-card-val"><CurrencyDisplay amount={payDist.card} /></div>
+              <div className="pay-progress-bg">
+                <div className="pay-progress-bar" style={{ width: `${pct(payDist.card, revenue)}%`, background: GL }} />
+              </div>
+            </div>
+
+            <div className="pay-card">
+              <div className="pay-card-header">
+                <span className="pay-card-title">Nasiya</span>
+                <Wallet size={14} color="#F59E0B" />
+              </div>
+              <div className="pay-card-val"><CurrencyDisplay amount={payDist.debt} /></div>
+              <div className="pay-progress-bg">
+                <div className="pay-progress-bar" style={{ width: `${pct(payDist.debt, revenue)}%`, background: '#F59E0B' }} />
+              </div>
+            </div>
           </div>
         </div>
 
         {/* RIGHT COLUMN */}
-        <div style={{ display:'flex', flexDirection:'column', gap:'1rem' }}>
+        <div className="dashboard-col">
 
-          <div style={{ border:`1px solid ${CARD_B}`, borderRadius:'20px', background:'#fff', overflow:'hidden', boxShadow:'0 8px 24px -18px rgba(0,0,0,.3)' }}>
-            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'20px 20px 0' }}>
-              <div style={{ fontWeight:700, fontSize:'16px', color: TD }}>Top mahsulotlar</div>
-              <span style={{ fontSize:'13px', color: GD, fontWeight:700 }}>{filterLabels[timeFilter]}</span>
+          {/* Top Mahsulotlar */}
+          <div style={{ border: `1px solid ${CARD_B}`, borderRadius: '16px', background: '#fff', overflow: 'hidden', boxShadow: '0 4px 16px -10px rgba(0,0,0,0.08)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px 8px' }}>
+              <div style={{ fontWeight: 700, fontSize: '15px', color: TD }}>Top mahsulotlar</div>
+              <span style={{ fontSize: '12px', color: GD, fontWeight: 700 }}>{filterLabels[timeFilter]}</span>
             </div>
-            <div style={{ marginTop:14 }}>
+            <div>
               {topProducts.length > 0 ? topProducts.map((p, i) => (
-                <div key={i} style={{ display:'flex', alignItems:'center', gap:14, padding:'14px 20px', borderBottom: i<topProducts.length-1?`1px solid ${CARD_B}`:'none' }}>
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', borderBottom: i < topProducts.length - 1 ? `1px solid ${CARD_B}` : 'none' }}>
                   <div style={{
-                    width:44, height:44, borderRadius:'14px', flexShrink:0,
-                    background: i===0?`linear-gradient(135deg,${GL},${GD})`:'#F0F5FC',
-                    color: i===0?'#fff': TG,
-                    display:'flex', alignItems:'center', justifyContent:'center',
-                    fontWeight:800, fontSize:'14px'
-                  }}>{i+1}</div>
-                  <div style={{ flex:1, minWidth:0 }}>
-                    <div style={{ fontWeight:700, fontSize:'15px', color: TD, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{p.name}</div>
-                    <div style={{ fontSize:'13px', color: TG, marginTop:2 }}>{p.qty} dona sotildi</div>
+                    width: 32, height: 32, borderRadius: '10px', flexShrink: 0,
+                    background: i === 0 ? `linear-gradient(135deg,${GL},${GD})` : '#F0F5FC',
+                    color: i === 0 ? '#fff' : TG,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontWeight: 800, fontSize: '13px'
+                  }}>{i + 1}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, fontSize: '13px', color: TD, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</div>
+                    <div style={{ fontSize: '11px', color: TG, marginTop: 1 }}>{p.qty} dona sotildi</div>
                   </div>
-                  <div style={{ background: GL, color:'#fff', fontSize:'13px', fontWeight:700, padding:'6px 14px', borderRadius:'20px', flexShrink:0 }}>
+                  <div style={{ background: GL, color: '#fff', fontSize: '12px', fontWeight: 700, padding: '4px 10px', borderRadius: '14px', flexShrink: 0 }}>
                     {formatCompact(p.revenue)}
                   </div>
                 </div>
               )) : (
-                <div style={{ padding:'2rem', textAlign:'center', color: TG, fontSize:'15px' }}>Ma'lumot yo'q</div>
+                <div style={{ padding: '1.5rem', textAlign: 'center', color: TG, fontSize: '13px' }}>Ma'lumot yo'q</div>
               )}
             </div>
           </div>
 
-          {/* Recent Sales (from .list-card .list-row) */}
-          <div style={{ border:`1px solid ${CARD_B}`, borderRadius:'20px', background:'#fff', overflow:'hidden', boxShadow:'0 8px 24px -18px rgba(0,0,0,.3)', flex:1 }}>
-            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'20px 20px 8px' }}>
-              <div style={{ fontWeight:700, fontSize:'16px', color: TD }}>So'nggi sotuvlar</div>
-              <button onClick={()=>navigate('/reports')} style={{ fontSize:'13px', color: GL, fontWeight:700, background:'none', border:'none', cursor:'pointer', display:'flex', alignItems:'center', gap:4 }}>
-                Barchasi <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M9 6l6 6-6 6"/></svg>
+          {/* So'nggi Sotuvlar */}
+          <div style={{ border: `1px solid ${CARD_B}`, borderRadius: '16px', background: '#fff', overflow: 'hidden', boxShadow: '0 4px 16px -10px rgba(0,0,0,0.08)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px 8px' }}>
+              <div style={{ fontWeight: 700, fontSize: '15px', color: TD }}>So'nggi sotuvlar</div>
+              <button onClick={() => navigate('/reports')} style={{ fontSize: '12px', color: GL, fontWeight: 700, background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}>
+                Barchasi <ChevronRight size={12} />
               </button>
             </div>
             <div>
-              {sales.slice(0,6).map((sale, i) => (
-                <div key={sale.id} style={{ display:'flex', alignItems:'center', gap:14, padding:'14px 20px', borderBottom: i<5&&i<sales.length-1?`1px solid ${CARD_B}`:'none' }}>
-                  <div style={{ width:44, height:44, borderRadius:'14px', background:'#F0F5FC', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-                    {sale.paymentType==='cash'
-                      ? <Banknote size={18} color="#10B981"/>
-                      : sale.paymentType==='card'
-                      ? <CreditCard size={18} color={GL}/>
-                      : <Wallet size={18} color="#F59E0B"/>}
+              {sales.slice(0, 4).map((sale, i) => (
+                <div key={sale.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', borderBottom: i < 3 && i < sales.length - 1 ? `1px solid ${CARD_B}` : 'none' }}>
+                  <div style={{ width: 34, height: 34, borderRadius: '10px', background: '#F0F5FC', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    {sale.paymentType === 'cash'
+                      ? <Banknote size={16} color="#10B981" />
+                      : sale.paymentType === 'card'
+                      ? <CreditCard size={16} color={GL} />
+                      : <Wallet size={16} color="#F59E0B" />}
                   </div>
-                  <div style={{ flex:1, minWidth:0 }}>
-                    <div style={{ fontWeight:700, fontSize:'15px', color: TD, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, fontSize: '13px', color: TD, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {sale.customerName || 'Anonim xaridor'}
                     </div>
-                    <div style={{ fontSize:'12px', color: TG, marginTop:2 }}>
-                      {new Date(sale.createdAt).toLocaleTimeString('uz-UZ',{hour:'2-digit',minute:'2-digit'})} • {sale.items?.length||0} mahsulot
+                    <div style={{ fontSize: '11px', color: TG, marginTop: 1 }}>
+                      {new Date(sale.createdAt).toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' })} • {sale.items?.length || 0} ta mahsulot
                     </div>
                   </div>
-                  <div style={{ fontWeight:700, fontSize:'15px', color: GL, flexShrink:0 }}>
-                    <CurrencyDisplay amount={sale.finalTotal}/>
+                  <div style={{ fontWeight: 700, fontSize: '13px', color: GL, flexShrink: 0 }}>
+                    <CurrencyDisplay amount={sale.finalTotal} />
                   </div>
                 </div>
               ))}
-              {sales.length===0 && (
-                <div style={{ padding:'3rem', textAlign:'center', color: TG, fontSize:'15px' }}>Hozircha sotuvlar yo'q</div>
+              {sales.length === 0 && (
+                <div style={{ padding: '1.5rem', textAlign: 'center', color: TG, fontSize: '13px' }}>Hozircha sotuvlar yo'q</div>
               )}
             </div>
           </div>
 
-          {/* Quick Actions (from .list-card) */}
-          <div style={{ border:`1px solid ${CARD_B}`, borderRadius:'20px', background:'#fff', overflow:'hidden', boxShadow:'0 8px 24px -18px rgba(0,0,0,.3)' }}>
-            <div style={{ padding:'18px 20px 8px', fontWeight:700, fontSize:'16px', color: TD }}>Tezkor harakatlar</div>
-            <ListRow icon={<ShoppingCart size={16}/>} label="Yangi sotuv" onClick={()=>navigate('/sales')}/>
-            <ListRow icon={<Package size={16}/>} label="Mahsulot qo'shish" onClick={()=>navigate('/products')}/>
-            <ListRow icon={<Users size={16}/>} label="Mijozlar" onClick={()=>navigate('/customers')}/>
-            <ListRow icon={<Wallet size={16}/>} label="Qarzlar" onClick={()=>navigate('/customers/debts')}
-              right={overdueDebts>0 && <span style={{ fontSize:'12px', fontWeight:700, color:'#fff', background: RED, padding:'2px 10px', borderRadius:'999px' }}>{overdueDebts}</span>}
-            />
+          {/* Quick Actions (2x2 Grid) */}
+          <div style={{ border: `1px solid ${CARD_B}`, borderRadius: '16px', background: '#fff', overflow: 'hidden', boxShadow: '0 4px 16px -10px rgba(0,0,0,0.08)' }}>
+            <div style={{ padding: '14px 16px 4px', fontWeight: 700, fontSize: '15px', color: TD }}>Tezkor harakatlar</div>
+            <div className="quick-actions-grid">
+              <button className="quick-action-btn" onClick={() => navigate('/sales')}>
+                <div className="quick-action-icon"><ShoppingCart size={16} /></div>
+                Yangi sotuv
+              </button>
+              <button className="quick-action-btn" onClick={() => navigate('/products')}>
+                <div className="quick-action-icon"><Package size={16} /></div>
+                Mahsulotlar
+              </button>
+              <button className="quick-action-btn" onClick={() => navigate('/customers')}>
+                <div className="quick-action-icon"><Users size={16} /></div>
+                Mijozlar
+              </button>
+              <button className="quick-action-btn" onClick={() => navigate('/customers/debts')}>
+                <div className="quick-action-icon"><Wallet size={16} /></div>
+                Qarzlar {overdueDebts > 0 && <span style={{ background: RED, color: '#fff', fontSize: '10px', padding: '1px 6px', borderRadius: '999px', marginLeft: 'auto' }}>{overdueDebts}</span>}
+              </button>
+            </div>
           </div>
+
         </div>
       </div>
     </div>

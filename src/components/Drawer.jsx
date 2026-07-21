@@ -43,7 +43,10 @@ const Drawer = ({ isOpen, onClose, title, children, position = 'right', width = 
       flexDirection: 'column',
       fontFamily: "'Poppins','Segoe UI',sans-serif",
     };
-    if (position === 'bottom') {
+    if (position === 'top') {
+      return { ...base, top: isElectron ? '40px' : 0, left: 0, right: 0, width: '100%', maxHeight: '85vh',
+        borderBottomLeftRadius: '24px', borderBottomRightRadius: '24px' };
+    } else if (position === 'bottom') {
       return { ...base, bottom: 0, left: 0, right: 0, width: '100%', maxHeight: '90vh',
         borderTopLeftRadius: '24px', borderTopRightRadius: '24px' };
     } else if (position === 'left') {
@@ -53,6 +56,7 @@ const Drawer = ({ isOpen, onClose, title, children, position = 'right', width = 
   };
 
   const getAnimation = () => {
+    if (position === 'top')    return { initial: { y: '-100%' }, animate: { y: 0 }, exit: { y: '-100%' } };
     if (position === 'bottom') return { initial: { y: '100%' }, animate: { y: 0 }, exit: { y: '100%' } };
     if (position === 'left')   return { initial: { x: '-100%' }, animate: { x: 0 }, exit: { x: '-100%' } };
     return { initial: { x: '100%' }, animate: { x: 0 }, exit: { x: '100%' } };
@@ -64,14 +68,13 @@ const Drawer = ({ isOpen, onClose, title, children, position = 'right', width = 
         <>
           {/* Backdrop */}
           <motion.div
+            className="drawer-backdrop"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
             style={{
-              position: 'fixed', top: isElectron ? '40px' : 0, left: 0, right: 0, bottom: 0,
-              backgroundColor: 'rgba(26,37,56,0.45)',
-              backdropFilter: 'blur(4px)',
+              top: isElectron ? '40px' : 0,
               zIndex: zIndex,
             }}
             onClick={handleBackdropClick}

@@ -1,0 +1,350 @@
+/* Dashboard Modern Redesign CSS */
+
+.dashboard-wrapper {
+  font-family: 'Poppins', 'Segoe UI', sans-serif;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding-bottom: 2rem;
+  color: #1E293B;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Header & Filters */
+.dashboard-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.filter-pills-container {
+  display: flex;
+  background: #ffffff;
+  border: 1px solid #E2E8F0;
+  border-radius: 999px;
+  padding: 3px;
+  gap: 2px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.filter-pills-container::-webkit-scrollbar {
+  display: none;
+}
+
+.filter-pill-btn {
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  color: #64748B;
+  background: transparent;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.filter-pill-btn.active {
+  background: linear-gradient(135deg, #2563EB, #3B82F6);
+  color: #ffffff;
+  font-weight: 700;
+  box-shadow: 0 3px 10px -2px rgba(37, 99, 235, 0.4);
+}
+
+/* Alert Banner Strip */
+.alert-banner-strip {
+  background: #FFFBEB;
+  border: 1px solid #FDE68A;
+  border-radius: 14px;
+  padding: 8px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+  color: #B45309;
+  box-shadow: 0 2px 8px rgba(217, 119, 6, 0.06);
+}
+
+.alert-strip-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+
+.alert-strip-btn {
+  background: #FEF3C7;
+  border: 1px solid #FCD34D;
+  color: #92400E;
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.alert-strip-btn:hover {
+  background: #FDE68A;
+}
+
+/* Stats 4-Grid Header */
+.dash-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+/* Premium Stat Cards */
+.dash-card {
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 4px 16px -8px rgba(0, 0, 0, 0.08);
+  border: 1px solid #E2E8F0;
+  background: #ffffff;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.dash-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px -8px rgba(0, 0, 0, 0.12);
+}
+
+/* Hero Revenue Card */
+.dash-card-hero-revenue {
+  background: linear-gradient(135deg, #1E293B 0%, #334155 50%, #0F172A 100%);
+  border: none;
+  color: #ffffff;
+}
+
+.dash-card-hero-profit {
+  background: linear-gradient(135deg, #065F46 0%, #059669 60%, #10B981 100%);
+  border: none;
+  color: #ffffff;
+}
+
+.dash-card-title {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  opacity: 0.85;
+}
+
+.dash-card-val {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  margin-top: 4px;
+}
+
+.dash-card-sub {
+  font-size: 11px;
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  opacity: 0.9;
+}
+
+/* Layout Grid Main */
+.dashboard-main-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.dashboard-col {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Payment breakdown 3-grid */
+.pay-breakdown-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.pay-card {
+  background: #ffffff;
+  border: 1px solid #E2E8F0;
+  border-radius: 14px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pay-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.pay-card-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #64748B;
+}
+
+.pay-card-val {
+  font-size: 14px;
+  font-weight: 800;
+  color: #0F172A;
+}
+
+.pay-progress-bg {
+  height: 4px;
+  background: #F1F5F9;
+  border-radius: 999px;
+  overflow: hidden;
+  margin-top: 2px;
+}
+
+.pay-progress-bar {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #2563EB, #3B82F6);
+}
+
+/* Quick Actions Grid */
+.quick-actions-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 12px;
+}
+
+.quick-action-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid #E2E8F0;
+  background: #F8FAFC;
+  color: #1E293B;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.quick-action-btn:hover {
+  background: #EFF6FF;
+  border-color: #BFDBFE;
+  color: #2563EB;
+  transform: translateY(-1px);
+}
+
+.quick-action-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #2563EB;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+}
+
+/* Responsive Media Queries */
+@media (max-width: 1200px) {
+  .dash-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .dashboard-main-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .dashboard-wrapper {
+    gap: 0.75rem;
+  }
+
+  .dashboard-header-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .filter-pills-container {
+    width: 100%;
+    justify-content: space-between;
+    box-sizing: border-box;
+  }
+
+  .filter-pill-btn {
+    flex: 1;
+    padding: 6px 8px;
+    font-size: 12px;
+    text-align: center;
+  }
+
+  .dash-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+
+  .dash-card {
+    padding: 12px;
+    border-radius: 14px;
+  }
+
+  .dash-card-val {
+    font-size: 17px;
+  }
+
+  .dashboard-main-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .pay-breakdown-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+  }
+
+  .pay-card {
+    padding: 8px 10px;
+  }
+
+  .pay-card-val {
+    font-size: 12px;
+  }
+
+  .quick-actions-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    padding: 10px;
+  }
+
+  .quick-action-btn {
+    padding: 10px;
+    font-size: 12px;
+    gap: 8px;
+  }
+
+  .quick-action-icon {
+    width: 28px;
+    height: 28px;
+  }
+}

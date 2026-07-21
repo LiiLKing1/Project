@@ -427,3 +427,124 @@ a {
 ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
 
+/* ─── Mobile Responsiveness ─────────────────────────────── */
+@media (max-width: 768px) {
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+
+  .page-header > div:last-child {
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .page-card-header {
+    flex-direction: column;
+    align-items: stretch !important;
+  }
+
+  .search-wrap {
+    min-width: 100% !important;
+    width: 100% !important;
+  }
+
+  /* Rule 1: MANDATORY 2x2 Stat Cards Grid */
+  .stat-row {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+    margin-bottom: 1rem !important;
+  }
+
+  .stat-card {
+    padding: 10px 12px !important;
+    border-radius: 12px !important;
+    min-height: auto !important;
+  }
+
+  .stat-card-label {
+    font-size: 11px !important;
+    line-height: 1.2 !important;
+  }
+
+  .stat-card-value {
+    font-size: 17px !important;
+    margin: 2px 0 !important;
+    font-weight: 700 !important;
+  }
+
+  .stat-card-sub {
+    font-size: 10px !important;
+  }
+
+  /* Page Header Responsiveness */
+  .page-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 12px !important;
+    margin-bottom: 1rem !important;
+  }
+
+  .page-header > div:last-child {
+    width: 100% !important;
+    display: flex !important;
+    gap: 8px !important;
+    flex-wrap: wrap !important;
+  }
+
+  .page-header .btn {
+    flex: 1 1 auto !important;
+    justify-content: center !important;
+    padding: 8px 12px !important;
+    font-size: 13px !important;
+  }
+
+  /* Rule 2: Zero Horizontal Table Overflow & Mobile Card Table */
+  .page-table {
+    min-width: 100% !important;
+    width: 100% !important;
+    font-size: 13px !important;
+  }
+
+  .page-table th {
+    padding: 8px 10px !important;
+    font-size: 11px !important;
+  }
+
+  .page-table td {
+    padding: 10px 8px !important;
+  }
+
+  .table-responsive {
+    width: 100% !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    margin-bottom: 1rem !important;
+  }
+
+  /* Modal Form Grid Responsiveness */
+  .modal-body form, .modal-content form {
+    gap: 12px !important;
+  }
+
+  div[style*="gridTemplateColumns"], div[style*="grid-template-columns"] {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Global Drawer Backdrop Heavy Blur */
+.drawer-backdrop {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(15, 23, 42, 0.4) !important;
+  backdrop-filter: blur(4px) !important;
+  -webkit-backdrop-filter: blur(4px) !important;
+}
+
+

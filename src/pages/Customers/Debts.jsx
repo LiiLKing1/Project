@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import './Debts.css';
 import { db } from '../../firebase';
 import { collection, onSnapshot, query, where, doc, getDocs, writeBatch, increment, orderBy, serverTimestamp } from '../../services/firebaseMock';
 import { useToast } from '../../context/ToastContext';
@@ -10,12 +12,16 @@ import Modal from '../../components/Modal';
 import FormInput from '../../components/FormInput';
 import CurrencyDisplay from '../../components/CurrencyDisplay';
 import { formatCurrency } from '../../utils/formatters';
-import { Search, ChevronDown, ChevronUp, Plus, Minus, CreditCard, Trash2, Calendar } from 'lucide-react';
+import { Search, ChevronDown, ChevronUp, Plus, Minus, CreditCard, Trash2, Calendar, Zap, CheckSquare, MessageSquare } from 'lucide-react';
 
 const Debts = () => {
   const [allDebts, setAllDebts] = useState([]);
   const [customers, setCustomers] = useState([]); // All customers for new debt dropdown
   const [search, setSearch] = useState('');
+  
+  // Actions bounce menu state
+  const [showActionsMenu, setShowActionsMenu] = useState(false);
+  const actionsMenuRef = useRef(null);
   
   // Expanded customer state
   const [expandedId, setExpandedId] = useState(null);
@@ -72,6 +78,19 @@ const Debts = () => {
 
     return () => { unsubDebts(); unsubAll(); };
   }, [storeId]);
+
+  // Click outside for actions menu
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (actionsMenuRef.current && !actionsMenuRef.current.contains(e.target)) {
+        setShowActionsMenu(false);
+      }
+    };
+    if (showActionsMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showActionsMenu]);
 
   const debtors = React.useMemo(() => {
     const debtMap = {};
@@ -620,18 +639,75 @@ const Debts = () => {
           <h1 className="page-title">Qarzlar ro'yxati (Debitorlik)</h1>
           <p className="page-subtitle">Mijozlarning do'kondan bo'lgan qarzlari</p>
         </div>
-        <div style={{ display: 'flex', gap: '12px' }}>
-          <button className="btn btn-outline" style={{ color: '#3B82F6', borderColor: '#3B82F6' }} onClick={() => setIsQuickCloseOpen(true)}>
-            <CreditCard size={18} /> Tezkor yopish
-          </button>
-          <button className="btn btn-outline" onClick={() => setIsBulkPaymentOpen(true)}>
-            <CreditCard size={18} /> Ommaviy to'lov
-          </button>
-          <button className="btn btn-outline" style={{ color: '#10B981', borderColor: '#10B981' }} onClick={() => setIsSmsModalOpen(true)}>
-            <CreditCard size={18} /> SMS Tarqatish
-          </button>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          {/* Actions Button Wrapper */}
+          <div style={{ position: 'relative' }} ref={actionsMenuRef}>
+            <button 
+              className="btn btn-outline" 
+              onClick={() => setShowActionsMenu(!showActionsMenu)}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 600, borderColor: '#3B82F6', color: '#2563EB' }}
+            >
+              <Zap size={16} /> Amallar {showActionsMenu ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            </button>
+
+            {/* Spring Bounce Popover directly under Amallar button */}
+            <AnimatePresence>
+              {showActionsMenu && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.8, y: -10 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.8, y: -10 }}
+                  transition={{ type: 'spring', stiffness: 450, damping: 25 }}
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    marginTop: '8px',
+                    background: '#ffffff',
+                    borderRadius: '16px',
+                    padding: '8px',
+                    boxShadow: '0 10px 30px -5px rgba(0,0,0,0.15), 0 0 0 1px rgba(0,0,0,0.06)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '4px',
+                    minWidth: '200px',
+                    zIndex: 90
+                  }}
+                >
+                  <button
+                    style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '10px 14px', borderRadius: '10px', border: 'none', background: 'transparent', cursor: 'pointer', textAlign: 'left', fontWeight: 600, fontSize: 13, color: '#1E293B', transition: 'background 0.15s' }}
+                    onMouseEnter={e => e.currentTarget.style.background = '#F1F5F9'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                    onClick={() => { setIsQuickCloseOpen(true); setShowActionsMenu(false); }}
+                  >
+                    <CreditCard size={16} color="#2563EB" /> Tezkor yopish
+                  </button>
+
+                  <button
+                    style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '10px 14px', borderRadius: '10px', border: 'none', background: 'transparent', cursor: 'pointer', textAlign: 'left', fontWeight: 600, fontSize: 13, color: '#1E293B', transition: 'background 0.15s' }}
+                    onMouseEnter={e => e.currentTarget.style.background = '#F1F5F9'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                    onClick={() => { setIsBulkPaymentOpen(true); setShowActionsMenu(false); }}
+                  >
+                    <CheckSquare size={16} color="#059669" /> Ommaviy to'lov
+                  </button>
+
+                  <button
+                    style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '10px 14px', borderRadius: '10px', border: 'none', background: 'transparent', cursor: 'pointer', textAlign: 'left', fontWeight: 600, fontSize: 13, color: '#1E293B', transition: 'background 0.15s' }}
+                    onMouseEnter={e => e.currentTarget.style.background = '#F1F5F9'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                    onClick={() => { setIsSmsModalOpen(true); setShowActionsMenu(false); }}
+                  >
+                    <MessageSquare size={16} color="#D97706" /> SMS Tarqatish
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
+          {/* Add Debt Button */}
           <button className="btn btn-primary" onClick={() => setIsDrawerOpen(true)}>
-            <Plus size={18} /> Qarz qo'shish
+            <Plus size={16} /> Qarz qo'shish
           </button>
         </div>
       </div>
@@ -667,106 +743,112 @@ const Debts = () => {
           </div>
         </div>
 
-        <div style={{ overflowX: 'auto' }}>
-          <table className="page-table">
-            <thead>
-              <tr>
-                <th>F.I.O</th>
-                <th>Telefon</th>
-                <th>Umumiy qarz summasi</th>
-                <th style={{ textAlign: 'right' }}>Amallar</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredDebtors.length === 0 ? (
-                <tr>
-                  <td colSpan="4" style={{ textAlign: 'center', padding: '3rem', color: '#8A9BB5' }}>
-                    Qarzdorlar topilmadi
-                  </td>
-                </tr>
-              ) : filteredDebtors.map(customer => (
-                <React.Fragment key={customer.id}>
-                  <tr style={{ backgroundColor: expandedId === customer.id ? '#F7FAFF' : 'transparent', cursor: 'pointer' }} onClick={() => toggleExpand(customer.id)}>
-                    <td>
-                      <div style={{ fontWeight: 600, color: '#1A2538' }}>{customer.fullName}</div>
-                    </td>
-                    <td style={{ color: '#8A9BB5', fontFamily: 'monospace', fontSize: 13 }}>{customer.phone}</td>
-                    <td>
-                      <span style={{ fontWeight: 700, color: '#EF4B4B' }}><CurrencyDisplay amount={customer.currentDebt} /></span>
-                    </td>
-                    <td style={{ textAlign: 'right', color: '#8A9BB5' }}>
-                      {expandedId === customer.id ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
-                    </td>
-                  </tr>
-                  {expandedId === customer.id && (
-                    <tr>
-                      <td colSpan="4" style={{ padding: 0 }}>
-                        <div style={{ backgroundColor: '#F0F5FC', padding: '24px', borderBottom: '2px solid #4A90E2', boxShadow: 'inset 0 4px 6px -4px rgba(0,0,0,0.05)' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                            <h4 style={{ color: '#1A2538', fontWeight: 600, fontSize: 14 }}>Qarz yozuvlari:</h4>
-                            {customerDebts[customer.id]?.filter(d => d.status !== 'cancelled' && d.status !== 'paid').length > 1 && (
-                              <button
-                                className="btn btn-primary"
-                                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '6px 12px', fontSize: 13 }}
-                                onClick={(e) => { e.stopPropagation(); openPayAllModal(customer); }}
-                              >
-                                <CreditCard size={14} /> Barcha qarzlarni to'lash
-                              </button>
-                            )}
-                          </div>
-                          {customerDebts[customer.id]?.filter(d => d.status !== 'cancelled' && d.status !== 'paid').length > 0 ? (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                              {customerDebts[customer.id]?.filter(d => d.status !== 'cancelled' && d.status !== 'paid').map(debt => (
-                                <div key={debt.id} style={{ background: '#fff', padding: '16px 20px', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid #DCE8F5', boxShadow: '0 2px 8px -4px rgba(0,0,0,0.05)' }}>
-                                  <div>
-                                    <div style={{ fontWeight: 700, fontSize: 18, color: '#1A2538', display: 'flex', gap: 6 }}>
-                                      Qoldiq: <span style={{ color: '#EF4B4B' }}><CurrencyDisplay amount={debt.remainingAmount} /></span>
-                                    </div>
-                                    <div style={{ fontSize: 13, color: '#8A9BB5', marginTop: 6, display: 'flex', gap: 12 }}>
-                                      <span>Boshlang'ich summa: <CurrencyDisplay amount={debt.amount} /></span>
-                                      <span>Muddat: {new Date(debt.dueDate).toLocaleDateString()}</span>
-                                    </div>
-                                    {debt.note && <div style={{ fontSize: 13, color: '#8A9BB5', marginTop: 4 }}>Izoh: {debt.note}</div>}
-                                  </div>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                    {getStatusBadge(debt.status, debt.dueDate)}
-                                    <button className="btn btn-primary" onClick={() => openPaymentModal(debt, customer.id)} style={{ padding: '8px 16px', fontSize: 13 }}>To'lov qabul qilish</button>
-                                    {(userProfile?.role === 'admin' || userProfile?.role === 'manager') && (
-                                      <button className="action-btn delete" onClick={() => handleCancelDebt(debt, customer.id)} title="Qarzni bekor qilish">
-                                        <Trash2 size={16} />
-                                      </button>
-                                    )}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#fff', padding: '20px', borderRadius: '12px', border: '1px dashed #DCE8F5' }}>
-                              <div>
-                                <div style={{ fontSize: 15, fontWeight: 600, color: '#1A2538' }}>Aktiv qarz yozuvlari mavjud emas</div>
-                                <div style={{ fontSize: 13, color: '#8A9BB5', marginTop: 4 }}>
-                                  Lekin mijozning umumiy qarzdorlik balansi mavjud. Bu yerdan qarzni boshqarishingiz mumkin.
-                                </div>
-                              </div>
-                              <div style={{ display: 'flex', gap: '8px' }}>
-                                <button className="btn btn-outline" style={{ color: '#10B981', borderColor: '#10B981', padding: '6px 12px', fontSize: 13 }} onClick={() => openLegacyPayModal(customer)}><Minus size={14} /> To'lash</button>
-                                <button className="btn btn-outline" style={{ color: '#3B82F6', borderColor: '#3B82F6', padding: '6px 12px', fontSize: 13 }} onClick={() => openLegacyAddModal(customer)}><Plus size={14} /> Qo'shish</button>
-                                {(userProfile?.role === 'admin' || userProfile?.role === 'manager') && (
-                                  <button className="action-btn delete" onClick={() => handleClearLegacyDebt(customer)} title="To'liq o'chirish">
-                                    <Trash2 size={14} />
-                                  </button>
-                                )}
-                              </div>
-                            </div>
+        <div className="debts-table-wrapper" style={{ flex: 1, overflowY: 'auto' }}>
+          <div className="debts-table-header">
+            <div>F.I.O</div>
+            <div>Telefon</div>
+            <div>Umumiy qarz summasi</div>
+            <div style={{ textAlign: 'right' }}>Batafsil</div>
+          </div>
+
+          {filteredDebtors.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '3rem', color: '#8A9BB5' }}>
+              Qarzdorlar topilmadi
+            </div>
+          ) : filteredDebtors.map(customer => {
+            const isExpanded = expandedId === customer.id;
+
+            return (
+              <React.Fragment key={customer.id}>
+                <div 
+                  className={`debts-table-row ${isExpanded ? 'expanded' : ''}`}
+                  onClick={() => toggleExpand(customer.id)}
+                >
+                  <div className="debt-col-name">{customer.fullName}</div>
+                  <div className="debt-col-phone">{customer.phone}</div>
+                  <div className="debt-col-amount"><CurrencyDisplay amount={customer.currentDebt} /></div>
+                  <div className="debt-col-expand">
+                    {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                  </div>
+                </div>
+                {/* Expanded Customer Debt Records */}
+                <AnimatePresence initial={false}>
+                  {isExpanded && (
+                    <motion.div
+                      key="customer-debts-details"
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.25, ease: 'easeInOut' }}
+                      style={{ overflow: 'hidden' }}
+                    >
+                      <div style={{ backgroundColor: '#F8FAFC', padding: '16px', borderBottom: '1px solid #E2E8F0' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: 8 }}>
+                          <h4 style={{ color: '#0F172A', fontWeight: 600, fontSize: 13, margin: 0 }}>Qarz yozuvlari:</h4>
+                          {customerDebts[customer.id]?.filter(d => d.status !== 'cancelled' && d.status !== 'paid').length > 1 && (
+                            <button
+                              className="btn btn-primary"
+                              style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '4px 10px', fontSize: 12 }}
+                              onClick={(e) => { e.stopPropagation(); openPayAllModal(customer); }}
+                            >
+                              <CreditCard size={14} /> Barcha qarzlarni to'lash
+                            </button>
                           )}
                         </div>
-                      </td>
-                    </tr>
+
+                        {customerDebts[customer.id]?.filter(d => d.status !== 'cancelled' && d.status !== 'paid').length > 0 ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                            {customerDebts[customer.id]?.filter(d => d.status !== 'cancelled' && d.status !== 'paid').map(debt => (
+                              <div key={debt.id} className="debt-item-card">
+                                <div>
+                                  <div style={{ fontWeight: 700, fontSize: 16, color: '#0F172A', display: 'flex', gap: 6, alignItems: 'center' }}>
+                                    Qoldiq: <span style={{ color: '#EF4B4B' }}><CurrencyDisplay amount={debt.remainingAmount} /></span>
+                                  </div>
+                                  <div style={{ fontSize: 12, color: '#64748B', marginTop: 4, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                                    <span>Boshlang'ich: <CurrencyDisplay amount={debt.amount} /></span>
+                                    <span>Muddat: {new Date(debt.dueDate).toLocaleDateString('uz-UZ')}</span>
+                                  </div>
+                                  {debt.note && <div style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>Izoh: {debt.note}</div>}
+                                </div>
+
+                                <div className="debt-item-actions">
+                                  {getStatusBadge(debt.status, debt.dueDate)}
+                                  <button className="btn btn-primary" onClick={() => openPaymentModal(debt, customer.id)} style={{ padding: '6px 12px', fontSize: 12 }}>To'lov qabul qilish</button>
+                                  {(userProfile?.role === 'admin' || userProfile?.role === 'manager') && (
+                                    <button className="action-btn delete" onClick={() => handleCancelDebt(debt, customer.id)} title="Qarzni bekor qilish">
+                                      <Trash2 size={15} />
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', backgroundColor: '#fff', padding: '16px', borderRadius: '12px', border: '1px dashed #E2E8F0' }}>
+                            <div>
+                              <div style={{ fontSize: 14, fontWeight: 600, color: '#0F172A' }}>Aktiv qarz yozuvlari mavjud emas</div>
+                              <div style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>
+                                Lekin mijozning umumiy qarzdorlik balansi mavjud. Bu yerdan qarzni boshqarishingiz mumkin.
+                              </div>
+                            </div>
+                            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                              <button className="btn btn-outline" style={{ color: '#10B981', borderColor: '#10B981', padding: '6px 12px', fontSize: 12 }} onClick={() => openLegacyPayModal(customer)}><Minus size={14} /> To'lash</button>
+                              <button className="btn btn-outline" style={{ color: '#3B82F6', borderColor: '#3B82F6', padding: '6px 12px', fontSize: 12 }} onClick={() => openLegacyAddModal(customer)}><Plus size={14} /> Qo'shish</button>
+                              {(userProfile?.role === 'admin' || userProfile?.role === 'manager') && (
+                                <button className="action-btn delete" onClick={() => handleClearLegacyDebt(customer)} title="To'liq o'chirish">
+                                  <Trash2 size={14} />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </motion.div>
                   )}
-                </React.Fragment>
-              ))}
-            </tbody>
-          </table>
+                </AnimatePresence>
+              </React.Fragment>
+            );
+          })}
         </div>
       </div>
 

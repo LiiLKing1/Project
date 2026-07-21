@@ -1,5 +1,6 @@
 import { dataService } from '../../services/dataService';
 import React, { useState, useEffect } from 'react';
+import './Reports.css';
 import { BarChart3, Download, Calendar, DollarSign, ShoppingBag, Trash2 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { db } from '../../firebase';
@@ -283,27 +284,21 @@ const Reports = () => {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1.5rem' }}>
-        <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <div style={{ padding: '1rem', borderRadius: 'var(--radius-lg)', backgroundColor: 'var(--primary-light)', color: 'var(--primary)' }}><DollarSign size={24} /></div>
-          <div>
-            <div className="subtitle">Jami tushum</div>
-            <div className="h2" style={{ marginTop: '0.25rem' }}><CurrencyDisplay amount={totalRevenue} /></div>
-          </div>
+      <div className="stat-row">
+        <div className="stat-card">
+          <span className="stat-card-label">Jami tushum</span>
+          <span className="stat-card-value blue"><CurrencyDisplay amount={totalRevenue} /></span>
+          <span className="stat-card-sub">Tanlangan davr bo'yicha</span>
         </div>
-        <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <div style={{ padding: '1rem', borderRadius: 'var(--radius-lg)', backgroundColor: 'var(--success-light)', color: 'var(--success)' }}><BarChart3 size={24} /></div>
-          <div>
-            <div className="subtitle">Sof foyda</div>
-            <div className="h2" style={{ marginTop: '0.25rem' }}><CurrencyDisplay amount={totalProfit} /></div>
-          </div>
+        <div className="stat-card">
+          <span className="stat-card-label">Sof foyda</span>
+          <span className="stat-card-value green"><CurrencyDisplay amount={totalProfit} /></span>
+          <span className="stat-card-sub">Tanlangan davr bo'yicha</span>
         </div>
-        <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <div style={{ padding: '1rem', borderRadius: 'var(--radius-lg)', backgroundColor: 'var(--warning-light)', color: 'var(--warning)' }}><ShoppingBag size={24} /></div>
-          <div>
-            <div className="subtitle">Sotilgan cheklar soni</div>
-            <div className="h2" style={{ marginTop: '0.25rem' }}>{filteredSales.length} ta</div>
-          </div>
+        <div className="stat-card">
+          <span className="stat-card-label">Cheklar soni</span>
+          <span className="stat-card-value amber">{filteredSales.length} ta</span>
+          <span className="stat-card-sub">Sotilgan cheklar</span>
         </div>
       </div>
 
@@ -340,86 +335,88 @@ const Reports = () => {
             style={{ padding: '0.5rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-surface)' }}
           />
         </div>
-        <div style={{ overflowX: 'auto' }}>
-          <div className="table-responsive">
-<table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+        <div className="table-responsive">
+          <table className="page-table mobile-card-table">
             <thead>
-              <tr style={{ borderBottom: '2px solid var(--border-color)', color: 'var(--text-secondary)' }}>
-                <th style={{ padding: '1rem' }}>Sana</th>
-                <th style={{ padding: '1rem' }}>Chek raqami</th>
-                <th style={{ padding: '1rem' }}>Mijoz</th>
-                <th style={{ padding: '1rem' }}>Mahsulotlar</th>
-                <th style={{ padding: '1rem' }}>To'lov turi</th>
-                <th style={{ padding: '1rem' }}>Summa</th>
-                <th style={{ padding: '1rem' }}>Amallar</th>
+              <tr>
+                <th>Sana</th>
+                <th>Chek №</th>
+                <th>Mijoz</th>
+                <th>Mahsulotlar</th>
+                <th>To'lov turi</th>
+                <th>Summa</th>
+                <th style={{ textAlign: 'right' }}>Amallar</th>
               </tr>
             </thead>
             <tbody>
               {filteredSales.length === 0 ? (
-                <tr><td colSpan="7" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>Ma'lumot topilmadi</td></tr>
+                <tr><td colSpan="7" style={{ textAlign: 'center', padding: '2rem', color: '#8A9BB5' }}>Ma'lumot topilmadi</td></tr>
               ) : filteredSales.map(sale => (
-                <tr key={sale.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                  <td style={{ padding: '1rem' }}>{new Date(sale.createdAt).toLocaleString('uz-UZ', { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
-                  <td style={{ padding: '1rem', fontWeight: 500 }}>{sale.saleNumber}</td>
-                  <td style={{ padding: '1rem' }}>
+                <tr key={sale.id}>
+                  <td>{new Date(sale.createdAt).toLocaleString('uz-UZ', { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
+                  <td style={{ fontWeight: 500 }}>{sale.saleNumber}</td>
+                  <td>
                     {sale.customerId 
                       ? (customers.find(c => c.id === sale.customerId)?.fullName || 'Noma\'lum mijoz') 
                       : 'Umumiy mijoz'
                     }
                   </td>
-                  <td style={{ padding: '1rem' }}>
+                  <td>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                       {sale.items?.map((item, idx) => (
-                        <span key={idx} style={{ fontSize: '0.875rem' }}>{item.name} <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>x{item.qty}</span></span>
+                        <span key={idx} style={{ fontSize: '0.875rem' }}>{item.name} <span style={{ color: '#8A9BB5', fontWeight: 600 }}>x{item.qty}</span></span>
                       ))}
                     </div>
                   </td>
-                  <td style={{ padding: '1rem' }}>
-                    <span style={{ padding: '0.25rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem', backgroundColor: 'var(--bg-main)', fontWeight: 600 }}>
+                  <td>
+                    <span style={{ padding: '0.25rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem', backgroundColor: '#F1F5F9', fontWeight: 600, color: '#334155' }}>
                       {sale.paymentType === 'cash' ? 'Naqd' : sale.paymentType === 'card' ? 'Karta' : sale.paymentType === 'debt' ? 'Nasiya' : 'Aralash'}
                     </span>
                   </td>
-                  <td style={{ padding: '1rem', fontWeight: 600, color: 'var(--primary)' }}><CurrencyDisplay amount={sale.finalTotal} /></td>
-                  <td style={{ padding: '1rem' }}>
-                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <td style={{ fontWeight: 600, color: 'var(--primary)' }}><CurrencyDisplay amount={sale.finalTotal} /></td>
+                  <td>
+                    <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
                       <button 
-                        className="btn btn-outline" 
-                        style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                        className="action-btn edit" 
                         onClick={() => {
                           const custName = sale.customerId ? (customers.find(c => c.id === sale.customerId)?.fullName) : 'Umumiy mijoz';
                           setSelectedSale({ ...sale, customerName: custName });
                           setIsReceiptModalOpen(true);
                         }}
+                        title="Ko'rish"
                       >
-                        <Eye size={14} /> Ko'rish
+                        <Eye size={14} />
                       </button>
-                      <button 
-                        className="btn btn-ghost" 
-                        style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.25rem', color: 'var(--primary)' }}
-                        onClick={() => {
-                          setSelectedSale(sale);
-                          setIsEditModalOpen(true);
-                        }}
-                      >
-                        <Edit2 size={14} /> Tahrirlash
-                      </button>
-                      <button 
-                        className="btn btn-ghost" 
-                        style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.25rem', color: 'var(--danger)' }}
-                        onClick={() => {
-                          setSelectedSale(sale);
-                          setIsDeleteModalOpen(true);
-                        }}
-                      >
-                        <Trash2 size={14} /> Bekor qilish
-                      </button>
+                      {(userProfile?.role === 'admin' || userProfile?.role === 'manager') && (
+                        <>
+                          <button 
+                            className="action-btn edit" 
+                            onClick={() => {
+                              setSelectedSale(sale);
+                              setIsEditModalOpen(true);
+                            }}
+                            title="Tahrirlash"
+                          >
+                            <Edit2 size={14} />
+                          </button>
+                          <button 
+                            className="action-btn delete" 
+                            onClick={() => {
+                              setSelectedSale(sale);
+                              setIsDeleteModalOpen(true);
+                            }}
+                            title="Bekor qilish"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-</div>
         </div>
       </div>
 

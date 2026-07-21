@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Bell, User, Menu } from 'lucide-react';
+import { Bell, User, Menu, X } from 'lucide-react';
 import { useRoles } from '../context/RolesContext';
 import { db } from '../firebase';
 import { collection, doc, onSnapshot, query } from '../services/firebaseMock';
@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import { useSettings } from '../context/SettingsContext';
 import { useWarehouse } from '../context/WarehouseContext';
 import { formatCurrency } from '../utils/formatters';
+import Drawer from '../components/Drawer';
 import './layout.css';
 
 const Topbar = ({ toggleSidebar }) => {
@@ -16,6 +17,7 @@ const Topbar = ({ toggleSidebar }) => {
   const [customers, setCustomers] = useState([]);
   const [allProducts, setAllProducts] = useState([]);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   const [dismissedNotifs, setDismissedNotifs] = useState(() => {
     try { return JSON.parse(localStorage.getItem('dismissedNotifs')) || []; } catch { return []; }
   });
@@ -26,6 +28,12 @@ const Topbar = ({ toggleSidebar }) => {
   const { settings } = useSettings();
   const { warehouses, selectedWarehouseId, setSelectedWarehouseId } = useWarehouse();
   const curr = settings?.currency || 'UZS';
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Handle click outside and Escape key
   useEffect(() => {
@@ -41,7 +49,7 @@ const Topbar = ({ toggleSidebar }) => {
       }
     };
 
-    if (showDropdown) {
+    if (showDropdown && !isMobile) {
       document.addEventListener('mousedown', handleClickOutside);
       document.addEventListener('keydown', handleKeyDown);
     }
@@ -50,7 +58,7 @@ const Topbar = ({ toggleSidebar }) => {
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [showDropdown]);
+  }, [showDropdown, isMobile]);
 
   useEffect(() => {
     if (userProfile?.storeOwnerId) {
@@ -105,6 +113,69 @@ const Topbar = ({ toggleSidebar }) => {
   
   const totalNotifs = visibleDebts.length + visibleOutOfStock.length;
 
+  const renderNotifList = () => (
+    <div style={{ maxHeight: '60vh', overflowY: 'auto' }}>
+      {totalNotifs > 0 ? (
+        <>
+          {visibleDebts.map(debt => {
+            const customer = customers.find(c => c.id === debt.customerId);
+            const customerName = customer ? customer.fullName : 'Noma\'lum mijoz';
+            return (
+              <div 
+                key={debt.id} 
+                onClick={() => { 
+                  handleDismiss(debt.id);
+                  setShowDropdown(false); 
+                  navigate('/customers/debts'); 
+                }}
+                style={{ padding: '1rem', borderBottom: '1px solid var(--border-color)', cursor: 'pointer', transition: 'background-color 0.2s' }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ fontWeight: 600, color: 'var(--danger)', fontSize: '0.875rem' }}>Muddati o'tgan qarz</div>
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); handleDismiss(debt.id); }}
+                    style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '4px' }}
+                    title="O'chirish"
+                  ><X size={16} /></button>
+                </div>
+                <div style={{ fontSize: '0.875rem', color: 'var(--text-main)', marginTop: '0.25rem', lineHeight: '1.4' }}>
+                  Bugun <strong>{customerName}</strong> sizga <strong>{formatCurrency(debt.remainingAmount, curr)}</strong> qarzini berishi kerak.
+                </div>
+              </div>
+            );
+          })}
+          {visibleOutOfStock.map(product => (
+            <div 
+              key={`stock-${product.id}`}
+              onClick={() => { 
+                handleDismiss(`stock-${product.id}`);
+                setShowDropdown(false); 
+                navigate('/products', { state: { editProductId: product.id } }); 
+              }}
+              style={{ padding: '1rem', borderBottom: '1px solid var(--border-color)', cursor: 'pointer', transition: 'background-color 0.2s' }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ fontWeight: 600, color: '#D97706', fontSize: '0.875rem' }}>Kam qoldi / Tugadi</div>
+                <button 
+                  onClick={(e) => { e.stopPropagation(); handleDismiss(`stock-${product.id}`); }}
+                  style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '4px' }}
+                  title="O'chirish"
+                ><X size={16} /></button>
+              </div>
+              <div style={{ fontSize: '0.875rem', color: 'var(--text-main)', marginTop: '0.25rem', lineHeight: '1.4' }}>
+                <strong>{product.name}</strong> mahsuloti omborda kam qoldi yoki tugadi (qoldiq: {product.stockByWarehouse?.[selectedWarehouseId] || 0} {product.unit || 'dona'}).
+              </div>
+            </div>
+          ))}
+        </>
+      ) : (
+        <div style={{ padding: '2.5rem 1rem', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+          Yangi xabarnomalar yo'q
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <header className="topbar">
       <div className="topbar-left">
@@ -145,78 +216,24 @@ const Topbar = ({ toggleSidebar }) => {
             )}
           </button>
           
-          {showDropdown && (
-            <div style={{ position: 'absolute', top: '100%', right: '0', marginTop: '0.5rem', width: '300px', backgroundColor: 'var(--bg-surface)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-lg)', border: '1px solid var(--border-color)', zIndex: 100, overflow: 'hidden' }}>
+          {/* Desktop Dropdown */}
+          {!isMobile && showDropdown && (
+            <div style={{ position: 'absolute', top: '100%', right: '0', marginTop: '0.5rem', width: '320px', backgroundColor: 'var(--bg-surface)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-lg)', border: '1px solid var(--border-color)', zIndex: 100, overflow: 'hidden' }}>
               <div style={{ padding: '1rem', borderBottom: '1px solid var(--border-color)', fontWeight: 600, color: 'var(--text-main)' }}>
                 Xabarnomalar
               </div>
-              <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
-                {totalNotifs > 0 ? (
-                  <>
-                    {visibleDebts.map(debt => {
-                      const customer = customers.find(c => c.id === debt.customerId);
-                      const customerName = customer ? customer.fullName : 'Noma\'lum mijoz';
-                      return (
-                        <div 
-                          key={debt.id} 
-                          onClick={() => { 
-                            handleDismiss(debt.id);
-                            setShowDropdown(false); 
-                            navigate('/customers/debts'); 
-                          }}
-                          style={{ padding: '1rem', borderBottom: '1px solid var(--border-color)', cursor: 'pointer', transition: 'background-color 0.2s' }}
-                          onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--bg-main)'}
-                          onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
-                        >
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <div style={{ fontWeight: 500, color: 'var(--danger)', fontSize: '0.875rem' }}>Muddati o'tgan qarz</div>
-                            <button 
-                              onClick={(e) => { e.stopPropagation(); handleDismiss(debt.id); }}
-                              style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '1rem' }}
-                              title="O'chirish"
-                            >×</button>
-                          </div>
-                          <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '0.25rem', lineHeight: '1.4' }}>
-                            Bugun <strong>{customerName}</strong> sizga <strong>{formatCurrency(debt.remainingAmount, curr)}</strong> qarzini berishi kerak.
-                          </div>
-                        </div>
-                      );
-                    })}
-                    {visibleOutOfStock.map(product => (
-                      <div 
-                        key={`stock-${product.id}`}
-                        onClick={() => { 
-                          handleDismiss(`stock-${product.id}`);
-                          setShowDropdown(false); 
-                          navigate('/products', { state: { editProductId: product.id } }); 
-                        }}
-                        style={{ padding: '1rem', borderBottom: '1px solid var(--border-color)', cursor: 'pointer', transition: 'background-color 0.2s' }}
-                        onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--bg-main)'}
-                        onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
-                      >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <div style={{ fontWeight: 500, color: 'var(--warning)', fontSize: '0.875rem' }}>Kam qoldi / Tugadi</div>
-                          <button 
-                            onClick={(e) => { e.stopPropagation(); handleDismiss(`stock-${product.id}`); }}
-                            style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '1rem' }}
-                            title="O'chirish"
-                          >×</button>
-                        </div>
-                        <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '0.25rem', lineHeight: '1.4' }}>
-                          <strong>{product.name}</strong> mahsuloti omborda kam qoldi yoki tugadi (qoldiq: {product.stockByWarehouse?.[selectedWarehouseId] || 0} {product.unit || 'dona'}).
-                        </div>
-                      </div>
-                    ))}
-                  </>
-                ) : (
-                  <div style={{ padding: '2rem 1rem', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
-                    Yangi xabarnomalar yo'q
-                  </div>
-                )}
-              </div>
+              {renderNotifList()}
             </div>
           )}
         </div>
+
+        {/* Mobile Top Drawer */}
+        {isMobile && (
+          <Drawer position="top" isOpen={showDropdown} onClose={() => setShowDropdown(false)} title="Xabarnomalar">
+            {renderNotifList()}
+          </Drawer>
+        )}
+
         <div className="user-profile">
           <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: 'var(--primary)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
             {initials}

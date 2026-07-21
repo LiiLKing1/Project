@@ -125,8 +125,8 @@ const Suppliers = () => {
           </div>
         </div>
 
-        <div style={{ overflowX: 'auto' }}>
-          <table className="page-table">
+        <div className="table-responsive" style={{ overflowX: 'auto' }}>
+          <table className="page-table" style={{ minWidth: '600px' }}>
             <thead>
               <tr>
                 <th>Ism/Familiya</th>

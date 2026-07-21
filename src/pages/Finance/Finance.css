@@ -1,0 +1,49 @@
+/* Finance Page Mobile-First Responsive CSS */
+
+.table-responsive {
+  width: 100%;
+}
+
+@media (max-width: 768px) {
+  .mobile-card-table {
+    display: block;
+    width: 100%;
+  }
+
+  .mobile-card-table thead {
+    display: none;
+  }
+
+  .mobile-card-table tbody {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .mobile-card-table tr {
+    display: grid;
+    grid-template-areas:
+      "col2  col4"
+      "col3  col3"
+      "col1  col5";
+    grid-template-columns: 1fr auto;
+    row-gap: 6px;
+    padding: 14px;
+    border-radius: 14px;
+    border: 1px solid #E2E8F0;
+    background: #ffffff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+  }
+
+  .mobile-card-table td {
+    display: block;
+    padding: 0 !important;
+    border: none !important;
+  }
+
+  .mobile-card-table td:nth-child(1) { grid-area: col1; font-size: 11px; color: #94A3B8; }
+  .mobile-card-table td:nth-child(2) { grid-area: col2; font-weight: 700; font-size: 14px; color: #0F172A; }
+  .mobile-card-table td:nth-child(3) { grid-area: col3; font-size: 13px; color: #64748B; }
+  .mobile-card-table td:nth-child(4) { grid-area: col4; justify-self: end; font-weight: 700; font-size: 15px; color: #EF4B4B; }
+  .mobile-card-table td:nth-child(5) { grid-area: col5; justify-self: end; font-size: 11px; color: #94A3B8; }
+}

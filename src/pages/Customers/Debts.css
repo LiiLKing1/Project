@@ -1,0 +1,152 @@
+/* Debts Page Responsive CSS */
+
+.debts-table-wrapper {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.debts-table-header {
+  display: grid;
+  grid-template-columns: 2fr 1.5fr 1.5fr 60px;
+  gap: 1rem;
+  padding: 12px 20px;
+  background: #F8FAFC;
+  border-bottom: 2px solid #E2E8F0;
+  color: #64748B;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.debts-table-row {
+  display: grid;
+  grid-template-columns: 2fr 1.5fr 1.5fr 60px;
+  gap: 1rem;
+  align-items: center;
+  padding: 14px 20px;
+  border-bottom: 1px solid #EDF2F7;
+  background: #ffffff;
+  transition: all 0.15s ease;
+  cursor: pointer;
+}
+
+.debts-table-row:hover {
+  background: #F8FAFC;
+}
+
+.debts-table-row.expanded {
+  background: #EFF6FF;
+  border-bottom-color: #BFDBFE;
+}
+
+.debt-col-name {
+  font-weight: 600;
+  color: #0F172A;
+  font-size: 14px;
+}
+
+.debt-col-phone {
+  color: #64748B;
+  font-family: monospace;
+  font-size: 13px;
+}
+
+.debt-col-amount {
+  font-weight: 700;
+  color: #EF4B4B;
+  font-size: 15px;
+}
+
+.debt-col-expand {
+  display: flex;
+  justify-content: flex-end;
+  color: #64748B;
+}
+
+/* Expanded Card Items */
+.debt-item-card {
+  background: #fff;
+  padding: 14px 18px;
+  border-radius: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border: 1px solid #E2E8F0;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
+  gap: 12px;
+}
+
+.debt-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* Mobile Breakpoint (<= 768px) */
+@media (max-width: 768px) {
+  .debts-table-header {
+    display: none;
+  }
+
+  .debts-table-wrapper {
+    padding: 10px;
+  }
+
+  .debts-table-row {
+    display: grid;
+    grid-template-areas:
+      "name   amount"
+      "phone  expand";
+    grid-template-columns: 1fr auto;
+    row-gap: 6px;
+    column-gap: 12px;
+    padding: 14px;
+    border-radius: 14px;
+    border: 1px solid #E2E8F0;
+    margin-bottom: 10px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+  }
+
+  .debt-col-name {
+    grid-area: name;
+    font-size: 15px;
+    font-weight: 700;
+  }
+
+  .debt-col-amount {
+    grid-area: amount;
+    justify-self: end;
+    font-size: 15px;
+  }
+
+  .debt-col-phone {
+    grid-area: phone;
+    font-size: 12px;
+  }
+
+  .debt-col-expand {
+    grid-area: expand;
+    justify-self: end;
+  }
+
+  /* Expanded items layout on mobile */
+  .debt-item-card {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .debt-item-actions {
+    width: 100%;
+    justify-content: space-between;
+    border-top: 1px dashed #E2E8F0;
+    padding-top: 8px;
+    margin-top: 4px;
+  }
+
+  .debt-item-actions button {
+    flex: 1;
+  }
+}

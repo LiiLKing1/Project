@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Wallet, Plus, ArrowUpRight, ArrowDownRight, Check } from 'lucide-react';
+import './Finance.css';
 import { db } from '../../firebase';
 import { collection, onSnapshot, query, orderBy } from '../../services/firebaseMock';
 import { saveDoc } from '../../utils/firebaseUtils';
@@ -115,9 +116,9 @@ const Finance = () => {
           </div>
         </div>
 
-        <div style={{ flex: 1, overflowY: 'auto' }}>
-          <table className="page-table">
-            <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
+        <div style={{ flex: 1, overflowY: 'auto' }} className="table-responsive">
+          <table className="page-table mobile-card-table">
+            <thead>
               <tr>
                 <th>Sana</th>
                 <th>Kategoriya</th>

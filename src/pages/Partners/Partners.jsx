@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import './Partners.css';
 import { Search, Plus, Edit, Trash2, Phone, MapPin, Calendar, Clock, CheckCircle2, AlertCircle, ShoppingBag, FileText, ChevronDown, RefreshCw, AlertTriangle, ArrowLeft, Handshake, ArrowRight, PackagePlus, Check, Banknote, CreditCard } from 'lucide-react';
 import CustomSelect from '../../components/CustomSelect';
 import { db } from '../../firebase';
@@ -377,8 +378,8 @@ const Partners = () => {
           </div>
         </div>
 
-        <div style={{ overflowX: 'auto' }}>
-          <table className="page-table">
+        <div className="table-responsive">
+          <table className="page-table mobile-card-table">
             <thead>
               <tr>
                 <th>Kompaniya</th>

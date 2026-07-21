@@ -1,0 +1,128 @@
+/* Customers Page Responsive CSS */
+
+.customers-table-wrapper {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.customers-table-header {
+  display: grid;
+  grid-template-columns: 2fr 130px 1.2fr 1fr 1fr 90px;
+  gap: 1rem;
+  padding: 12px 20px;
+  background: #F8FAFC;
+  border-bottom: 2px solid #E2E8F0;
+  color: #64748B;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.customers-table-row {
+  display: grid;
+  grid-template-columns: 2fr 130px 1.2fr 1fr 1fr 90px;
+  gap: 1rem;
+  align-items: center;
+  padding: 14px 20px;
+  border-bottom: 1px solid #EDF2F7;
+  background: #ffffff;
+  transition: background 0.15s ease;
+}
+
+.customers-table-row:hover {
+  background: #F8FAFC;
+}
+
+.cust-col-name {
+  font-weight: 600;
+  color: #0F172A;
+  font-size: 14px;
+}
+
+.cust-col-phone {
+  color: #64748B;
+  font-family: monospace;
+  font-size: 13px;
+}
+
+.cust-col-purchases {
+  font-weight: 600;
+  color: #0F172A;
+}
+
+.cust-col-bonus {
+  font-weight: 600;
+  color: #2563EB;
+}
+
+.cust-col-debt {
+  font-weight: 700;
+}
+
+.cust-col-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+/* Mobile Breakpoint (<= 768px) */
+@media (max-width: 768px) {
+  .customers-table-header {
+    display: none;
+  }
+
+  .customers-table-wrapper {
+    padding: 10px;
+  }
+
+  .customers-table-row {
+    display: grid;
+    grid-template-areas:
+      "name    debt"
+      "phone   bonus"
+      "purch   actions";
+    grid-template-columns: 1fr auto;
+    row-gap: 8px;
+    column-gap: 12px;
+    padding: 14px;
+    border-radius: 14px;
+    border: 1px solid #E2E8F0;
+    margin-bottom: 10px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+  }
+
+  .cust-col-name {
+    grid-area: name;
+    font-size: 15px;
+    font-weight: 700;
+  }
+
+  .cust-col-debt {
+    grid-area: debt;
+    justify-self: end;
+    font-size: 13px;
+  }
+
+  .cust-col-phone {
+    grid-area: phone;
+    font-size: 12px;
+  }
+
+  .cust-col-bonus {
+    grid-area: bonus;
+    justify-self: end;
+    font-size: 13px;
+  }
+
+  .cust-col-purchases {
+    grid-area: purch;
+    font-size: 12px;
+    color: #64748B;
+  }
+
+  .cust-col-actions {
+    grid-area: actions;
+    justify-self: end;
+  }
+}

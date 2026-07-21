@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import '../Customers/Debts.css';
 import { db } from '../../firebase';
 import { collection, onSnapshot, query, doc, writeBatch, increment } from '../../services/firebaseMock';
 import { useToast } from '../../context/ToastContext';
@@ -309,90 +311,94 @@ const PartnerDebts = () => {
           </div>
         </div>
 
-        <div style={{ overflowX: 'auto' }}>
-          <table className="page-table">
-            <thead>
-              <tr>
-                <th>Hamkor Kompaniya</th>
-                <th>Mas'ul shaxs / Telefon</th>
-                <th>Umumiy qarz (Sizning qarzingiz)</th>
-                <th style={{ textAlign: 'right' }}>Amallar</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredDebtors.length === 0 ? (
-                <tr>
-                  <td colSpan="4" style={{ textAlign: 'center', padding: '3rem', color: '#8A9BB5' }}>
-                    Qarzdorlik yo'q
-                  </td>
-                </tr>
-              ) : filteredDebtors.map(partner => (
-                <React.Fragment key={partner.id}>
-                  <tr style={{ backgroundColor: expandedId === partner.id ? '#F7FAFF' : 'transparent', cursor: 'pointer' }} onClick={() => toggleExpand(partner.id)}>
-                    <td><div style={{ fontWeight: 600, color: '#1A2538' }}>{partner.companyName}</div></td>
-                    <td>
-                      <div style={{ color: '#8A9BB5' }}>{partner.contactPerson}</div>
-                      <div style={{ fontSize: 13, fontFamily: 'monospace', color: '#8A9BB5' }}>{partner.phone}</div>
-                    </td>
-                    <td>
-                      <span style={{ fontWeight: 700, color: '#EF4B4B' }}><CurrencyDisplay amount={partner.currentPayable} /></span>
-                    </td>
-                    <td style={{ textAlign: 'right', color: '#8A9BB5' }}>
-                      {expandedId === partner.id ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
-                    </td>
-                  </tr>
-                  {expandedId === partner.id && (
-                    <tr>
-                      <td colSpan="4" style={{ padding: 0 }}>
-                        <div style={{ backgroundColor: '#F0F5FC', padding: '24px', borderBottom: '2px solid #4A90E2', boxShadow: 'inset 0 4px 6px -4px rgba(0,0,0,0.05)' }}>
-                          <h4 style={{ marginBottom: '16px', color: '#1A2538', fontWeight: 600, fontSize: 14 }}>Qarz yozuvlari:</h4>
-                          {partnerDebtsData[partner.id]?.filter(d => d.status !== 'cancelled' && d.status !== 'paid').length > 0 ? (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                              {partnerDebtsData[partner.id]?.filter(d => d.status !== 'cancelled' && d.status !== 'paid').map(debt => (
-                                <div key={debt.id} style={{ background: '#fff', padding: '16px 20px', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid #DCE8F5', boxShadow: '0 2px 8px -4px rgba(0,0,0,0.05)' }}>
-                                  <div>
-                                    <div style={{ fontWeight: 700, fontSize: 18, color: '#1A2538', display: 'flex', gap: 6 }}>
-                                      Qoldiq: <span style={{ color: '#EF4B4B' }}><CurrencyDisplay amount={debt.remainingAmount} /></span>
-                                    </div>
-                                    <div style={{ fontSize: 13, color: '#8A9BB5', marginTop: 6, display: 'flex', gap: 12 }}>
-                                      <span>Boshlang'ich summa: <CurrencyDisplay amount={debt.amount} /></span>
-                                      <span>Muddat: {new Date(debt.dueDate).toLocaleDateString()}</span>
-                                    </div>
-                                    {debt.note && <div style={{ fontSize: 13, color: '#8A9BB5', marginTop: 4 }}>Izoh: {debt.note}</div>}
+        <div className="debts-table-wrapper">
+          <div className="debts-table-header">
+            <div>Hamkor Kompaniya</div>
+            <div>Mas'ul shaxs / Telefon</div>
+            <div>Umumiy qarz (Sizning qarzingiz)</div>
+            <div style={{ textAlign: 'right' }}>Batafsil</div>
+          </div>
+
+          {filteredDebtors.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '3rem', color: '#8A9BB5' }}>
+              Qarzdorlik yo'q
+            </div>
+          ) : filteredDebtors.map(partner => {
+            const isExpanded = expandedId === partner.id;
+
+            return (
+              <React.Fragment key={partner.id}>
+                <div 
+                  className={`debts-table-row ${isExpanded ? 'expanded' : ''}`}
+                  onClick={() => toggleExpand(partner.id)}
+                >
+                  <div className="debt-col-name">{partner.companyName}</div>
+                  <div className="debt-col-phone">{partner.contactPerson} ({partner.phone})</div>
+                  <div className="debt-col-amount"><CurrencyDisplay amount={partner.currentPayable} /></div>
+                  <div className="debt-col-expand">
+                    {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                  </div>
+                </div>
+
+                <AnimatePresence initial={false}>
+                  {isExpanded && (
+                    <motion.div
+                      key="partner-debts-details"
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.25, ease: 'easeInOut' }}
+                      style={{ overflow: 'hidden' }}
+                    >
+                      <div style={{ backgroundColor: '#F8FAFC', padding: '16px', borderBottom: '1px solid #E2E8F0' }}>
+                        <h4 style={{ marginBottom: '12px', color: '#0F172A', fontWeight: 600, fontSize: 13 }}>Qarz yozuvlari:</h4>
+                        {partnerDebtsData[partner.id]?.filter(d => d.status !== 'cancelled' && d.status !== 'paid').length > 0 ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                            {partnerDebtsData[partner.id]?.filter(d => d.status !== 'cancelled' && d.status !== 'paid').map(debt => (
+                              <div key={debt.id} className="debt-item-card">
+                                <div>
+                                  <div style={{ fontWeight: 700, fontSize: 16, color: '#0F172A', display: 'flex', gap: 6, alignItems: 'center' }}>
+                                    Qoldiq: <span style={{ color: '#EF4B4B' }}><CurrencyDisplay amount={debt.remainingAmount} /></span>
                                   </div>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                    {getStatusBadge(debt.status, debt.dueDate)}
-                                    <button className="btn btn-primary" onClick={() => openPaymentModal(debt, partner.id)} style={{ padding: '8px 16px', fontSize: 13 }}>To'lov qilish</button>
-                                    {(userProfile?.role === 'admin' || userProfile?.role === 'manager') && (
-                                      <button className="action-btn delete" onClick={() => handleCancelDebt(debt, partner.id)} title="Qarzni bekor qilish">
-                                        <Trash2 size={16} />
-                                      </button>
-                                    )}
+                                  <div style={{ fontSize: 12, color: '#64748B', marginTop: 4, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                                    <span>Boshlang'ich: <CurrencyDisplay amount={debt.amount} /></span>
+                                    <span>Muddat: {new Date(debt.dueDate).toLocaleDateString('uz-UZ')}</span>
                                   </div>
+                                  {debt.note && <div style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>Izoh: {debt.note}</div>}
                                 </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#fff', padding: '20px', borderRadius: '12px', border: '1px dashed #DCE8F5' }}>
-                              <div>
-                                <div style={{ fontSize: 15, fontWeight: 600, color: '#1A2538' }}>Aktiv qarz yozuvlari mavjud emas</div>
-                                <div style={{ fontSize: 13, color: '#8A9BB5', marginTop: 4 }}>
-                                  Lekin hamkorning umumiy qarzdorlik balansi mavjud. Bu yerdan to'lov qilishingiz mumkin.
+
+                                <div className="debt-item-actions">
+                                  {getStatusBadge(debt.status, debt.dueDate)}
+                                  <button className="btn btn-primary" onClick={() => openPaymentModal(debt, partner.id)} style={{ padding: '6px 12px', fontSize: 12 }}>To'lov qilish</button>
+                                  {(userProfile?.role === 'admin' || userProfile?.role === 'manager') && (
+                                    <button className="action-btn delete" onClick={() => handleCancelDebt(debt, partner.id)} title="Qarzni bekor qilish">
+                                      <Trash2 size={15} />
+                                    </button>
+                                  )}
                                 </div>
                               </div>
-                              <button className="btn btn-outline" style={{ color: '#10B981', borderColor: '#10B981' }} onClick={() => openLegacyPayModal(partner)}>
-                                <Minus size={16} /> To'lov qilish
-                              </button>
+                            ))}
+                          </div>
+                        ) : (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', backgroundColor: '#fff', padding: '16px', borderRadius: '12px', border: '1px dashed #E2E8F0' }}>
+                            <div>
+                              <div style={{ fontSize: 14, fontWeight: 600, color: '#0F172A' }}>Aktiv qarz yozuvlari mavjud emas</div>
+                              <div style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>
+                                Lekin hamkorning umumiy qarzdorlik balansi mavjud. Bu yerdan to'lov qilishingiz mumkin.
+                              </div>
                             </div>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
+                            <button className="btn btn-outline" style={{ color: '#10B981', borderColor: '#10B981', padding: '6px 12px', fontSize: 12, alignSelf: 'flex-start' }} onClick={() => openLegacyPayModal(partner)}>
+                              <Minus size={14} /> To'lov qilish
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </motion.div>
                   )}
-                </React.Fragment>
-              ))}
-            </tbody>
-          </table>
+                </AnimatePresence>
+              </React.Fragment>
+            );
+          })}
         </div>
       </div>
 

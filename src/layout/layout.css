@@ -193,9 +193,16 @@
   
   .pos-layout {
     grid-template-columns: 1fr !important;
-    gap: 1rem !important;
-    overflow-y: auto;
+    grid-template-rows: 1fr !important;
+    gap: 0 !important;
+    overflow: hidden !important;
   }
+
+  .pos-products-grid {
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)) !important;
+    gap: 0.5rem !important;
+  }
+
 }
 
 .pos-layout {
@@ -210,3 +217,25 @@
     display: none;
   }
 }
+
+/* POS Payment Drawer Responsive */
+@media (max-width: 900px) {
+  .pos-payment-drawer {
+    flex-direction: column !important;
+    height: 100% !important;
+    max-height: 100vh !important;
+    border-radius: 0 !important;
+  }
+  .pos-payment-left {
+    width: 100% !important;
+    flex: 0 0 auto !important;
+    padding: 16px !important;
+  }
+  .pos-payment-right {
+    flex: 1 !important;
+    width: 100% !important;
+    padding: 16px !important;
+    overflow-y: auto !important;
+  }
+}
+

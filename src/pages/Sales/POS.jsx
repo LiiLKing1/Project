@@ -1,6 +1,6 @@
 import { dataService } from '../../services/dataService';
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, Plus, Minus, Trash2, CreditCard, Banknote, User, FileText, ChevronDown, Percent, Calendar, X, CheckCircle } from 'lucide-react';
+import { Search, Plus, Minus, Trash2, CreditCard, Banknote, User, FileText, ChevronDown, Percent, Calendar, X, CheckCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { db } from '../../firebase';
 import { collection, onSnapshot, query, where, writeBatch, increment, doc, orderBy, getDoc, runTransaction } from '../../services/firebaseMock';
 import { useToast } from '../../context/ToastContext';
@@ -20,6 +20,55 @@ const POS = () => {
   const [customers, setCustomers] = useState([]);
   const [cart, setCart] = useState([]);
   const [search, setSearch] = useState('');
+  
+  // Mobile Cart Drawer State
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 1024);
+  const [isCartDrawerOpen, setIsCartDrawerOpen] = useState(false);
+  const [showSwipeHint, setShowSwipeHint] = useState(false);
+  const [touchStartX, setTouchStartX] = useState(null);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 1024);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  useEffect(() => {
+    if (!isMobile || isCartDrawerOpen) {
+      setShowSwipeHint(false);
+      return;
+    }
+    let timeout;
+    const resetTimer = () => {
+      setShowSwipeHint(false);
+      clearTimeout(timeout);
+      timeout = setTimeout(() => {
+        if (!isCartDrawerOpen && window.innerWidth <= 1024) {
+          setShowSwipeHint(true);
+        }
+      }, 3000);
+    };
+    window.addEventListener('touchstart', resetTimer);
+    window.addEventListener('touchmove', resetTimer);
+    window.addEventListener('click', resetTimer);
+    resetTimer();
+    return () => {
+      clearTimeout(timeout);
+      window.removeEventListener('touchstart', resetTimer);
+      window.removeEventListener('touchmove', resetTimer);
+      window.removeEventListener('click', resetTimer);
+    };
+  }, [isMobile, isCartDrawerOpen]);
+
+  const handleTouchStart = (e) => setTouchStartX(e.targetTouches[0].clientX);
+  const handleTouchEnd = (e) => {
+    if (!touchStartX) return;
+    const touchEndX = e.changedTouches[0].clientX;
+    const distance = touchStartX - touchEndX;
+    if (distance > 60) setIsCartDrawerOpen(true);
+    if (distance < -60) setIsCartDrawerOpen(false);
+    setTouchStartX(null);
+  };
   
   // Customer selection
   const [customerSearch, setCustomerSearch] = useState('');
@@ -371,148 +420,310 @@ const POS = () => {
   
   const canDiscount = userProfile?.role === 'admin' || userProfile?.role === 'manager';
 
+  useEffect(() => {
+    const topbar = document.querySelector('.topbar');
+    if (topbar && isMobile) {
+      if (isCartDrawerOpen) {
+        topbar.style.transform = 'translateX(-30%)';
+        topbar.style.opacity = '0.3';
+        topbar.style.transition = 'transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1), opacity 0.5s ease';
+      } else {
+        topbar.style.transform = 'translateX(0)';
+        topbar.style.opacity = '1';
+      }
+    }
+    return () => {
+      if (topbar) {
+        topbar.style.transform = '';
+        topbar.style.opacity = '';
+        topbar.style.transition = '';
+      }
+    }
+  }, [isCartDrawerOpen, isMobile]);
+
   return (
-    <div className="pos-layout">
+    <div className="pos-layout" style={{ overflow: 'hidden', display: isMobile ? 'block' : undefined }}>
       {/* Products Section */}
-      <div className="flex-col" style={{ gap: '1.5rem', overflow: 'hidden' }}>
-        <div className="flex-between">
-          <h1 className="h1">Sotuv Oynasi</h1>
-          <div style={{ position: 'relative', width: '100%', maxWidth: '350px' }}>
-            <Search size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
-            <input 
-              type="text" 
-              placeholder="Shtrix-kod yoki nom..." 
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              style={{ width: '100%', paddingLeft: '2.5rem', fontSize: '1rem', padding: '1rem 1rem 1rem 2.5rem' }}
-              autoFocus
-            />
-          </div>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1rem', overflowY: 'auto', paddingRight: '1rem', paddingBottom: '2rem' }}>
-          {filteredProducts.map(p => (
-            <div key={p.id} className="glass-panel" onClick={() => addToCart(p)} style={{ padding: '1rem', cursor: p.stock > 0 ? 'pointer' : 'not-allowed', opacity: p.stock > 0 ? 1 : 0.5, transition: 'transform 0.1s' }} onMouseDown={e => p.stock > 0 && (e.currentTarget.style.transform = 'scale(0.98)')} onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'}>
-              <div style={{ fontWeight: '600', marginBottom: '0.5rem', fontSize: '1rem' }}>{p.name}</div>
-              <div style={{ color: 'var(--primary)', fontWeight: '700', fontSize: '1.125rem' }}><CurrencyDisplay amount={p.sellPrice} /></div>
-              <div className="flex-between" style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
-                <span>{p.barcode}</span>
-                <span style={{ fontWeight: 600, color: p.stock <= p.minStock ? 'var(--danger)' : 'var(--success)' }}>
-                  Qoldiq: {p.stock}
-                </span>
-              </div>
+      <motion.div 
+        className="flex-col pos-products-wrapper" 
+        onTouchStart={handleTouchStart} 
+        onTouchEnd={handleTouchEnd}
+        animate={{ 
+          x: isMobile && isCartDrawerOpen ? '-30%' : '0%', 
+          opacity: isMobile && isCartDrawerOpen ? 0.3 : 1 
+        }}
+        transition={{ type: 'spring', damping: 26, stiffness: 220 }}
+        style={{ gap: '1.5rem', overflow: 'hidden' }}
+      >
+          <div className="flex-between">
+            <h1 className="h1">Sotuv Oynasi</h1>
+            <div style={{ position: 'relative', width: '100%', maxWidth: '350px' }}>
+              <Search size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
+              <input 
+                type="text" 
+                placeholder="Shtrix-kod yoki nom..." 
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                style={{ width: '100%', paddingLeft: '2.5rem', fontSize: '1rem', padding: '1rem 1rem 1rem 2.5rem' }}
+                autoFocus
+              />
             </div>
-          ))}
-        </div>
-      </div>
+          </div>
 
-      {/* Cart Section */}
-      <div className="glass-panel flex-col" style={{ height: '100%', display: 'flex' }}>
-        <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <h2 className="h2">Savat</h2>
-          
-          <div style={{ position: 'relative' }}>
-            {selectedCustomer ? (
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem 1rem', backgroundColor: 'var(--primary-light)', borderRadius: 'var(--radius-md)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--primary)', fontWeight: 600 }}>
-                  <User size={18} /> {selectedCustomer.fullName}
-                  {selectedCustomer.bonusBalance > 0 && (
-                    <span style={{ marginLeft: '0.5rem', fontSize: '0.75rem', padding: '0.2rem 0.5rem', backgroundColor: '#fbbf24', color: '#000', borderRadius: '1rem' }}>
-                      Bonus: <CurrencyDisplay amount={selectedCustomer.bonusBalance} />
-                    </span>
-                  )}
+          <div className="pos-products-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1rem', overflowY: 'auto', paddingRight: '1rem', paddingBottom: '2rem' }}>
+            {filteredProducts.map(p => (
+              <div key={p.id} className="glass-panel" onClick={() => addToCart(p)} style={{ padding: '1rem', cursor: p.stock > 0 ? 'pointer' : 'not-allowed', opacity: p.stock > 0 ? 1 : 0.5, transition: 'transform 0.1s' }} onMouseDown={e => p.stock > 0 && (e.currentTarget.style.transform = 'scale(0.98)')} onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'}>
+                <div style={{ fontWeight: '600', marginBottom: '0.5rem', fontSize: '1rem' }}>{p.name}</div>
+                <div style={{ color: 'var(--primary)', fontWeight: '700', fontSize: '1.125rem' }}><CurrencyDisplay amount={p.sellPrice} /></div>
+                <div className="flex-between" style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
+                  <span>{p.barcode}</span>
+                  <span style={{ fontWeight: 600, color: p.stock <= p.minStock ? 'var(--danger)' : 'var(--success)' }}>
+                    Qoldiq: {p.stock}
+                  </span>
                 </div>
-                <button onClick={() => setSelectedCustomer(null)} style={{ color: 'var(--danger)' }}>✕</button>
               </div>
-            ) : (
-              <>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <div style={{ position: 'relative', flex: 1 }}>
-                    <User size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
-                    <input 
-                      type="text" 
-                      placeholder="Mijoz qidirish (telefon yoki ism)..." 
-                      value={customerSearch}
-                      onChange={(e) => { setCustomerSearch(e.target.value); setShowCustomerDropdown(true); }}
-                      onFocus={() => setShowCustomerDropdown(true)}
-                      style={{ width: '100%', paddingLeft: '2.5rem' }}
-                    />
+            ))}
+          </div>
+      </motion.div>
+
+      {/* Cart Section Desktop */}
+      {!isMobile && (
+        <div className="glass-panel flex-col" style={{ width: 'auto', height: '100%', display: 'flex' }}>
+          <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div className="flex-between">
+              <h2 className="h2">Savat</h2>
+            </div>
+          
+            <div style={{ position: 'relative' }}>
+              {selectedCustomer ? (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem 1rem', backgroundColor: 'var(--primary-light)', borderRadius: 'var(--radius-md)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--primary)', fontWeight: 600 }}>
+                    <User size={18} /> {selectedCustomer.fullName}
+                    {selectedCustomer.bonusBalance > 0 && !isMobile && (
+                      <span style={{ marginLeft: '0.5rem', fontSize: '0.75rem', padding: '0.2rem 0.5rem', backgroundColor: '#fbbf24', color: '#000', borderRadius: '1rem' }}>
+                        Bonus: <CurrencyDisplay amount={selectedCustomer.bonusBalance} />
+                      </span>
+                    )}
                   </div>
-                  <button 
-                    className="btn btn-outline" 
-                    onClick={() => setShowCustomerDropdown(!showCustomerDropdown)}
-                    style={{ padding: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                  >
-                    <ChevronDown size={18} />
-                  </button>
+                  <button onClick={() => setSelectedCustomer(null)} style={{ color: 'var(--danger)' }}>✕</button>
                 </div>
-                {showCustomerDropdown && (customerSearch.trim() ? filteredCustomers.length > 0 : customers.length > 0) && (
-                  <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', zIndex: 10, marginTop: '0.5rem', boxShadow: 'var(--shadow-md)', maxHeight: '250px', overflowY: 'auto' }}>
-                    {(customerSearch.trim() ? filteredCustomers : customers.slice(0, 10)).map(c => (
-                      <div key={c.id} onClick={() => { setSelectedCustomer(c); setCustomerSearch(''); setShowCustomerDropdown(false); }} style={{ padding: '0.75rem 1rem', cursor: 'pointer', borderBottom: '1px solid var(--border-color)' }}>
-                        <div style={{ fontWeight: 600 }}>{c.fullName}</div>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{c.phone}</div>
-                      </div>
-                    ))}
+              ) : (
+                <>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <div style={{ position: 'relative', flex: 1 }}>
+                      <User size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
+                      <input 
+                        type="text" 
+                        placeholder="Mijoz qidirish..." 
+                        value={customerSearch}
+                        onChange={(e) => { setCustomerSearch(e.target.value); setShowCustomerDropdown(true); }}
+                        onFocus={() => setShowCustomerDropdown(true)}
+                        style={{ width: '100%', paddingLeft: '2.5rem' }}
+                      />
+                    </div>
+                    {!isMobile && (
+                      <button 
+                        className="btn btn-outline" 
+                        onClick={() => setShowCustomerDropdown(!showCustomerDropdown)}
+                        style={{ padding: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                      >
+                        <ChevronDown size={18} />
+                      </button>
+                    )}
                   </div>
-                )}
-              </>
+                  {showCustomerDropdown && (customerSearch.trim() ? filteredCustomers.length > 0 : customers.length > 0) && (
+                    <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', zIndex: 10, marginTop: '0.5rem', boxShadow: 'var(--shadow-md)', maxHeight: '250px', overflowY: 'auto' }}>
+                      {(customerSearch.trim() ? filteredCustomers : customers.slice(0, 10)).map(c => (
+                        <div key={c.id} onClick={() => { setSelectedCustomer(c); setCustomerSearch(''); setShowCustomerDropdown(false); }} style={{ padding: '0.75rem 1rem', cursor: 'pointer', borderBottom: '1px solid var(--border-color)' }}>
+                          <div style={{ fontWeight: 600 }}>{c.fullName}</div>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{c.phone}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+          
+          <div style={{ flex: 1, overflowY: 'auto', padding: '1rem' }}>
+            {cart.length === 0 ? (
+              <div className="flex-center" style={{ height: '100%', color: 'var(--text-secondary)' }}>Savat bo'sh</div>
+            ) : (
+              <div className="flex-col" style={{ gap: '1rem' }}>
+                {cart.map(item => (
+                  <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '1rem', borderBottom: '1px solid var(--border-color)' }}>
+                    <div>
+                      <div style={{ fontWeight: '500' }}>{item.name}</div>
+                      <div style={{ color: 'var(--primary)', fontWeight: '600', fontSize: '0.875rem' }}><CurrencyDisplay amount={item.sellPrice * item.qty} /></div>
+                    </div>
+                    <div className="flex-center" style={{ gap: '0.5rem' }}>
+                      <button className="btn btn-outline" style={{ padding: '0.25rem' }} onClick={() => updateQty(item.id, -1, item.stock)}><Minus size={16} /></button>
+                      {isMobile ? (
+                        <span style={{ fontWeight: 600, width: '30px', textAlign: 'center' }}>{item.qty}</span>
+                      ) : (
+                        <input 
+                          type="text" 
+                          inputMode="numeric"
+                          value={item.qty} 
+                          onChange={(e) => {
+                            const val = e.target.value.replace(/\D/g, '');
+                            if (val === '') {
+                              setCart(prev => prev.map(p => p.id === item.id ? { ...p, qty: '' } : p));
+                            } else {
+                              const num = parseInt(val, 10);
+                              if (!isNaN(num)) setCart(prev => prev.map(p => p.id === item.id ? { ...p, qty: Math.min(item.stock, num) } : p));
+                            }
+                          }}
+                          onBlur={(e) => {
+                            let num = parseInt(e.target.value.replace(/\D/g, ''), 10);
+                            if (isNaN(num) || num < 1) num = 1;
+                            setCart(prev => prev.map(p => p.id === item.id ? { ...p, qty: Math.min(item.stock, num) } : p));
+                          }}
+                          style={{ width: '65px', textAlign: 'center', fontWeight: '600', padding: '0.25rem', border: '1px solid var(--border-color)', borderRadius: '4px', background: 'transparent', color: 'var(--text-main)' }}
+                        />
+                      )}
+                      <button className="btn btn-outline" style={{ padding: '0.25rem' }} onClick={() => updateQty(item.id, 1, item.stock)}><Plus size={16} /></button>
+                      <button className="btn btn-ghost" style={{ color: 'var(--danger)', padding: '0.25rem', marginLeft: '0.5rem' }} onClick={() => removeFromCart(item.id)}><Trash2 size={16} /></button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
-        </div>
-        
-        <div style={{ flex: 1, overflowY: 'auto', padding: '1rem' }}>
-          {cart.length === 0 ? (
-            <div className="flex-center" style={{ height: '100%', color: 'var(--text-secondary)' }}>Savat bo'sh</div>
-          ) : (
-            <div className="flex-col" style={{ gap: '1rem' }}>
-              {cart.map(item => (
-                <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '1rem', borderBottom: '1px solid var(--border-color)' }}>
-                  <div>
-                    <div style={{ fontWeight: '500' }}>{item.name}</div>
-                    <div style={{ color: 'var(--primary)', fontWeight: '600', fontSize: '0.875rem' }}><CurrencyDisplay amount={item.sellPrice * item.qty} /></div>
-                  </div>
-                  <div className="flex-center" style={{ gap: '0.5rem' }}>
-                    <button className="btn btn-outline" style={{ padding: '0.25rem' }} onClick={() => updateQty(item.id, -1, item.stock)}><Minus size={16} /></button>
-                    <input 
-                      type="text" 
-                      inputMode="numeric"
-                      value={item.qty} 
-                      onChange={(e) => {
-                        const val = e.target.value.replace(/\D/g, '');
-                        if (val === '') {
-                          setCart(prev => prev.map(p => p.id === item.id ? { ...p, qty: '' } : p));
-                        } else {
-                          const num = parseInt(val, 10);
-                          if (!isNaN(num)) setCart(prev => prev.map(p => p.id === item.id ? { ...p, qty: Math.min(item.stock, num) } : p));
-                        }
-                      }}
-                      onBlur={(e) => {
-                        let num = parseInt(e.target.value.replace(/\D/g, ''), 10);
-                        if (isNaN(num) || num < 1) num = 1;
-                        setCart(prev => prev.map(p => p.id === item.id ? { ...p, qty: Math.min(item.stock, num) } : p));
-                      }}
-                      style={{ width: '65px', textAlign: 'center', fontWeight: '600', padding: '0.25rem', border: '1px solid var(--border-color)', borderRadius: '4px', background: 'transparent', color: 'var(--text-main)' }}
-                    />
-                    <button className="btn btn-outline" style={{ padding: '0.25rem' }} onClick={() => updateQty(item.id, 1, item.stock)}><Plus size={16} /></button>
-                    <button className="btn btn-ghost" style={{ color: 'var(--danger)', padding: '0.25rem', marginLeft: '0.5rem' }} onClick={() => removeFromCart(item.id)}><Trash2 size={16} /></button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
 
-        <div style={{ padding: '1.5rem', borderTop: '1px solid var(--border-color)', backgroundColor: 'var(--bg-main)' }}>
-          <div className="flex-between" style={{ marginBottom: '1.5rem' }}>
-            <span style={{ fontSize: '1.25rem', color: 'var(--text-secondary)', fontWeight: 500 }}>Jami summa:</span>
-            <span className="h1" style={{ color: 'var(--primary)', fontSize: '2rem' }}><CurrencyDisplay amount={subtotal} /></span>
+          <div style={{ padding: '1.5rem', borderTop: '1px solid var(--border-color)', backgroundColor: 'var(--bg-main)' }}>
+            <div className="flex-between" style={{ marginBottom: '1.5rem' }}>
+              <span style={{ fontSize: '1.25rem', color: 'var(--text-secondary)', fontWeight: 500 }}>Jami summa:</span>
+              <span className="h1" style={{ color: 'var(--primary)', fontSize: '2rem' }}><CurrencyDisplay amount={subtotal} /></span>
+            </div>
+            <button className="btn btn-primary" disabled={cart.length === 0} onClick={openPaymentDrawer} style={{ width: '100%', padding: '1rem', fontSize: '1.125rem' }}>
+               To'lash
+            </button>
           </div>
-          <button className="btn btn-primary" disabled={cart.length === 0} onClick={openPaymentDrawer} style={{ width: '100%', padding: '1rem', fontSize: '1.125rem' }}>
-             To'lash
-          </button>
         </div>
-      </div>
+      )}
+
+      {/* Mobile Cart Fullscreen Drawer */}
+      <AnimatePresence>
+        {isMobile && isCartDrawerOpen && (
+          <motion.div
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
+            initial={{ x: '100%' }}
+            animate={{ x: 0 }}
+            exit={{ x: '100%' }}
+            transition={{ type: 'spring', damping: 26, stiffness: 220 }}
+            style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999, background: '#f8fafc', display: 'flex', flexDirection: 'column' }}
+          >
+            <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '1rem', background: '#fff' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h2 className="h2" style={{ margin: 0 }}>Savat</h2>
+                <button className="btn btn-ghost" onClick={() => setIsCartDrawerOpen(false)} style={{ padding: '8px', color: 'var(--text-secondary)' }}>
+                  <ChevronRight size={28}/>
+                </button>
+              </div>
+            
+              <div style={{ position: 'relative' }}>
+                {selectedCustomer ? (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem 1rem', backgroundColor: 'var(--primary-light)', borderRadius: 'var(--radius-md)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--primary)', fontWeight: 600 }}>
+                      <User size={18} /> {selectedCustomer.fullName}
+                    </div>
+                    <button onClick={() => setSelectedCustomer(null)} style={{ color: 'var(--danger)' }}>✕</button>
+                  </div>
+                ) : (
+                  <>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <div style={{ position: 'relative', flex: 1 }}>
+                        <User size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
+                        <input 
+                          type="text" 
+                          placeholder="Mijoz qidirish..." 
+                          value={customerSearch}
+                          onChange={(e) => { setCustomerSearch(e.target.value); setShowCustomerDropdown(true); }}
+                          onFocus={() => setShowCustomerDropdown(true)}
+                          style={{ width: '100%', paddingLeft: '2.5rem' }}
+                        />
+                      </div>
+                    </div>
+                    {showCustomerDropdown && filteredCustomers.length > 0 && (
+                      <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, backgroundColor: '#fff', border: '1px solid var(--border-color)', zIndex: 10, maxHeight: '200px', overflowY: 'auto' }}>
+                        {filteredCustomers.map(c => (
+                          <div key={c.id} onClick={() => { setSelectedCustomer(c); setCustomerSearch(''); setShowCustomerDropdown(false); }} style={{ padding: '0.75rem 1rem', cursor: 'pointer', borderBottom: '1px solid var(--border-color)' }}>
+                            <div style={{ fontWeight: 600 }}>{c.fullName}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+            
+            <div style={{ flex: 1, overflowY: 'auto', padding: '1rem' }}>
+              {cart.length === 0 ? (
+                <div className="flex-center" style={{ height: '100%', color: 'var(--text-secondary)' }}>Savat bo'sh</div>
+              ) : (
+                <div className="flex-col" style={{ gap: '1rem', background: '#fff', padding: '1rem', borderRadius: '1rem' }}>
+                  {cart.map(item => (
+                    <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '1rem', borderBottom: '1px solid var(--border-color)' }}>
+                      <div>
+                        <div style={{ fontWeight: '500' }}>{item.name}</div>
+                        <div style={{ color: 'var(--primary)', fontWeight: '600', fontSize: '0.875rem' }}><CurrencyDisplay amount={item.sellPrice * item.qty} /></div>
+                      </div>
+                      <div className="flex-center" style={{ gap: '0.5rem' }}>
+                        <button className="btn btn-outline" style={{ padding: '0.25rem' }} onClick={() => updateQty(item.id, -1, item.stock)}><Minus size={16} /></button>
+                        <span style={{ fontWeight: 600, width: '30px', textAlign: 'center' }}>{item.qty}</span>
+                        <button className="btn btn-outline" style={{ padding: '0.25rem' }} onClick={() => updateQty(item.id, 1, item.stock)}><Plus size={16} /></button>
+                        <button className="btn btn-ghost" style={{ color: 'var(--danger)', padding: '0.25rem', marginLeft: '0.5rem' }} onClick={() => removeFromCart(item.id)}><Trash2 size={16} /></button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div style={{ padding: '1.5rem', borderTop: '1px solid var(--border-color)', backgroundColor: '#fff' }}>
+              <div className="flex-between" style={{ marginBottom: '1.5rem' }}>
+                <span style={{ fontSize: '1.25rem', color: 'var(--text-secondary)', fontWeight: 500 }}>Jami summa:</span>
+                <span className="h1" style={{ color: 'var(--primary)', fontSize: '2rem' }}><CurrencyDisplay amount={subtotal} /></span>
+              </div>
+              <button className="btn btn-primary" disabled={cart.length === 0} onClick={openPaymentDrawer} style={{ width: '100%', padding: '1rem', fontSize: '1.125rem' }}>
+                 To'lash
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ══ Mobile Swipe Hint ══ */}
+      <AnimatePresence>
+        {isMobile && showSwipeHint && !isCartDrawerOpen && (
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 20 }}
+            style={{
+              position: 'fixed', bottom: '100px', right: '0',
+              background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(16px)',
+              padding: '12px 24px 12px 20px', 
+              borderTopLeftRadius: '30px', borderBottomLeftRadius: '30px', 
+              boxShadow: '-8px 8px 32px rgba(0,0,0,0.1)',
+              display: 'flex', alignItems: 'center', gap: '12px', zIndex: 1000, 
+              color: '#1A2538', fontWeight: 600, fontSize: '14px', lineHeight: '1.3',
+              pointerEvents: 'none'
+            }}
+          >
+            <div style={{ display: 'flex', color: 'var(--primary)', marginLeft: '-8px' }}>
+              <ChevronLeft size={18} style={{ marginRight: '-12px' }}/>
+              <ChevronLeft size={18} style={{ marginRight: '-12px' }}/>
+              <ChevronLeft size={18} />
+            </div>
+            <div style={{ whiteSpace: 'nowrap' }}>Savatni ochish uchun chapga suring</div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ══ Fullscreen Payment Overlay ══ */}
       <AnimatePresence>
@@ -552,7 +763,7 @@ const POS = () => {
                 pointerEvents: 'none',
               }}
             >
-              <div style={{
+              <div className="pos-payment-drawer" style={{
                 width: '100%',
                 maxWidth: '960px',
                 height: 'calc(100vh - 40px)',
@@ -566,7 +777,7 @@ const POS = () => {
               }}>
 
                 {/* ── LEFT: Receipt ── */}
-                <div style={{
+                <div className="pos-payment-left" style={{
                   width: '380px',
                   flexShrink: 0,
                   background: 'linear-gradient(160deg, #1A2538 0%, #2C4A7C 100%)',
@@ -616,7 +827,7 @@ const POS = () => {
                 </div>
 
                 {/* ── RIGHT: Payment Form ── */}
-                <div style={{
+                <div className="pos-payment-right" style={{
                   flex: 1,
                   display: 'flex',
                   flexDirection: 'column',

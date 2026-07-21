@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import './Customers.css';
 import { UserPlus, Search, Edit, Trash2, CreditCard } from 'lucide-react';
 import { db } from '../../firebase';
 import { collection, onSnapshot, doc, query, orderBy, where, getDocs } from '../../services/firebaseMock';
@@ -224,53 +225,58 @@ const Customers = () => {
           </div>
         </div>
 
-        <div style={{ overflowX: 'auto' }}>
-          <table className="page-table">
-            <thead>
-              <tr>
-                <th>F.I.O</th>
-                <th>Telefon</th>
-                <th>Jami xarid</th>
-                <th>Bonus</th>
-                <th>Qarz</th>
-                <th style={{ textAlign: 'right' }}>Amallar</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredCustomers.length === 0 ? (
-                <tr>
-                  <td colSpan="6" style={{ textAlign: 'center', padding: '3rem', color: '#8A9BB5' }}>
-                    Mijozlar topilmadi
-                  </td>
-                </tr>
-              ) : filteredCustomers.map(c => (
-                <tr key={c.id}>
-                  <td>
-                    <div style={{ fontWeight: 600, color: '#1A2538' }}>
-                      {c.fullName}
-                      {c.isVip && <span className="badge badge-amber" style={{ marginLeft: 6 }}>VIP</span>}
-                      {c.bonusPercent > 0 && <span className="badge badge-blue" style={{ marginLeft: 6 }}>{c.bonusPercent}% Bonus</span>}
-                    </div>
-                  </td>
-                  <td style={{ color: '#8A9BB5', fontFamily: 'monospace', fontSize: 13 }}>{c.phone}</td>
-                  <td style={{ fontWeight: 600 }}><CurrencyDisplay amount={c.totalPurchases} /></td>
-                  <td style={{ fontWeight: 600, color: '#4A90E2' }}><CurrencyDisplay amount={c.bonusBalance} /></td>
-                  <td>
-                    {c.currentDebt > 0
-                      ? <span style={{ fontWeight: 700, color: '#EF4B4B' }}><CurrencyDisplay amount={c.currentDebt} /></span>
-                      : <span className="badge badge-green">Yo'q</span>
-                    }
-                  </td>
-                  <td>
-                    <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-                      <button className="action-btn edit" onClick={() => openModal(c)} title="Tahrirlash"><Edit size={14}/></button>
-                      <button className="action-btn delete" onClick={() => handleDelete(c)} title="O'chirish"><Trash2 size={14}/></button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="customers-table-wrapper" style={{ flex: 1, overflowY: 'auto' }}>
+          <div className="customers-table-header">
+            <div>F.I.O</div>
+            <div>Telefon</div>
+            <div>Jami xarid</div>
+            <div>Bonus</div>
+            <div>Qarz</div>
+            <div style={{ textAlign: 'right' }}>Amallar</div>
+          </div>
+
+          {filteredCustomers.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '3rem', color: '#8A9BB5' }}>
+              Mijozlar topilmadi
+            </div>
+          ) : filteredCustomers.map(c => (
+            <div className="customers-table-row" key={c.id}>
+              {/* 1. Name */}
+              <div className="cust-col-name">
+                {c.fullName}
+                {c.isVip && <span className="badge badge-amber" style={{ marginLeft: 6, fontSize: 10 }}>VIP</span>}
+                {c.bonusPercent > 0 && <span className="badge badge-blue" style={{ marginLeft: 6, fontSize: 10 }}>{c.bonusPercent}% Bonus</span>}
+              </div>
+
+              {/* 2. Phone */}
+              <div className="cust-col-phone">{c.phone}</div>
+
+              {/* 3. Purchases */}
+              <div className="cust-col-purchases">
+                <span style={{ fontSize: 11, color: '#94A3B8' }} className="mobile-only-label">Xarid: </span>
+                <CurrencyDisplay amount={c.totalPurchases} />
+              </div>
+
+              {/* 4. Bonus */}
+              <div className="cust-col-bonus">
+                <CurrencyDisplay amount={c.bonusBalance} />
+              </div>
+
+              {/* 5. Debt */}
+              <div className="cust-col-debt">
+                {c.currentDebt > 0
+                  ? <span style={{ color: '#EF4B4B' }}><CurrencyDisplay amount={c.currentDebt} /></span>
+                  : <span className="badge badge-green" style={{ fontSize: 11 }}>Qarzsiz</span>
+                }
+              </div>
+
+              {/* 6. Actions */}
+              <div className="cust-col-actions">
+                <button className="action-btn edit" onClick={() => openModal(c)} title="Tahrirlash"><Edit size={14}/></button>
+                <button className="action-btn delete" onClick={() => handleDelete(c)} title="O'chirish"><Trash2 size={14}/></button>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import './Catalog.css';
 import { Search, Plus, Filter, Edit, Trash2, Download, Upload, CheckCircle2, AlertTriangle, XCircle, FileSpreadsheet, Package, LayoutGrid, List, Grid3x3, Rows3 } from 'lucide-react';
 import CustomSelect from '../../components/CustomSelect';
 import { db } from '../../firebase';
@@ -33,12 +34,13 @@ const formatCompact = (num) => {
   return num.toString();
 };
 
-const MiniRing = ({ pct: p, color = GL, bad = false }) => {
+const MiniRing = ({ pct: rawP = 0, color = GL, bad = false }) => {
+  const p = isNaN(rawP) || !isFinite(rawP) ? 0 : rawP;
   const R = 15, CIRC = 2 * Math.PI * R;
   const fill = (p / 100) * CIRC;
   const trackColor = bad ? '#FCE9E9' : ACTIVE_TRACK;
   return (
-    <div style={{ position: 'relative', width: 36, height: 36 }}>
+    <div style={{ position: 'relative', width: 36, height: 36, flexShrink: 0 }}>
       <svg width="36" height="36" viewBox="0 0 36 36" style={{ transform: 'rotate(-90deg)' }}>
         <circle cx="18" cy="18" r={R} fill="none" stroke={trackColor} strokeWidth="4"/>
         <circle cx="18" cy="18" r={R} fill="none" stroke={bad ? RED : GL} strokeWidth="4" strokeDasharray={`${Math.min(fill, CIRC)} ${CIRC}`} strokeLinecap="round"/>
@@ -49,19 +51,23 @@ const MiniRing = ({ pct: p, color = GL, bad = false }) => {
 };
 
 const MacroCard = ({ label, value, maxValue, unit, trend, isAlert, icon }) => {
-  const p = maxValue > 0 ? Math.round((value / maxValue) * 100) : 0;
+  const numVal = Number(value) || 0;
+  const numMax = Number(maxValue) || 0;
+  const p = numMax > 0 ? Math.round((numVal / numMax) * 100) : 0;
+  const safeP = isNaN(p) || !isFinite(p) ? 0 : p;
+
   return (
-    <div style={{ flex: 1, border: `1px solid ${CARD_B}`, borderRadius: '20px', padding: '16px', boxShadow: '0 8px 24px -18px rgba(0,0,0,.3)', background: '#fff', minWidth: 0 }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-        <div style={{ width: 32, height: 32, borderRadius: '50%', background: isAlert ? '#FCE9E9' : ACTIVE_TRACK, color: isAlert ? RED : GD, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+    <div className="catalog-macro-card">
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+        <div style={{ width: 28, height: 28, borderRadius: '50%', background: isAlert ? '#FCE9E9' : ACTIVE_TRACK, color: isAlert ? RED : GD, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           {icon}
         </div>
-        <span style={{ fontSize: '11px', fontWeight: 700, color: '#fff', padding: '4px 8px', borderRadius: '8px', background: isAlert ? RED : '#1A2538' }}>{trend}</span>
+        <span style={{ fontSize: '10px', fontWeight: 700, color: '#fff', padding: '2px 6px', borderRadius: '6px', background: isAlert ? RED : '#1A2538' }}>{trend}</span>
       </div>
-      <div style={{ fontSize: '15px', fontWeight: 700, color: TD, marginBottom: '6px' }}>{label}</div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ fontSize: '13px', color: TG, fontWeight: 600 }}>{value} / {unit}</span>
-        <MiniRing pct={Math.min(p, 100)} bad={isAlert}/>
+      <div className="catalog-macro-title">{label}</div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '4px' }}>
+        <span className="catalog-macro-value">{value} / {unit}</span>
+        <MiniRing pct={Math.min(safeP, 100)} bad={isAlert}/>
       </div>
     </div>
   );
@@ -362,14 +368,14 @@ const Catalog = () => {
   );
 
   return (
-    <div style={{ display:'flex', flexDirection:'column', gap:'1.25rem', fontFamily:"'Poppins','Segoe UI',sans-serif" }}>
+    <div className="catalog-container">
       {/* Header */}
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', flexShrink: 0 }}>
+      <div className="catalog-header">
         <div>
           <h1 style={{ fontSize:'24px', fontWeight:800, color:'#1A2538', margin:0, letterSpacing:'-0.5px' }}>Mahsulotlar Katalogi</h1>
           <p style={{ fontSize:'13px', color:'#8A9BB5', marginTop:4 }}>{products.filter(p=>p.status!=='archived').length} ta mahsulot ro'yxatda</p>
         </div>
-        <div style={{ display:'flex', gap:'0.75rem' }}>
+        <div className="catalog-header-actions">
           <button className="btn btn-outline" style={{ display:'flex', alignItems:'center', gap:'0.4rem' }} onClick={() => setIsTransferOpen(true)}>
             <FileSpreadsheet size={18}/> Stok ko'chirish
           </button>
@@ -380,7 +386,7 @@ const Catalog = () => {
       </div>
 
       {/* MacroCards */}
-      <div style={{ display:'flex', gap:'1rem', flexShrink: 0 }}>
+      <div className="catalog-macro-container">
         <MacroCard label="Xilma-xillik (Turi)" value={new Intl.NumberFormat('uz-UZ').format(totalDistinctProducts)} maxValue={100} unit="max" trend="100%" isAlert={false} icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>}/>
         <MacroCard label="Jami Qoldiq" value={formatCompact(totalPhysicalStock)} maxValue={10000} unit="dona" trend="Barchasi" isAlert={false} icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 7h-7L10 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"></path></svg>}/>
         <MacroCard label="Jami Tannarx" value={formatCompact(totalCostValue)} maxValue={totalCostValue+totalSellValue} unit={curr} trend="Tikilgan" isAlert={false} icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10"></circle><path d="M12 8v8"></path><path d="M8 12h8"></path></svg>}/>
@@ -390,9 +396,9 @@ const Catalog = () => {
       {/* Main card — no fixed height, page scrolls naturally */}
       <div style={{ border:'1px solid #DCE8F5', borderRadius:'20px', background:'#fff', boxShadow:'0 8px 24px -18px rgba(0,0,0,.3)' }}>
         {/* Toolbar — sticky so it stays while scrolling */}
-        <div style={{ padding:'16px 20px', borderBottom:'1px solid #DCE8F5', display:'flex', justifyContent:'space-between', alignItems:'center', position:'sticky', top:0, zIndex:10, background:'#fff', borderRadius:'20px 20px 0 0' }}>
+        <div className="catalog-toolbar">
           {/* Search */}
-          <div style={{ position:'relative', width:'320px' }}>
+          <div className="catalog-search-wrap">
             <Search size={17} style={{ position:'absolute', left:'1rem', top:'50%', transform:'translateY(-50%)', color:'#8A9BB5' }}/>
             <input type="text" placeholder="Mahsulot nomi yoki shtrix-kodi..." value={search} onChange={e => setSearch(e.target.value)}
               style={{ width:'100%', padding:'9px 10px 9px 2.6rem', borderRadius:'12px', border:'1.5px solid #DCE8F5', fontSize:'14px', outline:'none', fontFamily:'inherit' }}
@@ -400,15 +406,15 @@ const Catalog = () => {
               onBlur={e => e.target.style.borderColor='#DCE8F5'}
             />
           </div>
-          <div style={{ display:'flex', alignItems:'center', gap:'12px' }}>
+          <div className="catalog-toolbar-right">
             {/* Category filter */}
-            <div style={{ width:'220px' }}>
+            <div className="catalog-category-filter">
               <CustomSelect value={categoryFilter} onChange={v => setCategoryFilter(v)}
                 options={[{value:'',label:'Barcha kategoriyalar'},...categories.map(c=>({value:c.id,label:c.name}))]}
               />
             </div>
             {/* View mode toggle */}
-            <div style={{ display:'flex', background:'#F0F5FC', borderRadius:'12px', padding:'4px', gap:'2px' }}>
+            <div className="catalog-view-mode-toggle">
               {VIEW_MODES.map(vm => (
                 <button key={vm.id} title={vm.title} onClick={() => setViewMode(vm.id)}
                   style={{ width:36, height:36, borderRadius:'9px', border:'none', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', transition:'all 0.2s',
@@ -430,8 +436,8 @@ const Catalog = () => {
             <>
               {/* ── LIST VIEW ── */}
               {viewMode === 'list' && (
-                <div>
-                  <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr 1fr 1fr 90px', gap:'1rem', padding:'12px 20px', borderBottom:'2px solid #DCE8F5', background:'#F7FAFF', color:'#8A9BB5', fontSize:'12px', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.05em' }}>
+                <div className="catalog-table-wrapper">
+                  <div className="catalog-table-header" style={{ padding:'12px 20px', borderBottom:'2px solid #DCE8F5', background:'#F7FAFF', color:'#8A9BB5', fontSize:'12px', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.05em' }}>
                     <div style={{ paddingLeft:'54px' }}>Mahsulot</div>
                     <div>Kategoriya</div>
                     <div>Qoldiq</div>
@@ -442,26 +448,32 @@ const Catalog = () => {
                     const cat = categories.find(c => c.id === p.categoryId);
                     const stock = p.stockByWarehouse?.[selectedWarehouseId] || 0;
                     return (
-                      <div key={p.id} style={{ display:'grid', gridTemplateColumns:'2fr 1fr 1fr 1fr 90px', gap:'1rem', alignItems:'center', padding:'12px 20px', borderBottom:'1px solid #DCE8F5', transition:'background .15s' }}
+                      <div key={p.id} className="catalog-table-row"
                         onMouseEnter={e => e.currentTarget.style.backgroundColor='#F4F8FF'}
                         onMouseLeave={e => e.currentTarget.style.backgroundColor='transparent'}>
-                        <div style={{ display:'flex', alignItems:'center', gap:'12px', minWidth:0 }}>
+                        <div className="catalog-row-info">
                           <div style={{ width:40, height:40, borderRadius:'12px', background:'#F0F5FC', color:'#8A9BB5', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}><Package size={18}/></div>
                           <div style={{ minWidth:0 }}>
                             <div style={{ fontWeight:700, fontSize:'14px', color:'#1A2538', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{p.name}</div>
                             <div style={{ fontSize:'11px', color:'#8A9BB5', marginTop:2, fontFamily:'monospace' }}>{p.barcode || '—'}</div>
                           </div>
                         </div>
-                        <span style={{ padding:'3px 10px', background:'#D1E8F5', color:'#2C6FBF', borderRadius:'999px', fontSize:'12px', fontWeight:700, display:'inline-block' }}>{cat?.name || 'Boshqa'}</span>
-                        <div>
-                          <div style={{ fontWeight:700, color:getStockColor(stock,p.minStock), fontSize:'14px' }}>{stock} {p.unit}</div>
-                          <div style={{ fontSize:'11px', color:'#8A9BB5' }}>qoldiq</div>
+                        
+                        <div className="catalog-row-extra">
+                          <span style={{ padding:'3px 10px', background:'#D1E8F5', color:'#2C6FBF', borderRadius:'999px', fontSize:'12px', fontWeight:700, display:'inline-block' }}>{cat?.name || 'Boshqa'}</span>
+                          <div>
+                            <div style={{ fontWeight:700, color:getStockColor(stock,p.minStock), fontSize:'14px' }}>{stock} {p.unit}</div>
+                            <div style={{ fontSize:'11px', color:'#8A9BB5' }}>qoldiq</div>
+                          </div>
+                          <div>
+                            <div style={{ fontWeight:700, color:'#4A90E2', fontSize:'14px' }}><CurrencyDisplay amount={p.sellPrice}/></div>
+                            <div style={{ fontSize:'11px', color:'#8A9BB5' }}>tn: <CurrencyDisplay amount={p.costPrice}/></div>
+                          </div>
                         </div>
-                        <div>
-                          <div style={{ fontWeight:700, color:'#4A90E2', fontSize:'14px' }}><CurrencyDisplay amount={p.sellPrice}/></div>
-                          <div style={{ fontSize:'11px', color:'#8A9BB5' }}>tn: <CurrencyDisplay amount={p.costPrice}/></div>
+
+                        <div className="catalog-row-actions">
+                          <ProductActions p={p}/>
                         </div>
-                        <div style={{ display:'flex', justifyContent:'flex-end' }}><ProductActions p={p}/></div>
                       </div>
                     );
                   })}
@@ -470,7 +482,7 @@ const Catalog = () => {
 
               {/* ── LARGE CARD VIEW ── */}
               {viewMode === 'large' && (
-                <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(260px,1fr))', gap:'16px', padding:'20px' }}>
+                <div className="catalog-grid-large">
                   {filteredProducts.map(p => {
                     const cat = categories.find(c => c.id === p.categoryId);
                     const stock = p.stockByWarehouse?.[selectedWarehouseId] || 0;
@@ -505,7 +517,7 @@ const Catalog = () => {
 
               {/* ── SMALL CARD VIEW ── */}
               {viewMode === 'small' && (
-                <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(170px,1fr))', gap:'12px', padding:'16px' }}>
+                <div className="catalog-grid-small">
                   {filteredProducts.map(p => {
                     const cat = categories.find(c => c.id === p.categoryId);
                     const stock = p.stockByWarehouse?.[selectedWarehouseId] || 0;
@@ -531,7 +543,7 @@ const Catalog = () => {
 
               {/* ── SQUARE (grid 3-col with image-like top) VIEW ── */}
               {viewMode === 'square' && (
-                <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))', gap:'14px', padding:'18px' }}>
+                <div className="catalog-grid-square">
                   {filteredProducts.map(p => {
                     const cat = categories.find(c => c.id === p.categoryId);
                     const stock = p.stockByWarehouse?.[selectedWarehouseId] || 0;
@@ -651,7 +663,7 @@ const Catalog = () => {
           )}
         </AnimatePresence>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+        <div className="form-grid-2">
           <FormInput label={`Tannarx (${curr})`} type="number" value={formData.costPrice} onChange={e => setFormData({...formData, costPrice: e.target.value})} error={formErrors.costPrice} required />
           <FormInput label={`Sotish narxi (${curr})`} type="number" value={formData.sellPrice} onChange={e => setFormData({...formData, sellPrice: e.target.value})} error={formErrors.sellPrice} required />
         </div>
@@ -665,7 +677,7 @@ const Catalog = () => {
           </div>
         )}
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+        <div className="form-grid-2">
           {!editingId ? (
              <FormInput label="Boshlang'ich qoldiq" type="number" value={formData.stock} onChange={e => setFormData({...formData, stock: e.target.value})} />
           ) : (

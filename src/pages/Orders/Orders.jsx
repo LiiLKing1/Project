@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import './Orders.css';
 import { PackageOpen, Search, Plus, Trash2, CheckCircle, ChevronDown, ChevronUp, X } from 'lucide-react';
 import CustomSelect from '../../components/CustomSelect';
 import { db } from '../../firebase';
@@ -276,97 +278,134 @@ const Orders = () => {
           </div>
         </div>
 
-        <div style={{ flex: 1, overflowY: 'auto' }}>
-          <table className="page-table">
-            <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
-              <tr>
-                <th>Sana</th>
-                <th>Yetkazib beruvchi</th>
-                <th>Summa</th>
-                <th>Holat</th>
-                <th>Amallar</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredOrders.length === 0 ? (
-                <tr>
-                  <td colSpan="5" style={{ textAlign: 'center', padding: '3rem', color: '#8A9BB5' }}>
-                    Buyurtmalar topilmadi
-                  </td>
-                </tr>
-              ) : filteredOrders.map(order => {
-                const supplier = suppliers.find(s => s.id === order.supplierId);
-                return (
-                  <React.Fragment key={order.id}>
-                    <tr style={{ backgroundColor: expandedId === order.id ? '#F4F8FF' : 'transparent', cursor: 'pointer' }} onClick={() => setExpandedId(expandedId === order.id ? null : order.id)}>
-                      <td style={{ color: '#8A9BB5', fontSize: 14 }}>{new Date(order.createdAt).toLocaleDateString()}</td>
-                      <td>
-                        <div style={{ fontWeight: 600, color: '#1A2538' }}>{supplier?.fullName || 'Noma\'lum'}</div>
-                      </td>
-                      <td>
-                        <div style={{ fontWeight: 700, color: '#1A2538' }}><CurrencyDisplay amount={order.totalAmount} /></div>
-                      </td>
-                      <td>
-                        {order.status === 'received' && <span style={{ display: 'inline-block', padding: '4px 10px', borderRadius: '20px', fontSize: 12, fontWeight: 600, backgroundColor: '#D1FAE5', color: '#10B981' }}>Qabul qilingan</span>}
-                        {order.status === 'cancelled' && <span style={{ display: 'inline-block', padding: '4px 10px', borderRadius: '20px', fontSize: 12, fontWeight: 600, backgroundColor: '#FEE2E2', color: '#EF4B4B' }}>Bekor qilingan</span>}
-                        {order.status === 'pending' && <span style={{ display: 'inline-block', padding: '4px 10px', borderRadius: '20px', fontSize: 12, fontWeight: 600, backgroundColor: '#FEF3C7', color: '#F59E0B' }}>Kutilmoqda</span>}
-                      </td>
-                      <td>
-                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                          {order.status === 'pending' && (
-                            <>
-                              <button className="btn btn-outline" style={{ padding: '6px 12px', fontSize: 13, borderColor: '#10B981', color: '#10B981' }} onClick={(e) => { e.stopPropagation(); handleReceiveOrder(order); }}>
-                                <CheckCircle size={14} /> Qabul qilish
-                              </button>
-                              <button className="action-btn delete" onClick={(e) => { e.stopPropagation(); handleCancelOrder(order); }}>
-                                <Trash2 size={16} />
-                              </button>
-                            </>
-                          )}
-                          <div style={{ color: '#8A9BB5', marginLeft: '8px' }}>
-                            {expandedId === order.id ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
-                          </div>
-                        </div>
-                      </td>
-                    </tr>
-                    {expandedId === order.id && (
-                      <tr>
-                        <td colSpan="5" style={{ padding: 0 }}>
-                          <div style={{ backgroundColor: '#F9FAFB', padding: '20px', borderBottom: '1px solid #DCE8F5' }}>
-                            <h4 style={{ margin: '0 0 16px 0', color: '#1A2538', fontSize: 14, fontWeight: 600 }}>Buyurtma tarkibi:</h4>
-                            <div style={{ borderRadius: '12px', overflow: 'hidden', border: '1px solid #DCE8F5', backgroundColor: '#fff' }}>
-                              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-                                <thead>
-                                  <tr style={{ backgroundColor: '#F4F8FF', borderBottom: '1px solid #DCE8F5' }}>
-                                    <th style={{ padding: '12px 16px', fontSize: 13, color: '#8A9BB5', fontWeight: 600 }}>Mahsulot</th>
-                                    <th style={{ padding: '12px 16px', fontSize: 13, color: '#8A9BB5', fontWeight: 600 }}>Soni</th>
-                                    <th style={{ padding: '12px 16px', fontSize: 13, color: '#8A9BB5', fontWeight: 600 }}>Tannarx</th>
-                                    <th style={{ padding: '12px 16px', fontSize: 13, color: '#8A9BB5', fontWeight: 600 }}>Jami</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {order.items.map((item, idx) => (
-                                    <tr key={idx} style={{ borderBottom: idx < order.items.length - 1 ? '1px solid #DCE8F5' : 'none' }}>
-                                      <td style={{ padding: '12px 16px', color: '#1A2538', fontWeight: 500 }}>
-                                        {item.name} {item.isNewProduct && <span style={{ display: 'inline-block', padding: '2px 6px', borderRadius: '4px', fontSize: 10, fontWeight: 600, backgroundColor: '#4A90E2', color: '#fff', marginLeft: 8 }}>Yangi</span>}
-                                      </td>
-                                      <td style={{ padding: '12px 16px', color: '#1A2538' }}>{item.qty} <span style={{ fontSize: 12, color: '#8A9BB5' }}>{item.unit || 'dona'}</span></td>
-                                      <td style={{ padding: '12px 16px', color: '#8A9BB5' }}><CurrencyDisplay amount={item.costPrice} /></td>
-                                      <td style={{ padding: '12px 16px', color: '#1A2538', fontWeight: 600 }}><CurrencyDisplay amount={item.qty * item.costPrice} /></td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
+        <div className="orders-table-wrapper" style={{ flex: 1, overflowY: 'auto' }}>
+          <div className="orders-table-header">
+            <div>Sana</div>
+            <div>Yetkazib beruvchi</div>
+            <div>Summa</div>
+            <div>Holat</div>
+            <div style={{ textAlign: 'right' }}>Amallar</div>
+          </div>
+
+          {filteredOrders.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '3rem', color: '#8A9BB5' }}>
+              Buyurtmalar topilmadi
+            </div>
+          ) : filteredOrders.map(order => {
+            const supplier = suppliers.find(s => s.id === order.supplierId);
+            const isExpanded = expandedId === order.id;
+
+            return (
+              <React.Fragment key={order.id}>
+                <div 
+                  className={`orders-table-row ${isExpanded ? 'expanded' : ''}`}
+                  onClick={() => setExpandedId(isExpanded ? null : order.id)}
+                >
+                  {/* 1. Date */}
+                  <div className="orders-col-date">
+                    {new Date(order.createdAt).toLocaleDateString('uz-UZ')}
+                  </div>
+
+                  {/* 2. Supplier */}
+                  <div className="orders-col-supplier">
+                    {supplier?.fullName || 'Noma\'lum'}
+                  </div>
+
+                  {/* 3. Amount */}
+                  <div className="orders-col-amount">
+                    <CurrencyDisplay amount={order.totalAmount} />
+                  </div>
+
+                  {/* 4. Status */}
+                  <div className="orders-col-status">
+                    {order.status === 'received' && (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderRadius: '20px', fontSize: 12, fontWeight: 600, backgroundColor: '#D1FAE5', color: '#059669' }}>
+                        Qabul qilingan
+                      </span>
                     )}
-                  </React.Fragment>
-                );
-              })}
-            </tbody>
-          </table>
+                    {order.status === 'cancelled' && (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderRadius: '20px', fontSize: 12, fontWeight: 600, backgroundColor: '#FEE2E2', color: '#DC2626' }}>
+                        Bekor qilingan
+                      </span>
+                    )}
+                    {order.status === 'pending' && (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderRadius: '20px', fontSize: 12, fontWeight: 600, backgroundColor: '#FEF3C7', color: '#D97706' }}>
+                        Kutilmoqda
+                      </span>
+                    )}
+                  </div>
+
+                  {/* 5. Actions */}
+                  <div className="orders-col-actions">
+                    {order.status === 'pending' && (
+                      <div style={{ display: 'flex', gap: 6 }} onClick={e => e.stopPropagation()}>
+                        <button 
+                          className="btn btn-outline" 
+                          style={{ padding: '4px 10px', fontSize: 12, borderColor: '#10B981', color: '#10B981', display: 'inline-flex', alignItems: 'center', gap: 4 }} 
+                          onClick={() => handleReceiveOrder(order)}
+                        >
+                          <CheckCircle size={14} /> Qabul qilish
+                        </button>
+                        <button 
+                          className="action-btn delete" 
+                          onClick={() => handleCancelOrder(order)}
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+                    )}
+                    <div className="orders-expand-badge">
+                      {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Expanded Details with Smooth Open & Close Animation */}
+                <AnimatePresence initial={false}>
+                  {isExpanded && (
+                    <motion.div
+                      key="order-expanded-details"
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.25, ease: 'easeInOut' }}
+                      style={{ overflow: 'hidden' }}
+                    >
+                      <div className="orders-expanded-box">
+                        <div style={{ fontWeight: 700, fontSize: 13, color: '#1E293B', marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span>Buyurtma tarkibi ({order.items.length} ta mahsulot)</span>
+                        </div>
+                        <div className="table-responsive" style={{ borderRadius: '10px', overflow: 'hidden', border: '1px solid #E2E8F0', backgroundColor: '#fff' }}>
+                          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                            <thead>
+                              <tr style={{ backgroundColor: '#F8FAFC', borderBottom: '1px solid #E2E8F0' }}>
+                                <th style={{ padding: '8px 12px', fontSize: 12, color: '#64748B', fontWeight: 600 }}>Mahsulot</th>
+                                <th style={{ padding: '8px 12px', fontSize: 12, color: '#64748B', fontWeight: 600 }}>Soni</th>
+                                <th style={{ padding: '8px 12px', fontSize: 12, color: '#64748B', fontWeight: 600 }}>Tannarx</th>
+                                <th style={{ padding: '8px 12px', fontSize: 12, color: '#64748B', fontWeight: 600, textAlign: 'right' }}>Jami</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {order.items.map((item, idx) => (
+                                <tr key={idx} style={{ borderBottom: idx < order.items.length - 1 ? '1px solid #F1F5F9' : 'none' }}>
+                                  <td style={{ padding: '10px 12px', color: '#0F172A', fontWeight: 500, fontSize: 13 }}>
+                                    {item.name} {item.isNewProduct && <span style={{ display: 'inline-block', padding: '2px 6px', borderRadius: '4px', fontSize: 10, fontWeight: 600, backgroundColor: '#3B82F6', color: '#fff', marginLeft: 6 }}>Yangi</span>}
+                                  </td>
+                                  <td style={{ padding: '10px 12px', color: '#0F172A', fontSize: 13 }}>{item.qty} <span style={{ fontSize: 11, color: '#64748B' }}>{item.unit || 'dona'}</span></td>
+                                  <td style={{ padding: '10px 12px', color: '#64748B', fontSize: 13 }}><CurrencyDisplay amount={item.costPrice} /></td>
+                                  <td style={{ padding: '10px 12px', color: '#0F172A', fontWeight: 600, fontSize: 13, textAlign: 'right' }}><CurrencyDisplay amount={item.qty * item.costPrice} /></td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </React.Fragment>
+            );
+          })}
         </div>
       </div>
 

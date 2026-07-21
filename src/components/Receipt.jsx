@@ -45,19 +45,22 @@ const Receipt = ({ sale, storeId }) => {
       {/* Header gradient */}
       <div style={{
         background: 'linear-gradient(135deg, #4A90E2, #7BCEEB)',
-        padding: '20px 24px',
         textAlign: 'center',
         color: '#fff',
+        position: 'relative',
+        overflow: 'hidden'
       }}>
-        <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-0.5px', fontFamily: 'Poppins, sans-serif' }}>
-          {storeName || APP_NAME}
+        <div style={{ padding: '24px 24px 0 24px' }}>
+          <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-0.5px', fontFamily: 'Poppins, sans-serif' }}>
+            {storeName || APP_NAME}
+          </div>
+          <div style={{ fontSize: 12, opacity: 0.85, marginTop: 4, fontFamily: 'monospace' }}>
+            {sale.saleNumber ? `#${sale.saleNumber}` : '#PREVIEW'} · {date}
+          </div>
         </div>
-        <div style={{ fontSize: 12, opacity: 0.85, marginTop: 4, fontFamily: 'monospace' }}>
-          {sale.saleNumber ? `#${sale.saleNumber}` : '#PREVIEW'} · {date}
-        </div>
-        {/* Wavy bottom */}
-        <svg viewBox="0 0 340 20" style={{ display: 'block', marginTop: 12, marginBottom: -1, width: '100%' }}>
-          <path d="M0,10 Q42.5,0 85,10 Q127.5,20 170,10 Q212.5,0 255,10 Q297.5,20 340,10 L340,20 L0,20 Z" fill="#fff"/>
+        {/* 2 extra long horizontal sweeping waves Edge to Edge 100% full width */}
+        <svg viewBox="0 0 340 32" style={{ display: 'block', marginTop: 12, marginBottom: 0, width: '100%', height: '32px' }} preserveAspectRatio="none">
+          <path d="M0,16 Q42.5,-2 85,16 Q127.5,34 170,16 Q212.5,-2 255,16 Q297.5,34 340,16 L340,32 L0,32 Z" fill="#ffffff"/>
         </svg>
       </div>
 
