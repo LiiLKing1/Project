@@ -64,9 +64,18 @@ export const RolesProvider = ({ children }) => {
         const ownerDocRef = doc(db, `users/${storeOwnerId}`);
         const ownerDocSnap = await getDoc(ownerDocRef);
         if (ownerDocSnap.exists()) {
-          profileData.status = ownerDocSnap.data().status || 'active';
+          profileData.status = ownerDocSnap.data().status || 'pending'; // Default to pending if missing
         } else {
-          profileData.status = 'active'; // Default for old users
+          // If root doc doesn't exist, they are definitely pending and we should create it
+          profileData.status = 'pending';
+          await setDoc(ownerDocRef, {
+            email: profileData.email || currentUser.email,
+            displayName: profileData.name || currentUser.displayName || 'Admin',
+            role: 'owner',
+            status: 'pending',
+            emailVerified: currentUser?.emailVerified || false,
+            createdAt: new Date().toISOString()
+          }, { merge: true });
         }
         
         setUserProfile(profileData);
@@ -108,6 +117,17 @@ export const RolesProvider = ({ children }) => {
         const ownerDocRef = doc(db, `users/${currentUser.uid}`);
         const ownerDocSnap = await getDoc(ownerDocRef);
         const status = ownerDocSnap.exists() ? ownerDocSnap.data().status : 'pending';
+
+        if (!ownerDocSnap.exists()) {
+          await setDoc(ownerDocRef, {
+            email: currentUser.email,
+            displayName: currentUser.displayName || currentUser.email?.split('@')[0] || 'Admin',
+            role: 'owner',
+            status: 'pending',
+            emailVerified: currentUser.emailVerified || false,
+            createdAt: new Date().toISOString()
+          }, { merge: true });
+        }
 
         const newAdminProfile = {
           name: currentUser.displayName || currentUser.email?.split('@')[0] || 'Admin',
