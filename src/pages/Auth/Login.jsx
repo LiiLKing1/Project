@@ -81,6 +81,8 @@ const Login = () => {
           
           await sendEmailVerification(userCredential.user);
           addToast("Muvaffaqiyatli ro'yxatdan o'tdingiz. Emailingizga tasdiqlash xati yuborildi. Iltimos pochtangizni tekshiring", "success");
+          navigate('/verify-email');
+          return; // Stop execution to prevent navigating to redirectPath
         } else {
           await login(email, password);
           addToast("Tizimga muvaffaqiyatli kirdingiz", "success");
