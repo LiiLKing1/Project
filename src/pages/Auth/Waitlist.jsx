@@ -4,8 +4,10 @@ import { Clock, LogOut } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import TitleBar from '../../components/TitleBar';
 
+import { useNavigate } from 'react-router-dom';
+
 const Waitlist = () => {
-  const { logout } = useAuth();
+  const navigate = useNavigate();
 
   return (
     <div style={{
@@ -42,7 +44,7 @@ const Waitlist = () => {
         </p>
 
         <button 
-          onClick={logout}
+          onClick={() => navigate('/landing')}
           style={{
             display: 'inline-flex', alignItems: 'center', gap: '0.5rem',
             padding: '0.75rem 1.5rem', backgroundColor: '#F3F4F6', color: '#374151',
@@ -52,8 +54,7 @@ const Waitlist = () => {
           onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#E5E7EB'}
           onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#F3F4F6'}
         >
-          <LogOut size={18} />
-          Chiqish
+          Saytga qaytish
         </button>
       </motion.div>
     </div>

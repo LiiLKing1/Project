@@ -145,8 +145,12 @@ const features = [
   },
 ];
 
+import { useAuth } from '../../context/AuthContext';
+import { User } from 'lucide-react';
+
 export default function Landing() {
   const navigate = useNavigate();
+  const { currentUser } = useAuth();
   const [scrollY, setScrollY] = useState(0);
   const isElectron = window.electronAPI && window.electronAPI.isElectron;
 
@@ -218,7 +222,9 @@ export default function Landing() {
           font-family: inherit;
           transition: opacity 0.2s, transform 0.15s;
           text-decoration: none;
-          display: inline-block;
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
         }
         .pill-btn:hover { opacity: 0.88; transform: scale(1.03); }
         .pill-btn:active { transform: scale(0.97); }
@@ -265,8 +271,17 @@ export default function Landing() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 36 }}>
           <button className="nav-link" onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}>Xususiyatlar</button>
           <button className="nav-link" onClick={() => document.getElementById('about')?.scrollIntoView({ behavior: 'smooth' })}>Biz haqimizda</button>
-          <button className="nav-link" onClick={() => navigate('/login')}>Kirish</button>
-          <button className="pill-btn" onClick={() => navigate('/login')}>Boshlash</button>
+          
+          {currentUser ? (
+            <button className="pill-btn" onClick={() => navigate('/')}>
+              <User size={16} /> Hisobga kirish
+            </button>
+          ) : (
+            <>
+              <button className="nav-link" onClick={() => navigate('/login')}>Kirish</button>
+              <button className="pill-btn" onClick={() => navigate('/login')}>Boshlash</button>
+            </>
+          )}
         </div>
       </nav>
 
