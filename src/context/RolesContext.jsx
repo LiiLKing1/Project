@@ -29,6 +29,18 @@ export const RolesProvider = ({ children }) => {
 
   useEffect(() => {
     if (currentUser) {
+      // Clear localStorage if UID doesn't match
+      const saved = localStorage.getItem('userProfile');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.email !== currentUser.email) {
+          localStorage.removeItem('userProfile');
+          setUserProfile(null);
+          setLoadingRoles(true);
+        }
+      } else {
+        setLoadingRoles(true);
+      }
       loadUserProfile();
     } else {
       setUserProfile({ role: 'admin', storeOwnerId: 'demo-store', name: 'Demo User' });

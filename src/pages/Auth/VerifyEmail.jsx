@@ -35,8 +35,34 @@ const VerifyEmail = () => {
     }
   };
 
+  React.useEffect(() => {
+    let intervalId;
+    const checkVerification = async () => {
+      const auth = getAuth();
+      if (auth.currentUser) {
+        await auth.currentUser.reload();
+        if (auth.currentUser.emailVerified) {
+          // Update firestore document to indicate they are verified
+          try {
+            const { db } = await import('../../firebase');
+            const { doc, updateDoc } = await import('firebase/firestore');
+            await updateDoc(doc(db, 'users', auth.currentUser.uid), {
+              emailVerified: true
+            });
+          } catch(e) { console.error("Auto verify firestore update error", e); }
+          
+          addToast("Muvaffaqiyatli tasdiqlandi!", "success");
+          window.location.href = "/";
+        }
+      }
+    };
+
+    intervalId = setInterval(checkVerification, 3000);
+    return () => clearInterval(intervalId);
+  }, []);
+
   const handleCheckAgain = () => {
-    // Reload the user profile to fetch the latest emailVerified status
+    // Manual check just in case auto check missed it
     const auth = getAuth();
     if (auth.currentUser) {
       auth.currentUser.reload().then(async () => {

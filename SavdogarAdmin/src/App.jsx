@@ -88,6 +88,14 @@ function App() {
 
   const changeStatus = async (uid, newStatus) => {
     try {
+      if (newStatus === 'deleted') {
+        const { deleteDoc } = await import('firebase/firestore');
+        if(window.confirm("Rostdan ham bu arizani o'chirib yubormoqchimisiz?")) {
+          await deleteDoc(doc(db, 'users', uid));
+          alert("Ariza o'chirildi!");
+        }
+        return;
+      }
       await updateDoc(doc(db, 'users', uid), { status: newStatus });
     } catch (err) {
       alert("Xatolik: " + err.message);
@@ -118,9 +126,14 @@ function App() {
     <div className="admin-dashboard">
       <header className="header">
         <div className="logo-text">Savdogar Admin Panel</div>
-        <button className="btn-logout" onClick={() => auth.signOut()}>
-          <LogOut size={18} /> Chiqish
-        </button>
+        <div style={{display: 'flex', gap: '1rem', alignItems: 'center'}}>
+          <a href="https://savdogar.vercel.app" target="_blank" rel="noreferrer" style={{color: '#8052ff', textDecoration: 'none', fontWeight: 600}}>
+            Platformaga o'tish ↗
+          </a>
+          <button className="btn-logout" onClick={() => auth.signOut()}>
+            <LogOut size={18} /> Chiqish
+          </button>
+        </div>
       </header>
       
       <main className="main-content">
@@ -178,6 +191,9 @@ function App() {
                         <UserX size={16} /> Bloklash
                       </button>
                     )}
+                    <button className="btn-action block" onClick={() => changeStatus(u.id, 'deleted')} title="Arizani o'chirish" style={{backgroundColor: '#FEE2E2', color: '#DC2626'}}>
+                      O'chirish
+                    </button>
                   </td>
                 </tr>
               ))}

@@ -55,7 +55,12 @@ export const AuthProvider = ({ children }) => {
     return signInWithPopup(auth, provider);
   };
   
-  const logout = () => signOut(auth);
+  const logout = async () => {
+    localStorage.removeItem('userProfile');
+    localStorage.removeItem('roles');
+    localStorage.removeItem('hasOnboarded');
+    return signOut(auth);
+  };
 
   return (
     <AuthContext.Provider value={{ currentUser, login, signup, loginWithGoogle, logout }}>
