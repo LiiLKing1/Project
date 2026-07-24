@@ -8,6 +8,7 @@ import TitleBar from '../../components/TitleBar';
 import { APP_NAME } from '../../config/appConfig';
 import { db } from '../../firebase';
 import { doc, setDoc } from 'firebase/firestore';
+import { getAuth, sendEmailVerification } from 'firebase/auth';
 import './Login.css';
 
 const Login = () => {
@@ -77,7 +78,9 @@ const Login = () => {
             status: 'pending',
             createdAt: new Date().toISOString()
           });
-          addToast("Muvaffaqiyatli ro'yxatdan o'tdingiz. Hisobingiz tasdiqlanishini kuting", "success");
+          
+          await sendEmailVerification(userCredential.user);
+          addToast("Muvaffaqiyatli ro'yxatdan o'tdingiz. Emailingizga tasdiqlash xati yuborildi. Iltimos pochtangizni tekshiring", "success");
         } else {
           await login(email, password);
           addToast("Tizimga muvaffaqiyatli kirdingiz", "success");

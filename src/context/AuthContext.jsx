@@ -15,7 +15,7 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
-        const userData = { uid: user.uid, email: user.email, displayName: user.displayName };
+        const userData = { uid: user.uid, email: user.email, displayName: user.displayName, emailVerified: user.emailVerified };
         setCurrentUser(userData); // Save simplified object, full user objects are large
         localStorage.setItem('authUser', JSON.stringify(userData));
       } else {

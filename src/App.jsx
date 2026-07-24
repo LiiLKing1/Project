@@ -34,6 +34,7 @@ import Login from './pages/Auth/Login';
 import LinkAccount from './pages/Auth/LinkAccount';
 import Onboarding from './pages/Auth/Onboarding';
 import Waitlist from './pages/Auth/Waitlist';
+import VerifyEmail from './pages/Auth/VerifyEmail';
 import ReceiptView from './pages/Public/ReceiptView';
 import Landing from './pages/Landing/Landing';
 
@@ -46,6 +47,7 @@ function App() {
         <Route path="/link-account" element={<LinkAccount />} />
         <Route path="/onboarding" element={<Onboarding />} />
         <Route path="/waitlist" element={<Waitlist />} />
+        <Route path="/verify-email" element={<VerifyEmail />} />
         <Route path="/receipt/:storeId/:saleId" element={<ReceiptView />} />
         
         <Route path="/" element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
