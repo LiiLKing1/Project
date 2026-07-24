@@ -5,7 +5,7 @@ import { useRoles } from '../context/RolesContext';
 
 const ProtectedRoute = ({ children }) => {
   const { currentUser } = useAuth();
-  const { loadingRoles, hasOnboarded } = useRoles();
+  const { userProfile, loadingRoles, hasOnboarded } = useRoles();
 
   if (!currentUser) {
     const isElectron = window.electronAPI && window.electronAPI.isElectron;
@@ -22,11 +22,19 @@ const ProtectedRoute = ({ children }) => {
     );
   }
 
-  if (!hasOnboarded) {
+  if (!hasOnboarded && userProfile?.status !== 'pending') {
     return <Navigate to="/onboarding" replace />;
   }
+  
+  if (userProfile?.status === 'pending') {
+    return <Navigate to="/waitlist" replace />;
+  }
 
-  return children;
+  return (
+    <div className={userProfile?.status === 'blocked' ? 'read-only-mode' : ''}>
+      {children}
+    </div>
+  );
 };
 
 export default ProtectedRoute;

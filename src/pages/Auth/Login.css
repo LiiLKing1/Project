@@ -293,3 +293,34 @@
     margin: 0 1rem;
   }
 }
+
+.login-tabs {
+  display: flex;
+  background-color: rgba(255, 255, 255, 0.4);
+  padding: 0.25rem;
+  border-radius: 1rem;
+  margin-bottom: 1rem;
+}
+
+.login-tab {
+  flex: 1;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #4b5563;
+  background: transparent;
+  border: none;
+  border-radius: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+}
+
+.login-tab:hover {
+  color: #111827;
+}
+
+.login-tab.active {
+  background-color: #fff;
+  color: #111827;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}

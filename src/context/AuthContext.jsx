@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { auth } from '../firebase';
-import { onAuthStateChanged, signInWithEmailAndPassword, signOut, GoogleAuthProvider, signInWithPopup, signInWithCredential } from 'firebase/auth';
+import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, GoogleAuthProvider, signInWithPopup, signInWithCredential } from 'firebase/auth';
 
 const AuthContext = createContext();
 export const useAuth = () => useContext(AuthContext);
@@ -30,6 +30,7 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const login = (email, password) => signInWithEmailAndPassword(auth, email, password);
+  const signup = (email, password) => createUserWithEmailAndPassword(auth, email, password);
   
   useEffect(() => {
     if (window.electronAPI) {
@@ -57,7 +58,7 @@ export const AuthProvider = ({ children }) => {
   const logout = () => signOut(auth);
 
   return (
-    <AuthContext.Provider value={{ currentUser, login, loginWithGoogle, logout }}>
+    <AuthContext.Provider value={{ currentUser, login, signup, loginWithGoogle, logout }}>
       {!loading && children}
     </AuthContext.Provider>
   );

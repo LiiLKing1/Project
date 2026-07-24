@@ -46,11 +46,20 @@ export const RolesProvider = ({ children }) => {
       if (adminProfileSnap.exists()) {
         const profileData = adminProfileSnap.data();
         profileData.storeOwnerId = profileData.storeOwnerId || currentUser.uid;
-        setUserProfile(profileData);
-        localStorage.setItem('userProfile', JSON.stringify(profileData));
-        
         const storeOwnerId = profileData.storeOwnerId || currentUser.uid;
         
+        // Fetch the main user doc to get business status (pending, active, blocked)
+        const ownerDocRef = doc(db, `users/${storeOwnerId}`);
+        const ownerDocSnap = await getDoc(ownerDocRef);
+        if (ownerDocSnap.exists()) {
+          profileData.status = ownerDocSnap.data().status || 'active';
+        } else {
+          profileData.status = 'active'; // Default for old users
+        }
+        
+        setUserProfile(profileData);
+        localStorage.setItem('userProfile', JSON.stringify(profileData));
+
         // Check onboarding state
         const storeInfoRef = doc(db, `users/${storeOwnerId}/settings/storeInfo`);
         const storeInfoSnap = await getDoc(storeInfoRef);
@@ -84,11 +93,16 @@ export const RolesProvider = ({ children }) => {
           await setDoc(rolesRef, DEFAULT_ROLES);
         }
       } else {
+        const ownerDocRef = doc(db, `users/${currentUser.uid}`);
+        const ownerDocSnap = await getDoc(ownerDocRef);
+        const status = ownerDocSnap.exists() ? ownerDocSnap.data().status : 'pending';
+
         const newAdminProfile = {
           name: currentUser.displayName || currentUser.email?.split('@')[0] || 'Admin',
           email: currentUser.email,
           role: 'admin',
           storeOwnerId: currentUser.uid,
+          status: status,
           createdAt: new Date().toISOString()
         };
         await setDoc(adminProfileRef, newAdminProfile);

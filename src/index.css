@@ -116,6 +116,29 @@ a {
   border-radius: var(--radius-xl);
 }
 
+/* ====== Read-Only Mode (Blocked Users) ====== */
+.read-only-mode .btn:not(.btn-nav),
+.read-only-mode button:not(.nav-item):not(.nav-button):not(.sidebar-item):not(.login-submit-btn),
+.read-only-mode input:not([type="search"]),
+.read-only-mode select,
+.read-only-mode textarea {
+  pointer-events: none !important;
+  opacity: 0.6 !important;
+  cursor: not-allowed !important;
+}
+
+.read-only-mode .pos-container,
+.read-only-mode .action-bar {
+  pointer-events: none !important;
+  opacity: 0.8 !important;
+}
+
+/* Allow scrolling but prevent clicking on table actions */
+.read-only-mode table td button,
+.read-only-mode table td input[type="checkbox"] {
+  pointer-events: none !important;
+}
+
 /* Typography Utilities */
 .h1 { font-size: 1.875rem; font-weight: 700; color: var(--text-main); }
 .h2 { font-size: 1.5rem; font-weight: 600; color: var(--text-main); }
