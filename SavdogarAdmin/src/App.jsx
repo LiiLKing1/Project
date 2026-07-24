@@ -37,7 +37,7 @@ function App() {
     const unsub = onSnapshot(q, (snapshot) => {
       const docs = snapshot.docs
         .map(d => ({ id: d.id, ...d.data() }))
-        .filter(d => d.role === 'owner'); // Only show owners
+        .filter(d => d.role === 'owner' && d.emailVerified === true); // Only show verified owners
       setUsersList(docs);
     });
     
@@ -70,6 +70,7 @@ function App() {
         displayName: newName,
         role: 'owner',
         status: 'active', // Admin created users are active immediately
+        emailVerified: true, // Manually verified by Admin
         createdAt: new Date().toISOString()
       });
       await signOut(secondaryAuth);

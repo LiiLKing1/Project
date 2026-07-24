@@ -32,7 +32,12 @@ const Login = () => {
 
   React.useEffect(() => {
     if (currentUser) {
-      navigate(redirectPath);
+      // If it's an owner and email is not verified, force verify-email route
+      if (!currentUser.emailVerified && !currentUser.email.endsWith('@pos.com')) {
+        navigate('/verify-email');
+      } else {
+        navigate(redirectPath);
+      }
     }
   }, [currentUser, navigate, redirectPath]);
 
@@ -76,6 +81,7 @@ const Login = () => {
             displayName: name,
             role: 'owner',
             status: 'pending',
+            emailVerified: false,
             createdAt: new Date().toISOString()
           });
           

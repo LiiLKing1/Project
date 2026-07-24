@@ -39,8 +39,17 @@ const VerifyEmail = () => {
     // Reload the user profile to fetch the latest emailVerified status
     const auth = getAuth();
     if (auth.currentUser) {
-      auth.currentUser.reload().then(() => {
+      auth.currentUser.reload().then(async () => {
         if (auth.currentUser.emailVerified) {
+          // Update firestore document to indicate they are verified
+          const { db } = await import('../../firebase');
+          const { doc, updateDoc } = await import('firebase/firestore');
+          try {
+            await updateDoc(doc(db, 'users', auth.currentUser.uid), {
+              emailVerified: true
+            });
+          } catch(e) { console.error(e); }
+          
           addToast("Muvaffaqiyatli tasdiqlandi!", "success");
           window.location.href = "/";
         } else {
