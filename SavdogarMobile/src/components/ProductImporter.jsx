@@ -82,15 +82,15 @@ const ProductImporter = ({ isOpen, onClose }) => {
           return key ? row[key] : undefined;
         };
 
-        const rawBarcode = getVal(['shtrix-kod', 'штрихкод', 'штрих-код', 'barcode']);
-        const rawName = getVal(['nomi', 'наименование', 'name', 'название']);
-        const rawCategory = getVal(['kategoriya', 'бренд', 'категория', 'brand', 'category']);
-        const rawCostPrice = getVal(['tannarx', 'себестоимость', 'cost price']);
-        const rawSellPrice = getVal(['sotish narxi', 'цена продажи', 'цена', 'sell price']);
-        const rawUnit = getVal(['o\'lchov birligi', 'единица измерения', 'unit']);
-        const rawStock = getVal(['qoldiq', 'остаток', 'stock']);
-        const rawMinStock = getVal(['minimal qoldiq', 'мин. остаток', 'мин остаток', 'min stock']);
-        const rawSupplier = getVal(['yetkazib beruvchi', 'yetkazib beruvchilar', 'поставщик', 'поставщики', 'производитель', 'supplier', 'suppliers']);
+        const rawBarcode = getVal(['shtrix-kod', 'штрихкод', 'штрих-код', 'barcode', 'штрих код']);
+        const rawName = getVal(['nomi', 'номи', 'наименование', 'name', 'название']);
+        const rawCategory = getVal(['kategoriya', 'категория', 'бренд', 'category', 'brand']);
+        const rawCostPrice = getVal(['tannarx', 'таннарх', 'себестоимость', 'cost price', 'cost']);
+        const rawSellPrice = getVal(['sotish narxi', 'сотиш нархи', 'цена продажи', 'цена', 'sell price', 'price']);
+        const rawUnit = getVal(['o\'lchov birligi', 'olchov birligi', 'ўлчов бирлиги', 'улчов бирлиги', 'единица измерения', 'unit']);
+        const rawStock = getVal(['qoldiq', 'қолдиқ', 'колдик', 'остаток', 'stock']);
+        const rawMinStock = getVal(['minimal qoldiq', 'минимал қолдиқ', 'мин. остаток', 'мин остаток', 'min stock']);
+        const rawSupplier = getVal(['yetkazib beruvchi', 'yetkazib beruvchilar', 'етказиб берувчи', 'етказиб берувчилар', 'поставщик', 'поставщики', 'производитель', 'supplier', 'suppliers']);
 
         const barcode = rawBarcode ? String(rawBarcode) : '';
         const name = rawName ? String(rawName) : '';
