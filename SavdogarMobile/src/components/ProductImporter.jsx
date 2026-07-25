@@ -14,6 +14,7 @@ const ProductImporter = ({ isOpen, onClose }) => {
   const [isImporting, setIsImporting] = useState(false);
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [partners, setPartners] = useState([]);
   const [importHistory, setImportHistory] = useState([]);
 
   const { userProfile } = useRoles();
@@ -31,6 +32,9 @@ const ProductImporter = ({ isOpen, onClose }) => {
           
           const catSnap = await getDocs(collection(db, `users/${storeId}/categories`));
           setCategories(catSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+          
+          const partSnap = await getDocs(collection(db, `users/${storeId}/partners`));
+          setPartners(partSnap.docs.map(d => ({ id: d.id, ...d.data() })));
           
           const historySnap = await getDocs(query(collection(db, `users/${storeId}/importHistory`)));
           const historyData = historySnap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
@@ -146,6 +150,9 @@ const ProductImporter = ({ isOpen, onClose }) => {
       const categoryMap = {};
       categories.forEach(c => { categoryMap[c.name.toLowerCase().trim()] = c.id; });
       
+      const partnerMap = {};
+      partners.forEach(p => { partnerMap[p.companyName.toLowerCase().trim()] = p.id; });
+      
       for (const row of validRows) {
         const { parsed, status } = row;
         
@@ -155,6 +162,24 @@ const ProductImporter = ({ isOpen, onClose }) => {
           batch.set(newCatRef, { name: parsed.categoryName, createdAt: new Date().toISOString() });
           catId = newCatRef.id;
           categoryMap[parsed.categoryName.toLowerCase().trim()] = catId;
+        }
+
+        let partnerId = null;
+        if (parsed.supplier) {
+          partnerId = partnerMap[parsed.supplier.toLowerCase().trim()];
+          if (!partnerId) {
+            const newPartnerRef = doc(collection(db, `users/${storeId}/partners`));
+            batch.set(newPartnerRef, { 
+              companyName: parsed.supplier, 
+              contactPerson: parsed.supplier, 
+              phone: '', 
+              currentPayable: 0, 
+              status: 'active', 
+              createdAt: new Date().toISOString() 
+            });
+            partnerId = newPartnerRef.id;
+            partnerMap[parsed.supplier.toLowerCase().trim()] = partnerId;
+          }
         }
         
         let barcode = parsed.barcode;
@@ -171,6 +196,7 @@ const ProductImporter = ({ isOpen, onClose }) => {
           sellPrice: parsed.sellPrice,
           minStock: parsed.minStock,
           supplier: parsed.supplier,
+          partnerId: partnerId,
           status: 'active'
         };
         
