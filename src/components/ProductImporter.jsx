@@ -73,11 +73,26 @@ const ProductImporter = ({ isOpen, onClose }) => {
         let status = 'success';
         let reason = '';
         
-        const barcode = row['Shtrix-kod'] || row['Штрихкод'] || row['Barcode'] ? String(row['Shtrix-kod'] || row['Штрихкод'] || row['Barcode']) : '';
-        const name = row['Nomi'] || row['Наименование'] || row['Name'] ? String(row['Nomi'] || row['Наименование'] || row['Name']) : '';
-        const categoryName = row['Kategoriya'] || row['Бренд'] || row['Категория'] || row['Brand'] || row['Category'] ? String(row['Kategoriya'] || row['Бренд'] || row['Категория'] || row['Brand'] || row['Category']) : 'Boshqa';
-        const costPrice = Number(row['Tannarx'] || row['Себестоимость'] || row['Cost Price']);
-        const sellPrice = Number(row['Sotish narxi'] || row['Цена продажи'] || row['Цена'] || row['Sell Price']);
+        const getVal = (keys) => {
+          const key = Object.keys(row).find(k => keys.includes(k.trim().toLowerCase()));
+          return key ? row[key] : undefined;
+        };
+
+        const rawBarcode = getVal(['shtrix-kod', 'штрихкод', 'штрих-код', 'barcode']);
+        const rawName = getVal(['nomi', 'наименование', 'name', 'название']);
+        const rawCategory = getVal(['kategoriya', 'бренд', 'категория', 'brand', 'category']);
+        const rawCostPrice = getVal(['tannarx', 'себестоимость', 'cost price']);
+        const rawSellPrice = getVal(['sotish narxi', 'цена продажи', 'цена', 'sell price']);
+        const rawUnit = getVal(['o\'lchov birligi', 'единица измерения', 'unit']);
+        const rawStock = getVal(['qoldiq', 'остаток', 'stock']);
+        const rawMinStock = getVal(['minimal qoldiq', 'мин. остаток', 'мин остаток', 'min stock']);
+        const rawSupplier = getVal(['yetkazib beruvchi', 'поставщик', 'supplier']);
+
+        const barcode = rawBarcode ? String(rawBarcode) : '';
+        const name = rawName ? String(rawName) : '';
+        const categoryName = rawCategory ? String(rawCategory) : 'Boshqa';
+        const costPrice = Number(rawCostPrice) || 0;
+        const sellPrice = Number(rawSellPrice) || 0;
         
         if (!name.trim()) { status = 'error'; reason = 'Nomi kiritilmagan'; }
         else if (isNaN(costPrice) || costPrice < 0) { status = 'error'; reason = 'Tannarx noto\'g\'ri'; }
@@ -102,12 +117,12 @@ const ProductImporter = ({ isOpen, onClose }) => {
           originalRow: row,
           parsed: {
             barcode, name, categoryName, 
-            unit: row['O\'lchov birligi'] || row['Единица измерения'] || row['Unit'] || 'dona', 
+            unit: rawUnit ? String(rawUnit) : 'dona', 
             costPrice: costPrice || 0, 
             sellPrice: sellPrice || 0, 
-            stock: Number(row['Qoldiq'] || row['Остаток'] || row['Stock']) || 0, 
-            minStock: Number(row['Minimal qoldiq'] || row['Мин. остаток'] || row['Min Stock']) || 5,
-            supplier: row['Yetkazib beruvchi'] || row['Поставщик'] || row['Supplier'] || ''
+            stock: Number(rawStock) || 0, 
+            minStock: Number(rawMinStock) || 5,
+            supplier: rawSupplier ? String(rawSupplier) : ''
           },
           status, reason
         };
