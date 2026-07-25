@@ -90,7 +90,7 @@ const ProductImporter = ({ isOpen, onClose }) => {
         const rawUnit = getVal(['o\'lchov birligi', 'единица измерения', 'unit']);
         const rawStock = getVal(['qoldiq', 'остаток', 'stock']);
         const rawMinStock = getVal(['minimal qoldiq', 'мин. остаток', 'мин остаток', 'min stock']);
-        const rawSupplier = getVal(['yetkazib beruvchi', 'поставщик', 'supplier']);
+        const rawSupplier = getVal(['yetkazib beruvchi', 'yetkazib beruvchilar', 'поставщик', 'поставщики', 'производитель', 'supplier', 'suppliers']);
 
         const barcode = rawBarcode ? String(rawBarcode) : '';
         const name = rawName ? String(rawName) : '';
