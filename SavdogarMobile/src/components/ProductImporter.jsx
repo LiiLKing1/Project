@@ -73,11 +73,11 @@ const ProductImporter = ({ isOpen, onClose }) => {
         let status = 'success';
         let reason = '';
         
-        const barcode = row['Shtrix-kod'] ? String(row['Shtrix-kod']) : '';
-        const name = row['Nomi'] ? String(row['Nomi']) : '';
-        const categoryName = row['Kategoriya'] ? String(row['Kategoriya']) : 'Boshqa';
-        const costPrice = Number(row['Tannarx']);
-        const sellPrice = Number(row['Sotish narxi']);
+        const barcode = row['Shtrix-kod'] || row['Штрихкод'] || row['Barcode'] ? String(row['Shtrix-kod'] || row['Штрихкод'] || row['Barcode']) : '';
+        const name = row['Nomi'] || row['Наименование'] || row['Name'] ? String(row['Nomi'] || row['Наименование'] || row['Name']) : '';
+        const categoryName = row['Kategoriya'] || row['Бренд'] || row['Категория'] || row['Brand'] || row['Category'] ? String(row['Kategoriya'] || row['Бренд'] || row['Категория'] || row['Brand'] || row['Category']) : 'Boshqa';
+        const costPrice = Number(row['Tannarx'] || row['Себестоимость'] || row['Cost Price']);
+        const sellPrice = Number(row['Sotish narxi'] || row['Цена продажи'] || row['Цена'] || row['Sell Price']);
         
         if (!name.trim()) { status = 'error'; reason = 'Nomi kiritilmagan'; }
         else if (isNaN(costPrice) || costPrice < 0) { status = 'error'; reason = 'Tannarx noto\'g\'ri'; }
@@ -102,11 +102,12 @@ const ProductImporter = ({ isOpen, onClose }) => {
           originalRow: row,
           parsed: {
             barcode, name, categoryName, 
-            unit: row['O\'lchov birligi'] || 'dona', 
+            unit: row['O\'lchov birligi'] || row['Единица измерения'] || row['Unit'] || 'dona', 
             costPrice: costPrice || 0, 
             sellPrice: sellPrice || 0, 
-            stock: Number(row['Qoldiq']) || 0, 
-            minStock: Number(row['Minimal qoldiq']) || 5
+            stock: Number(row['Qoldiq'] || row['Остаток'] || row['Stock']) || 0, 
+            minStock: Number(row['Minimal qoldiq'] || row['Мин. остаток'] || row['Min Stock']) || 5,
+            supplier: row['Yetkazib beruvchi'] || row['Поставщик'] || row['Supplier'] || ''
           },
           status, reason
         };
@@ -154,6 +155,7 @@ const ProductImporter = ({ isOpen, onClose }) => {
           costPrice: parsed.costPrice,
           sellPrice: parsed.sellPrice,
           minStock: parsed.minStock,
+          supplier: parsed.supplier,
           status: 'active'
         };
         
