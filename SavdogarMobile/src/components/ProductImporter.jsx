@@ -320,6 +320,8 @@ const ProductImporter = ({ isOpen, onClose }) => {
                       <th style={{ padding: '0.5rem', textAlign: 'center' }}>Holat</th>
                       <th style={{ padding: '0.5rem', textAlign: 'left' }}>Shtrix-kod</th>
                       <th style={{ padding: '0.5rem', textAlign: 'left' }}>Nomi</th>
+                      <th style={{ padding: '0.5rem', textAlign: 'left' }}>Kategoriya</th>
+                      <th style={{ padding: '0.5rem', textAlign: 'left' }}>Yetkazib beruvchi</th>
                       <th style={{ padding: '0.5rem', textAlign: 'left' }}>Sabab</th>
                     </tr>
                   </thead>
@@ -333,6 +335,8 @@ const ProductImporter = ({ isOpen, onClose }) => {
                         </td>
                         <td style={{ padding: '0.5rem' }}>{row.parsed.barcode}</td>
                         <td style={{ padding: '0.5rem' }}>{row.parsed.name}</td>
+                        <td style={{ padding: '0.5rem' }}>{row.parsed.categoryName || '-'}</td>
+                        <td style={{ padding: '0.5rem' }}>{row.parsed.supplier || '-'}</td>
                         <td style={{ padding: '0.5rem', color: row.status === 'error' ? 'var(--danger)' : 'var(--text-secondary)' }}>
                           {row.reason}
                         </td>
