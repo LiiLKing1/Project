@@ -19,6 +19,7 @@ import Reports from './pages/Reports/Reports';
 import Finance from './pages/Finance/Finance';
 import Employees from './pages/Management/Employees';
 import Payroll from './pages/Management/Payroll';
+import AdminAccounts from './pages/Management/AdminAccounts';
 import Settings from './pages/Settings/Settings';
 import Loyalty from './pages/Settings/Loyalty';
 import Trash from './pages/Settings/Trash';
@@ -89,6 +90,7 @@ function App() {
           {/* Management / Boshqaruv */}
           <Route path="management" element={<PermissionRoute permKey="management"><Employees /></PermissionRoute>} />
           <Route path="management/payroll" element={<PermissionRoute permKey="management"><Payroll /></PermissionRoute>} />
+          <Route path="management/admins" element={<PermissionRoute permKey="management"><AdminAccounts /></PermissionRoute>} />
 
           {/* Settings */}
           <Route path="settings" element={<PermissionRoute permKey="settings"><Settings /></PermissionRoute>} />

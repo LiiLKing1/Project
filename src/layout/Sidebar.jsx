@@ -75,7 +75,8 @@ const Sidebar = ({ isOpen, closeSidebar }) => {
       title: 'Boshqaruv',
       items: [
         { path: '/management', name: 'Xodimlar', desc: 'Xodimlar ro\'yxati' },
-        { path: '/management/payroll', name: 'Ish haqi (Payroll)', desc: 'KPI va oylik maoshlar' }
+        { path: '/management/payroll', name: 'Ish haqi (Payroll)', desc: 'KPI va oylik maoshlar' },
+        { path: '/management/admins', name: 'Admin Akkauntlar', desc: 'Faqat login/parol orqali kiruvchilar' }
       ]
     },
     settings: {

@@ -1,0 +1,2143 @@
+<!doctype html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Components + Silk Background</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,500;14..32,650&display=swap" rel="stylesheet">
+  <style>
+    @property --angle-1 {
+      syntax: "<angle>";
+      inherits: false;
+      initial-value: -75deg;
+    }
+
+    @property --angle-2 {
+      syntax: "<angle>";
+      inherits: false;
+      initial-value: -45deg;
+    }
+
+    @property --gradient-angle {
+      syntax: "<angle>";
+      initial-value: 0deg;
+      inherits: false;
+    }
+
+    @property --gradient-angle-offset {
+      syntax: "<angle>";
+      initial-value: 0deg;
+      inherits: false;
+    }
+
+    @property --gradient-percent {
+      syntax: "<percentage>";
+      initial-value: 5%;
+      inherits: false;
+    }
+
+    @property --gradient-shine {
+      syntax: "<color>";
+      initial-value: white;
+      inherits: false;
+    }
+
+    :root {
+      color-scheme: dark;
+      --anim--hover-time: 400ms;
+      --anim--hover-ease: cubic-bezier(0.25, 1, 0.5, 1);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #050711;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      width: 100%;
+      min-height: 100vh;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      background: #020205;
+      color: #f8fafc;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      overflow-x: hidden;
+      overflow-y: auto;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+      background:
+        radial-gradient(circle at 50% 0%, rgba(255,255,255,0.18), transparent 28%),
+        radial-gradient(circle at 20% 22%, rgba(120, 112, 255, 0.18), transparent 32%),
+        linear-gradient(180deg, rgba(2,2,5,0.26), rgba(2,2,5,0.86));
+      mix-blend-mode: screen;
+    }
+
+    .silk-background {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      overflow: hidden;
+      pointer-events: none;
+      background: #020205;
+    }
+
+    .silk-background canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      opacity: 0.98;
+      filter: contrast(1.28) brightness(1.42) saturate(0.72);
+    }
+
+    .silk-background::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(circle at 50% 30%, transparent 0 42%, rgba(2,2,5,0.12) 66%, rgba(2,2,5,0.34) 100%),
+        linear-gradient(180deg, rgba(2,2,5,0.04), rgba(2,2,5,0.30));
+      pointer-events: none;
+    }
+
+    .silk-background.silk-fallback {
+      background:
+        radial-gradient(circle at 50% 28%, rgba(255,255,255,0.95), rgba(255,255,255,0.18) 20%, transparent 46%),
+        repeating-linear-gradient(115deg, rgba(255,255,255,0.52) 0 2px, rgba(255,255,255,0.05) 8px 24px, transparent 32px 58px),
+        #020205;
+      background-size: 180% 180%, 260% 260%, auto;
+      animation: silkFallbackMove 26s ease-in-out infinite alternate;
+    }
+
+    @keyframes silkFallbackMove {
+      0% { background-position: 0% 30%, 0% 50%, 0 0; }
+      100% { background-position: 100% 70%, 100% 50%, 0 0; }
+    }
+
+    .dotted-background {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 0;
+      opacity: 0.16;
+      mix-blend-mode: screen;
+    }
+
+    .page {
+      position: relative;
+      z-index: 1;
+      width: min(760px, calc(100vw - 32px));
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 64px 24px 80px;
+    }
+
+    .buttons-stack {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 34px;
+    }
+
+    .button-item {
+      display: grid;
+      grid-template-columns: 28px auto;
+      align-items: center;
+      justify-content: center;
+      column-gap: 18px;
+      min-height: 64px;
+    }
+
+    .button-number {
+      width: 28px;
+      height: 28px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 999px;
+      color: rgba(248,250,252,0.78);
+      font-size: 13px;
+      font-weight: 650;
+      line-height: 1;
+      user-select: none;
+    }
+
+    .relative { position: relative; }
+    .inline-block { display: inline-block; }
+
+    /* ========== 1-BUTTON: Liquid Metal ========== */
+    .shader-container-exploded canvas {
+      width: 100% !important;
+      height: 100% !important;
+      display: block !important;
+      position: absolute !important;
+      top: 0 !important;
+      left: 0 !important;
+      border-radius: 100px !important;
+    }
+
+    .shader-container-exploded.fallback-metal {
+      background:
+        radial-gradient(circle at 18% 34%, rgba(255,255,255,0.96), rgba(255,255,255,0.12) 18%, transparent 36%),
+        radial-gradient(circle at 74% 24%, rgba(255,255,255,0.62), rgba(255,255,255,0.08) 20%, transparent 40%),
+        linear-gradient(120deg, #050505 0%, #5f5f5f 16%, #0b0b0b 28%, #e8e8e8 42%, #1b1b1b 56%, #9a9a9a 72%, #030303 100%);
+      background-size: 180% 180%, 160% 160%, 260% 260%;
+      animation: fallbackLiquidMetal 7s ease-in-out infinite alternate;
+    }
+
+    .shader-container-exploded.fallback-metal.fast { animation-duration: 2.5s; }
+    .shader-container-exploded.fallback-metal.burst { animation-duration: 0.65s; }
+
+    @keyframes fallbackLiquidMetal {
+      0% { background-position: 0% 46%, 100% 50%, 0% 50%; filter: contrast(1.2) brightness(0.92); }
+      50% { background-position: 70% 22%, 20% 80%, 72% 52%; filter: contrast(1.38) brightness(1.08); }
+      100% { background-position: 100% 64%, 0% 20%, 100% 50%; filter: contrast(1.24) brightness(0.96); }
+    }
+
+    @keyframes ripple-animation {
+      0% { transform: translate(-50%, -50%) scale(0); opacity: 0.6; }
+      100% { transform: translate(-50%, -50%) scale(4); opacity: 0; }
+    }
+
+    /* ========== 2-BUTTON: GlassButton ========== */
+    .glass-button-wrap {
+      position: relative;
+      z-index: 2;
+      border-radius: 999vw;
+      background: transparent;
+      pointer-events: none;
+      transition: all var(--anim--hover-time) var(--anim--hover-ease);
+      font-size: 16px;
+    }
+
+    .glass-button-shadow {
+      --shadow-cuttoff-fix: 2em;
+      position: absolute;
+      width: calc(100% + var(--shadow-cuttoff-fix));
+      height: calc(100% + var(--shadow-cuttoff-fix));
+      top: calc(0% - var(--shadow-cuttoff-fix) / 2);
+      left: calc(0% - var(--shadow-cuttoff-fix) / 2);
+      filter: blur(clamp(2px, 0.125em, 12px));
+      -webkit-filter: blur(clamp(2px, 0.125em, 12px));
+      overflow: visible;
+      pointer-events: none;
+    }
+
+    .glass-button-shadow::after {
+      content: "";
+      position: absolute;
+      z-index: 0;
+      inset: 0;
+      border-radius: 999vw;
+      background: linear-gradient(180deg, rgba(0, 0, 0, 0.20), rgba(0, 0, 0, 0.10));
+      width: calc(100% - var(--shadow-cuttoff-fix) - 0.25em);
+      height: calc(100% - var(--shadow-cuttoff-fix) - 0.25em);
+      top: calc(var(--shadow-cuttoff-fix) - 0.5em);
+      left: calc(var(--shadow-cuttoff-fix) - 0.875em);
+      padding: 0.125em;
+      box-sizing: border-box;
+      -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+      mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      transition: all var(--anim--hover-time) var(--anim--hover-ease);
+      overflow: visible;
+      opacity: 1;
+    }
+
+    .glass-button {
+      --border-width: clamp(1px, 0.0625em, 4px);
+      all: unset;
+      cursor: pointer;
+      position: relative;
+      -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+      pointer-events: auto;
+      z-index: 3;
+      background: linear-gradient(
+        -75deg,
+        rgba(255, 255, 255, 0.08),
+        rgba(255, 255, 255, 0.28),
+        rgba(255, 255, 255, 0.08)
+      );
+      border-radius: 999vw;
+      box-shadow:
+        inset 0 0.125em 0.125em rgba(0, 0, 0, 0.05),
+        inset 0 -0.125em 0.125em rgba(255, 255, 255, 0.50),
+        0 0.25em 0.125em -0.125em rgba(0, 0, 0, 0.20),
+        0 0 0.1em 0.25em inset rgba(255, 255, 255, 0.20),
+        0 0 0 0 rgba(255, 255, 255, 1);
+      backdrop-filter: blur(clamp(1px, 0.125em, 4px));
+      -webkit-backdrop-filter: blur(clamp(1px, 0.125em, 4px));
+      transition: all var(--anim--hover-time) var(--anim--hover-ease);
+    }
+
+    .glass-button:hover {
+      transform: scale(0.975);
+      backdrop-filter: blur(0.01em);
+      -webkit-backdrop-filter: blur(0.01em);
+      box-shadow:
+        inset 0 0.125em 0.125em rgba(0, 0, 0, 0.05),
+        inset 0 -0.125em 0.125em rgba(255, 255, 255, 0.50),
+        0 0.15em 0.05em -0.1em rgba(0, 0, 0, 0.25),
+        0 0 0.05em 0.1em inset rgba(255, 255, 255, 0.50),
+        0 0 0 0 rgba(255, 255, 255, 1);
+    }
+
+    .glass-button-text {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5em;
+      user-select: none;
+      -webkit-user-select: none;
+      font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+      letter-spacing: -0.05em;
+      font-weight: 500;
+      font-size: 1em;
+      line-height: 1;
+      color: rgba(255, 255, 255, 0.92);
+      text-shadow: 0em 0.25em 0.12em rgba(0, 0, 0, 0.45);
+      transition: all var(--anim--hover-time) var(--anim--hover-ease);
+      padding-inline: 1.5em;
+      padding-block: 0.875em;
+      min-height: 44px;
+    }
+
+    .glass-button:hover .glass-button-text {
+      text-shadow: 0.025em 0.025em 0.025em rgba(0, 0, 0, 0.12);
+    }
+
+    .glass-button-text svg {
+      width: 1.12em;
+      height: 1.12em;
+      stroke-width: 2.1;
+      flex: 0 0 auto;
+    }
+
+    .glass-button-text::after {
+      content: "";
+      display: block;
+      position: absolute;
+      z-index: 1;
+      width: calc(100% - var(--border-width));
+      height: calc(100% - var(--border-width));
+      top: calc(0% + var(--border-width) / 2);
+      left: calc(0% + var(--border-width) / 2);
+      box-sizing: border-box;
+      border-radius: 999vw;
+      overflow: clip;
+      background: linear-gradient(
+        var(--angle-2),
+        rgba(255, 255, 255, 0) 0%,
+        rgba(255, 255, 255, 0.50) 40% 50%,
+        rgba(255, 255, 255, 0) 55%
+      );
+      mix-blend-mode: screen;
+      pointer-events: none;
+      background-size: 200% 200%;
+      background-position: 0% 50%;
+      background-repeat: no-repeat;
+      transition:
+        background-position calc(var(--anim--hover-time) * 1.25) var(--anim--hover-ease),
+        --angle-2 calc(var(--anim--hover-time) * 1.25) var(--anim--hover-ease);
+    }
+
+    .glass-button:hover .glass-button-text::after { background-position: 25% 50%; }
+    .glass-button:active .glass-button-text::after {
+      background-position: 50% 15%;
+      --angle-2: -15deg;
+    }
+
+    .glass-button::after {
+      content: "";
+      position: absolute;
+      z-index: 1;
+      inset: 0;
+      border-radius: 999vw;
+      width: calc(100% + var(--border-width));
+      height: calc(100% + var(--border-width));
+      top: calc(0% - var(--border-width) / 2);
+      left: calc(0% - var(--border-width) / 2);
+      padding: var(--border-width);
+      box-sizing: border-box;
+      background:
+        conic-gradient(
+          from var(--angle-1) at 50% 50%,
+          rgba(255, 255, 255, 0.78),
+          rgba(255, 255, 255, 0.05) 5% 40%,
+          rgba(255, 255, 255, 0.72) 50%,
+          rgba(255, 255, 255, 0.05) 60% 95%,
+          rgba(255, 255, 255, 0.78)
+        ),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.58), rgba(255, 255, 255, 0.22));
+      -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+      mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      transition: all var(--anim--hover-time) var(--anim--hover-ease), --angle-1 500ms ease;
+      box-shadow: inset 0 0 0 calc(var(--border-width) / 2) rgba(255, 255, 255, 0.50);
+      pointer-events: none;
+    }
+
+    .glass-button:hover::after { --angle-1: -125deg; }
+    .glass-button:active::after { --angle-1: -75deg; }
+
+    .glass-button-wrap:has(.glass-button:hover) .glass-button-shadow {
+      filter: blur(clamp(2px, 0.0625em, 6px));
+      -webkit-filter: blur(clamp(2px, 0.0625em, 6px));
+      transition: filter var(--anim--hover-time) var(--anim--hover-ease);
+    }
+
+    .glass-button-wrap:has(.glass-button:hover) .glass-button-shadow::after {
+      top: calc(var(--shadow-cuttoff-fix) - 0.875em);
+      opacity: 1;
+    }
+
+    .glass-button-wrap:has(.glass-button:active) {
+      transform: rotate3d(1, 0, 0, 25deg);
+    }
+
+    .glass-button-wrap:has(.glass-button:active) .glass-button {
+      box-shadow:
+        inset 0 0.125em 0.125em rgba(0, 0, 0, 0.05),
+        inset 0 -0.125em 0.125em rgba(255, 255, 255, 0.50),
+        0 0.125em 0.125em -0.125em rgba(0, 0, 0, 0.20),
+        0 0 0.1em 0.25em inset rgba(255, 255, 255, 0.20),
+        0 0.225em 0.05em 0 rgba(0, 0, 0, 0.05),
+        0 0.25em 0 0 rgba(255, 255, 255, 0.75),
+        inset 0 0.25em 0.05em 0 rgba(0, 0, 0, 0.15);
+    }
+
+    .glass-button-wrap:has(.glass-button:active) .glass-button-shadow {
+      filter: blur(clamp(2px, 0.125em, 12px));
+      -webkit-filter: blur(clamp(2px, 0.125em, 12px));
+    }
+
+    .glass-button-wrap:has(.glass-button:active) .glass-button-shadow::after {
+      top: calc(var(--shadow-cuttoff-fix) - 0.5em);
+      opacity: 0.75;
+    }
+
+    .glass-button-wrap:has(.glass-button:active) .glass-button-text {
+      text-shadow: 0.025em 0.25em 0.05em rgba(0, 0, 0, 0.12);
+    }
+
+    /* ========== 3-BUTTON: ShinyButton ========== */
+    .shiny-cta {
+      --shiny-cta-bg: #000000;
+      --shiny-cta-bg-subtle: #1a1818;
+      --shiny-cta-fg: #ffffff;
+      --shiny-cta-highlight: blue;
+      --shiny-cta-highlight-subtle: #8484ff;
+      --animation: gradient-angle linear infinite;
+      --duration: 3s;
+      --shadow-size: 2px;
+      --transition: 800ms cubic-bezier(0.25, 1, 0.5, 1);
+      isolation: isolate;
+      position: relative;
+      overflow: hidden;
+      cursor: pointer;
+      outline-offset: 4px;
+      padding: 1.25rem 2.5rem;
+      font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+      font-size: 1.125rem;
+      line-height: 1.2;
+      font-weight: 500;
+      border: 1px solid transparent;
+      border-radius: 360px;
+      color: var(--shiny-cta-fg);
+      white-space: nowrap;
+      background:
+        linear-gradient(var(--shiny-cta-bg), var(--shiny-cta-bg)) padding-box,
+        conic-gradient(
+          from calc(var(--gradient-angle) - var(--gradient-angle-offset)),
+          transparent,
+          var(--shiny-cta-highlight) var(--gradient-percent),
+          var(--gradient-shine) calc(var(--gradient-percent) * 2),
+          var(--shiny-cta-highlight) calc(var(--gradient-percent) * 3),
+          transparent calc(var(--gradient-percent) * 4)
+        ) border-box;
+      box-shadow: inset 0 0 0 1px var(--shiny-cta-bg-subtle), 0 14px 24px rgba(0,0,0,0.14);
+      transition: var(--transition);
+      transition-property: --gradient-angle-offset, --gradient-percent, --gradient-shine, transform, box-shadow;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .shiny-cta::before,
+    .shiny-cta::after,
+    .shiny-cta span::before {
+      content: "";
+      pointer-events: none;
+      position: absolute;
+      inset-inline-start: 50%;
+      inset-block-start: 50%;
+      translate: -50% -50%;
+      z-index: -1;
+    }
+
+    .shiny-cta:active {
+      translate: 0 1px;
+      box-shadow: inset 0 0 0 1px var(--shiny-cta-bg-subtle), 0 8px 18px rgba(0,0,0,0.16);
+    }
+
+    .shiny-cta::before {
+      --size: calc(100% - var(--shadow-size) * 3);
+      --position: 2px;
+      --space: calc(var(--position) * 2);
+      width: var(--size);
+      height: var(--size);
+      background: radial-gradient(
+        circle at var(--position) var(--position),
+        white calc(var(--position) / 4),
+        transparent 0
+      ) padding-box;
+      background-size: var(--space) var(--space);
+      background-repeat: space;
+      -webkit-mask-image: conic-gradient(
+        from calc(var(--gradient-angle) + 45deg),
+        black,
+        transparent 10% 90%,
+        black
+      );
+      mask-image: conic-gradient(
+        from calc(var(--gradient-angle) + 45deg),
+        black,
+        transparent 10% 90%,
+        black
+      );
+      border-radius: inherit;
+      opacity: 0.4;
+      z-index: -1;
+    }
+
+    .shiny-cta::after {
+      --animation: shimmer linear infinite;
+      width: 100%;
+      aspect-ratio: 1;
+      background: linear-gradient(-50deg, transparent, var(--shiny-cta-highlight), transparent);
+      -webkit-mask-image: radial-gradient(circle at bottom, transparent 40%, black);
+      mask-image: radial-gradient(circle at bottom, transparent 40%, black);
+      opacity: 0.6;
+    }
+
+    .shiny-cta span {
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    .shiny-cta span::before {
+      --size: calc(100% + 1rem);
+      width: var(--size);
+      height: var(--size);
+      box-shadow: inset 0 -1ex 2rem 4px var(--shiny-cta-highlight);
+      opacity: 0;
+      transition: opacity var(--transition);
+      animation: calc(var(--duration) * 1.5) breathe linear infinite;
+    }
+
+    .shiny-cta,
+    .shiny-cta::before,
+    .shiny-cta::after {
+      animation:
+        var(--animation) var(--duration),
+        var(--animation) calc(var(--duration) / 0.4) reverse paused;
+      animation-composition: add;
+    }
+
+    .shiny-cta:is(:hover, :focus-visible) {
+      --gradient-percent: 20%;
+      --gradient-angle-offset: 95deg;
+      --gradient-shine: var(--shiny-cta-highlight-subtle);
+      transform: translateY(-1px);
+    }
+
+    .shiny-cta:is(:hover, :focus-visible),
+    .shiny-cta:is(:hover, :focus-visible)::before,
+    .shiny-cta:is(:hover, :focus-visible)::after {
+      animation-play-state: running;
+    }
+
+    .shiny-cta:is(:hover, :focus-visible) span::before {
+      opacity: 1;
+    }
+
+    @keyframes gradient-angle {
+      to { --gradient-angle: 360deg; }
+    }
+
+    @keyframes shimmer {
+      to { rotate: 360deg; }
+    }
+
+    @keyframes breathe {
+      from, to { scale: 1; }
+      50% { scale: 1.2; }
+    }
+
+
+
+    /* ========== 4-COMPONENT: Pricing Card ========== */
+    .pricing-card-shell {
+      width: 320px;
+      max-width: calc(100vw - 86px);
+      position: relative;
+      border-radius: 22px;
+      padding: 6px;
+      border: 1px solid rgba(255, 255, 255, 0.74);
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.92), rgba(255,255,255,0.42)),
+        rgba(255,255,255,0.45);
+      box-shadow:
+        0 24px 48px rgba(25, 25, 25, 0.18),
+        0 4px 12px rgba(25,25,25,0.08),
+        inset 0 1px 0 rgba(255,255,255,0.80);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      overflow: hidden;
+    }
+
+    .pricing-card-shell::before {
+      content: "";
+      position: absolute;
+      inset: -1px;
+      border-radius: inherit;
+      background:
+        radial-gradient(circle at 18% 0%, rgba(255,255,255,0.88), transparent 32%),
+        radial-gradient(circle at 86% 12%, rgba(255,132,32,0.18), transparent 34%);
+      pointer-events: none;
+    }
+
+    .pricing-card-inner {
+      position: relative;
+      z-index: 1;
+    }
+
+    .pricing-header {
+      position: relative;
+      margin-bottom: 16px;
+      border-radius: 18px;
+      border: 1px solid rgba(15,15,15,0.10);
+      padding: 18px;
+      overflow: hidden;
+      background:
+        linear-gradient(180deg, rgba(248,248,248,0.86), rgba(235,235,235,0.64)),
+        rgba(240,240,240,0.70);
+    }
+
+    .pricing-header::before {
+      content: "";
+      position: absolute;
+      inset-inline: 0;
+      top: 0;
+      height: 170px;
+      border-radius: inherit;
+      background: linear-gradient(180deg, rgba(255,255,255,0.72) 0%, rgba(255,255,255,0.20) 42%, rgba(0,0,0,0) 100%);
+      pointer-events: none;
+    }
+
+    .pricing-plan,
+    .pricing-price,
+    .pricing-action,
+    .pricing-body {
+      position: relative;
+      z-index: 1;
+    }
+
+    .pricing-plan {
+      margin-bottom: 34px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+    }
+
+    .pricing-plan-name {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: rgba(39,39,42,0.68);
+      font-size: 14px;
+      line-height: 1;
+      font-weight: 650;
+    }
+
+    .pricing-plan-name svg {
+      width: 16px;
+      height: 16px;
+      color: rgba(39,39,42,0.72);
+    }
+
+    .pricing-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 999px;
+      border: 1px solid rgba(24,24,27,0.18);
+      padding: 4px 9px;
+      color: rgba(39,39,42,0.70);
+      font-size: 11px;
+      white-space: nowrap;
+      background: rgba(255,255,255,0.34);
+    }
+
+    .pricing-price {
+      margin-bottom: 14px;
+      display: flex;
+      align-items: flex-end;
+      gap: 5px;
+    }
+
+    .pricing-main-price {
+      color: #111111;
+      font-size: 34px;
+      line-height: 0.95;
+      font-weight: 850;
+      letter-spacing: -0.055em;
+    }
+
+    .pricing-period {
+      padding-bottom: 2px;
+      color: rgba(17,17,17,0.72);
+      font-size: 14px;
+      font-weight: 500;
+      white-space: nowrap;
+    }
+
+    .pricing-original-price {
+      margin-left: auto;
+      margin-right: 4px;
+      color: rgba(82,82,91,0.72);
+      font-size: 19px;
+      line-height: 1;
+      text-decoration: line-through;
+    }
+
+    .pricing-action {
+      width: 100%;
+      border: 0;
+      border-radius: 12px;
+      padding: 12px 16px;
+      cursor: pointer;
+      color: white;
+      font: inherit;
+      font-size: 14px;
+      font-weight: 750;
+      background: linear-gradient(180deg, #fb923c 0%, #f97316 48%, #ea580c 100%);
+      box-shadow:
+        0 14px 26px rgba(249, 115, 22, 0.34),
+        inset 0 1px 0 rgba(255,255,255,0.28),
+        inset 0 -1px 0 rgba(0,0,0,0.16);
+      transition: transform 180ms ease, box-shadow 180ms ease, filter 180ms ease;
+    }
+
+    .pricing-action:hover {
+      transform: translateY(-1px);
+      filter: saturate(1.06);
+      box-shadow:
+        0 18px 30px rgba(249, 115, 22, 0.38),
+        inset 0 1px 0 rgba(255,255,255,0.32),
+        inset 0 -1px 0 rgba(0,0,0,0.18);
+    }
+
+    .pricing-action:active {
+      transform: translateY(1px);
+      box-shadow:
+        0 9px 18px rgba(249, 115, 22, 0.28),
+        inset 0 1px 0 rgba(255,255,255,0.22),
+        inset 0 2px 8px rgba(0,0,0,0.18);
+    }
+
+    .pricing-body {
+      padding: 12px 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .pricing-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 13px;
+    }
+
+    .pricing-list-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 11px;
+      color: rgba(63,63,70,0.78);
+      font-size: 14px;
+      line-height: 1.25;
+    }
+
+    .pricing-list-item.locked {
+      opacity: 0.74;
+    }
+
+    .pricing-list-icon {
+      margin-top: 1px;
+      display: inline-flex;
+      width: 18px;
+      height: 18px;
+      flex: 0 0 18px;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .pricing-list-icon svg {
+      width: 17px;
+      height: 17px;
+    }
+
+    .pricing-list-icon.check svg { color: #22c55e; }
+    .pricing-list-icon.x svg { color: #ef4444; }
+
+    .pricing-separator {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      color: rgba(82,82,91,0.72);
+      font-size: 13px;
+      line-height: 1;
+    }
+
+    .pricing-separator span:first-child,
+    .pricing-separator span:last-child {
+      height: 1px;
+      flex: 1;
+      background: rgba(82,82,91,0.28);
+    }
+
+    .pricing-separator strong {
+      flex: 0 0 auto;
+      font-weight: 500;
+    }
+
+    /* ========== 5-COMPONENT: Pixel Canvas ========== */
+    .pixel-demo-button {
+      --active-color: #0ea5e9;
+      position: relative;
+      width: 300px;
+      max-width: calc(100vw - 92px);
+      aspect-ratio: 1 / 1;
+      overflow: hidden;
+      border: 1px solid rgba(148, 163, 184, 0.34);
+      border-radius: 32px;
+      cursor: pointer;
+      background:
+        linear-gradient(180deg, rgba(15,23,42,0.58), rgba(2,6,23,0.72)),
+        rgba(15,23,42,0.46);
+      box-shadow:
+        0 28px 70px rgba(0,0,0,0.38),
+        inset 0 1px 0 rgba(255,255,255,0.12),
+        inset 0 -1px 0 rgba(0,0,0,0.35);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      transition: border-color 220ms ease, transform 220ms ease, box-shadow 220ms ease, background 220ms ease;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .pixel-demo-button:hover,
+    .pixel-demo-button:focus-visible {
+      border-color: var(--active-color);
+      transform: translateY(-2px);
+      box-shadow:
+        0 34px 86px rgba(0,0,0,0.44),
+        0 0 0 1px rgba(14,165,233,0.22),
+        0 0 42px rgba(14,165,233,0.18),
+        inset 0 1px 0 rgba(255,255,255,0.18),
+        inset 0 -1px 0 rgba(0,0,0,0.38);
+    }
+
+    .pixel-demo-button:active {
+      transform: translateY(0) scale(0.992);
+    }
+
+    .pixel-demo-content {
+      position: relative;
+      z-index: 2;
+      height: 100%;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .pixel-demo-icon {
+      width: 82px;
+      height: 82px;
+      color: rgba(203, 213, 225, 0.76);
+      transition: transform 300ms ease, color 300ms ease, filter 300ms ease;
+      filter: drop-shadow(0 18px 28px rgba(0,0,0,0.30));
+    }
+
+    .pixel-demo-button:hover .pixel-demo-icon,
+    .pixel-demo-button:focus-visible .pixel-demo-icon {
+      transform: scale(1.12);
+      color: var(--active-color);
+      filter: drop-shadow(0 0 20px rgba(14,165,233,0.34));
+    }
+
+    pixel-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+
+
+    /* ========== 6-COMPONENT: Liquid Glass Notification ========== */
+    .liquid-notification-stage {
+      width: min(430px, calc(100vw - 82px));
+      min-height: 640px;
+      padding: 18px;
+      padding-bottom: 34px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      gap: 10px;
+      border-radius: 28px;
+      position: relative;
+      overflow: hidden;
+      background:
+        linear-gradient(180deg, rgba(2,6,23,0.18), rgba(2,6,23,0.66)),
+        radial-gradient(circle at 50% 15%, rgba(255,255,255,0.12), transparent 30%),
+        url("https://images.unsplash.com/photo-1534259070436-a95806b8621a?q=80&w=1170&auto=format&fit=crop") center / cover no-repeat;
+      box-shadow:
+        0 34px 90px rgba(0,0,0,0.42),
+        inset 0 1px 0 rgba(255,255,255,0.10),
+        0 0 0 1px rgba(255,255,255,0.08);
+    }
+
+    .liquid-notification-stage::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(120deg, rgba(14,165,233,0.16), transparent 36%, rgba(139,92,246,0.14)),
+        radial-gradient(circle at 42% 82%, rgba(0,0,0,0.45), transparent 46%);
+      pointer-events: none;
+    }
+
+    .liquid-glass-card {
+      --lg-radius: 18px;
+      position: relative;
+      z-index: 1;
+      width: min(410px, 100%);
+      height: 90px;
+      border-radius: var(--lg-radius);
+      overflow: hidden;
+      color: #fff;
+      isolation: isolate;
+      transition:
+        width 430ms cubic-bezier(0.5, 1.5, 0.5, 1),
+        height 430ms cubic-bezier(0.5, 1.5, 0.5, 1),
+        transform 220ms ease;
+      transform: translateZ(0);
+      cursor: grab;
+    }
+
+    .liquid-glass-card.static { cursor: default; }
+    .liquid-glass-card.expandable { cursor: pointer; }
+    .liquid-glass-card:hover { transform: scale(1.01); }
+    .liquid-glass-card:active { transform: scale(0.985); }
+    .liquid-glass-card.expanded { height: 325px; }
+
+    .liquid-glass-bend,
+    .liquid-glass-face,
+    .liquid-glass-edge {
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      pointer-events: none;
+    }
+
+    .liquid-glass-bend {
+      z-index: 0;
+      background: rgba(255,255,255,0.045);
+      backdrop-filter: blur(18px) saturate(1.28);
+      -webkit-backdrop-filter: blur(18px) saturate(1.28);
+      filter: url(#glass-blur);
+    }
+
+    .liquid-glass-face {
+      z-index: 1;
+      box-shadow:
+        0 4px 4px rgba(0,0,0,0.15),
+        0 0 12px rgba(0,0,0,0.08),
+        0 0 48px rgba(255,255,255,0.25);
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.13), rgba(255,255,255,0.045) 38%, rgba(255,255,255,0.02)),
+        linear-gradient(90deg, rgba(255,255,255,0.04), transparent 30%, rgba(255,255,255,0.06));
+    }
+
+    .liquid-glass-edge {
+      z-index: 2;
+      box-shadow:
+        inset 3px 3px 3px 0 rgba(255,255,255,0.45),
+        inset -3px -3px 3px 0 rgba(255,255,255,0.45),
+        inset 0 0 0 1px rgba(255,255,255,0.08);
+    }
+
+    .liquid-glass-content {
+      position: relative;
+      z-index: 3;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .liquid-notification-row {
+      min-height: 90px;
+      display: flex;
+      align-items: center;
+      padding: 16px;
+      gap: 14px;
+    }
+
+    .liquid-notification-icon {
+      width: 56px;
+      height: 56px;
+      border-radius: 14px;
+      object-fit: cover;
+      flex: 0 0 auto;
+      box-shadow: 0 10px 22px rgba(0,0,0,0.20);
+    }
+
+    .liquid-notification-text {
+      min-width: 0;
+      flex: 1;
+      padding-right: 8px;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.35);
+    }
+
+    .liquid-notification-title {
+      font-size: 32px;
+      line-height: 1.1;
+      font-weight: 650;
+      letter-spacing: -0.035em;
+      margin-bottom: 4px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .liquid-notification-line {
+      font-size: 14px;
+      line-height: 1.25;
+      color: rgba(255,255,255,0.92);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .liquid-notification-subline,
+    .liquid-notification-time {
+      font-size: 13px;
+      color: rgba(229,231,235,0.86);
+      line-height: 1.28;
+    }
+
+    .liquid-notification-time {
+      align-self: flex-start;
+      flex: 0 0 auto;
+      padding-top: 4px;
+    }
+
+    .liquid-notification-preview {
+      width: 92%;
+      height: 205px;
+      object-fit: cover;
+      border-radius: 16px;
+      margin: 0 auto 18px;
+      opacity: 0;
+      transform: translateY(10px) scale(0.985);
+      transition: opacity 280ms ease 110ms, transform 320ms ease 110ms;
+      box-shadow: 0 16px 32px rgba(0,0,0,0.30);
+    }
+
+    .liquid-glass-card.expanded .liquid-notification-preview {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+
+    .ui-layouts-wordmark {
+      display: inline-flex;
+      align-items: center;
+      height: 28px;
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: -0.08em;
+      color: currentColor;
+    }
+
+    .ui-layouts-wordmark span {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 20px;
+    }
+
+    .ui-layouts-wordmark .plus {
+      margin-left: 4px;
+      color: rgba(255,255,255,0.92);
+    }
+
+    @media (hover: none) and (pointer: coarse) {
+      .glass-button-text::after,
+      .glass-button:active .glass-button-text::after { --angle-2: -45deg; }
+      .glass-button::after,
+      .glass-button:hover::after,
+      .glass-button:active::after { --angle-1: -75deg; }
+    }
+
+    @media (max-width: 520px) {
+      .page { width: 100%; padding: 40px 18px; }
+      .button-item { column-gap: 12px; }
+      .glass-button-wrap { font-size: 15px; }
+      .shiny-cta { padding: 1.05rem 1.65rem; font-size: 1rem; }
+      .pricing-card-shell { width: min(320px, calc(100vw - 78px)); }
+      .pricing-plan { align-items: flex-start; flex-direction: column; gap: 10px; margin-bottom: 26px; }
+      .liquid-notification-stage { width: min(430px, calc(100vw - 78px)); min-height: 590px; padding: 14px; padding-bottom: 28px; }
+      .liquid-notification-title { font-size: 16px; }
+      .liquid-notification-line { font-size: 13px; }
+      .liquid-notification-icon { width: 50px; height: 50px; }
+    }
+
+
+
+  </style>
+</head>
+<body>
+  <div class="silk-background" aria-hidden="true"><canvas id="silk-canvas"></canvas></div>
+  <svg class="dotted-background" xmlns="http://www.w3.org/2000/svg" height="100%" width="100%">
+    <defs>
+      <pattern patternUnits="userSpaceOnUse" height="30" width="30" id="dottedGrid">
+        <circle fill="rgba(255,255,255,0.18)" r="1" cy="2" cx="2"></circle>
+      </pattern>
+    </defs>
+    <rect fill="url(#dottedGrid)" height="100%" width="100%"></rect>
+  </svg>
+
+  <main class="page">
+    <div id="root"></div>
+  </main>
+
+  <script type="module">
+    import React, { useEffect, useMemo, useRef, useState } from "https://esm.sh/react@18.2.0";
+    import { createRoot } from "https://esm.sh/react-dom@18.2.0/client";
+    import { Sparkles, CheckCircle2, XCircleIcon, Users, CodeIcon } from "https://esm.sh/lucide-react@0.468.0?deps=react@18.2.0";
+
+    function initSilkBackground() {
+      const canvas = document.getElementById("silk-canvas");
+      if (!canvas) return;
+      const gl = canvas.getContext("webgl", { antialias: false, alpha: false, powerPreference: "high-performance" });
+      if (!gl) {
+        canvas.parentElement.classList.add("silk-fallback");
+        return;
+      }
+
+      const vertexShaderSource = `
+        attribute vec2 aPosition;
+        varying vec2 vUv;
+        void main() {
+          vUv = aPosition * 0.5 + 0.5;
+          gl_Position = vec4(aPosition, 0.0, 1.0);
+        }
+      `;
+
+      const fragmentShaderSource = `
+        precision highp float;
+        varying vec2 vUv;
+        uniform float uTime;
+        uniform vec3 uColor;
+        uniform float uSpeed;
+        uniform float uScale;
+        uniform float uRotation;
+        uniform float uNoiseIntensity;
+        uniform vec2 uResolution;
+        const float e = 2.71828182845904523536;
+
+        float noise(vec2 texCoord) {
+          float G = e;
+          vec2 r = (G * sin(G * texCoord));
+          return fract(r.x * r.y * (1.0 + texCoord.x));
+        }
+
+        vec2 rotateUvs(vec2 uv, float angle) {
+          float c = cos(angle);
+          float s = sin(angle);
+          mat2 rot = mat2(c, -s, s, c);
+          return rot * uv;
+        }
+
+        void main() {
+          float rnd = noise(gl_FragCoord.xy);
+          vec2 uv = vUv;
+          float aspect = uResolution.x / max(uResolution.y, 1.0);
+          uv.x = (uv.x - 0.5) * aspect + 0.5;
+          uv = rotateUvs(uv * uScale, uRotation);
+          vec2 tex = uv * uScale;
+          float tOffset = uSpeed * uTime * 0.12;
+          tex.y += 0.03 * sin(8.0 * tex.x - tOffset);
+          float pattern = 0.6 + 0.4 * sin(
+            5.0 * (
+              tex.x + tex.y +
+              cos(3.0 * tex.x + 5.0 * tex.y) +
+              0.02 * tOffset
+            ) +
+            sin(20.0 * (tex.x + tex.y - 0.1 * tOffset))
+          );
+          vec4 col = vec4(uColor, 1.0) * vec4(pattern) - rnd / 15.0 * uNoiseIntensity;
+          col.a = 1.0;
+          gl_FragColor = col;
+        }
+      `;
+
+      const makeShader = (type, source) => {
+        const shader = gl.createShader(type);
+        gl.shaderSource(shader, source);
+        gl.compileShader(shader);
+        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+          console.error(gl.getShaderInfoLog(shader));
+          gl.deleteShader(shader);
+          return null;
+        }
+        return shader;
+      };
+
+      const vertexShader = makeShader(gl.VERTEX_SHADER, vertexShaderSource);
+      const fragmentShader = makeShader(gl.FRAGMENT_SHADER, fragmentShaderSource);
+      if (!vertexShader || !fragmentShader) return;
+
+      const program = gl.createProgram();
+      gl.attachShader(program, vertexShader);
+      gl.attachShader(program, fragmentShader);
+      gl.linkProgram(program);
+      if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+        console.error(gl.getProgramInfoLog(program));
+        return;
+      }
+      gl.useProgram(program);
+
+      const buffer = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+        -1, -1, 1, -1, -1, 1,
+        -1, 1, 1, -1, 1, 1,
+      ]), gl.STATIC_DRAW);
+
+      const position = gl.getAttribLocation(program, "aPosition");
+      gl.enableVertexAttribArray(position);
+      gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
+
+      const uniforms = {
+        time: gl.getUniformLocation(program, "uTime"),
+        color: gl.getUniformLocation(program, "uColor"),
+        speed: gl.getUniformLocation(program, "uSpeed"),
+        scale: gl.getUniformLocation(program, "uScale"),
+        rotation: gl.getUniformLocation(program, "uRotation"),
+        noiseIntensity: gl.getUniformLocation(program, "uNoiseIntensity"),
+        resolution: gl.getUniformLocation(program, "uResolution"),
+      };
+
+      const hexToRgb = (hex) => {
+        const clean = hex.replace("#", "");
+        return [
+          parseInt(clean.slice(0, 2), 16) / 255,
+          parseInt(clean.slice(2, 4), 16) / 255,
+          parseInt(clean.slice(4, 6), 16) / 255,
+        ];
+      };
+      // Silk settings from the React snippet:
+      // speed={5}, scale={1}, color="#ffffff", noiseIntensity={1.5}, rotation={0}
+      const silkSettings = {
+        speed: 5,
+        scale: 1,
+        color: "#ffffff",
+        noiseIntensity: 1.5,
+        rotation: 0,
+      };
+      const [r, g, b] = hexToRgb(silkSettings.color);
+      gl.uniform3f(uniforms.color, r, g, b);
+      gl.uniform1f(uniforms.speed, silkSettings.speed);
+      gl.uniform1f(uniforms.scale, silkSettings.scale);
+      gl.uniform1f(uniforms.rotation, silkSettings.rotation);
+      gl.uniform1f(uniforms.noiseIntensity, silkSettings.noiseIntensity);
+
+      let start = performance.now();
+      const resize = () => {
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const width = Math.max(1, Math.floor(window.innerWidth * dpr));
+        const height = Math.max(1, Math.floor(window.innerHeight * dpr));
+        if (canvas.width !== width || canvas.height !== height) {
+          canvas.width = width;
+          canvas.height = height;
+          gl.viewport(0, 0, width, height);
+          gl.uniform2f(uniforms.resolution, width, height);
+        }
+      };
+
+      const render = (now) => {
+        resize();
+        gl.uniform1f(uniforms.time, (now - start) * 0.001);
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+        requestAnimationFrame(render);
+      };
+      window.addEventListener("resize", resize, { passive: true });
+      requestAnimationFrame(render);
+    }
+
+    initSilkBackground();
+
+    let ShaderMount = null;
+    let liquidMetalFragmentShader = null;
+    let shaderPackageReady = false;
+
+    try {
+      const shaderPackage = await import("https://esm.sh/@paper-design/shaders?bundle");
+      ShaderMount = shaderPackage.ShaderMount;
+      liquidMetalFragmentShader = shaderPackage.liquidMetalFragmentShader;
+      shaderPackageReady = Boolean(ShaderMount && liquidMetalFragmentShader);
+    } catch (error) {
+      console.warn("Failed to load @paper-design/shaders. CSS fallback is active.", error);
+    }
+
+    function ZapIcon(props) {
+      return React.createElement(
+        "svg",
+        {
+          xmlns: "http://www.w3.org/2000/svg",
+          width: "24",
+          height: "24",
+          viewBox: "0 0 24 24",
+          fill: "none",
+          stroke: "currentColor",
+          strokeWidth: "2",
+          strokeLinecap: "round",
+          strokeLinejoin: "round",
+          "aria-hidden": "true",
+          ...props,
+        },
+        React.createElement("polygon", { points: "13 2 3 14 12 14 11 22 21 10 12 10 13 2" }),
+      );
+    }
+
+    function LiquidMetalButton({ label = "Get Started", onClick, viewMode = "text" }) {
+      const [isHovered, setIsHovered] = useState(false);
+      const [isPressed, setIsPressed] = useState(false);
+      const [ripples, setRipples] = useState([]);
+      const shaderRef = useRef(null);
+      const shaderMount = useRef(null);
+      const buttonRef = useRef(null);
+      const rippleId = useRef(0);
+      const fallbackTimer = useRef(null);
+
+      const dimensions = useMemo(() => {
+        if (viewMode === "icon") {
+          return { width: 46, height: 46, innerWidth: 42, innerHeight: 42, shaderWidth: 46, shaderHeight: 46 };
+        }
+        return { width: 142, height: 46, innerWidth: 138, innerHeight: 42, shaderWidth: 142, shaderHeight: 46 };
+      }, [viewMode]);
+
+      useEffect(() => {
+        const loadShader = async () => {
+          try {
+            if (shaderRef.current && shaderPackageReady) {
+              shaderRef.current.classList.remove("fallback-metal");
+              if (shaderMount.current?.destroy) shaderMount.current.destroy();
+              shaderMount.current = new ShaderMount(
+                shaderRef.current,
+                liquidMetalFragmentShader,
+                {
+                  u_repetition: 4,
+                  u_softness: 0.5,
+                  u_shiftRed: 0.3,
+                  u_shiftBlue: 0.3,
+                  u_distortion: 0,
+                  u_contour: 0,
+                  u_angle: 45,
+                  u_scale: 8,
+                  u_shape: 1,
+                  u_offsetX: 0.1,
+                  u_offsetY: -0.1,
+                },
+                undefined,
+                0.6,
+              );
+            } else if (shaderRef.current) {
+              shaderRef.current.classList.add("fallback-metal");
+            }
+          } catch (error) {
+            console.error("[LiquidMetalButton] Failed to mount shader:", error);
+            shaderRef.current?.classList.add("fallback-metal");
+          }
+        };
+
+        loadShader();
+
+        return () => {
+          if (shaderMount.current?.destroy) {
+            shaderMount.current.destroy();
+            shaderMount.current = null;
+          }
+          if (fallbackTimer.current) clearTimeout(fallbackTimer.current);
+        };
+      }, []);
+
+      const setFallbackSpeed = (mode) => {
+        if (!shaderRef.current) return;
+        shaderRef.current.classList.remove("fast", "burst");
+        if (mode) shaderRef.current.classList.add(mode);
+      };
+
+      const handleMouseEnter = () => {
+        setIsHovered(true);
+        shaderMount.current?.setSpeed?.(1);
+        setFallbackSpeed("fast");
+      };
+
+      const handleMouseLeave = () => {
+        setIsHovered(false);
+        setIsPressed(false);
+        shaderMount.current?.setSpeed?.(0.6);
+        setFallbackSpeed(null);
+      };
+
+      const handleClick = (e) => {
+        if (shaderMount.current?.setSpeed) {
+          shaderMount.current.setSpeed(2.4);
+          setTimeout(() => {
+            shaderMount.current?.setSpeed?.(isHovered ? 1 : 0.6);
+          }, 300);
+        }
+
+        setFallbackSpeed("burst");
+        if (fallbackTimer.current) clearTimeout(fallbackTimer.current);
+        fallbackTimer.current = setTimeout(() => setFallbackSpeed(isHovered ? "fast" : null), 300);
+
+        if (buttonRef.current) {
+          const rect = buttonRef.current.getBoundingClientRect();
+          const ripple = { x: e.clientX - rect.left, y: e.clientY - rect.top, id: rippleId.current++ };
+          setRipples((prev) => [...prev, ripple]);
+          setTimeout(() => setRipples((prev) => prev.filter((r) => r.id !== ripple.id)), 600);
+        }
+
+        onClick?.();
+      };
+
+      return React.createElement(
+        "div",
+        { className: "relative inline-block" },
+        React.createElement(
+          "div",
+          { style: { perspective: "1000px", perspectiveOrigin: "50% 50%" } },
+          React.createElement(
+            "div",
+            {
+              style: {
+                position: "relative",
+                width: `${dimensions.width}px`,
+                height: `${dimensions.height}px`,
+                transformStyle: "preserve-3d",
+                transition: "all 0.8s cubic-bezier(0.34, 1.56, 0.64, 1), width 0.4s ease, height 0.4s ease",
+                transform: "none",
+              },
+            },
+            React.createElement(
+              "div",
+              {
+                style: {
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  width: `${dimensions.width}px`,
+                  height: `${dimensions.height}px`,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "6px",
+                  transformStyle: "preserve-3d",
+                  transition: "all 0.8s cubic-bezier(0.34, 1.56, 0.64, 1), width 0.4s ease, height 0.4s ease, gap 0.4s ease",
+                  transform: "translateZ(20px)",
+                  zIndex: 30,
+                  pointerEvents: "none",
+                },
+              },
+              viewMode === "icon"
+                ? React.createElement(Sparkles, {
+                    size: 16,
+                    style: {
+                      color: "#666666",
+                      filter: "drop-shadow(0px 1px 2px rgba(0, 0, 0, 0.5))",
+                      transition: "all 0.8s cubic-bezier(0.34, 1.56, 0.64, 1)",
+                      transform: "scale(1)",
+                    },
+                  })
+                : React.createElement(
+                    "span",
+                    {
+                      style: {
+                        fontSize: "14px",
+                        color: "#666666",
+                        fontWeight: 400,
+                        textShadow: "0px 1px 2px rgba(0, 0, 0, 0.5)",
+                        transition: "all 0.8s cubic-bezier(0.34, 1.56, 0.64, 1)",
+                        transform: "scale(1)",
+                        whiteSpace: "nowrap",
+                      },
+                    },
+                    label,
+                  ),
+            ),
+            React.createElement(
+              "div",
+              {
+                style: {
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  width: `${dimensions.width}px`,
+                  height: `${dimensions.height}px`,
+                  transformStyle: "preserve-3d",
+                  transition: "all 0.8s cubic-bezier(0.34, 1.56, 0.64, 1), width 0.4s ease, height 0.4s ease",
+                  transform: `translateZ(10px) ${isPressed ? "translateY(1px) scale(0.98)" : "translateY(0) scale(1)"}`,
+                  zIndex: 20,
+                },
+              },
+              React.createElement("div", {
+                style: {
+                  width: `${dimensions.innerWidth}px`,
+                  height: `${dimensions.innerHeight}px`,
+                  margin: "2px",
+                  borderRadius: "100px",
+                  background: "linear-gradient(180deg, #202020 0%, #000000 100%)",
+                  boxShadow: isPressed
+                    ? "inset 0px 2px 4px rgba(0, 0, 0, 0.4), inset 0px 1px 2px rgba(0, 0, 0, 0.3)"
+                    : "none",
+                  transition: "all 0.8s cubic-bezier(0.34, 1.56, 0.64, 1), width 0.4s ease, height 0.4s ease, box-shadow 0.15s cubic-bezier(0.4, 0, 0.2, 1)",
+                },
+              }),
+            ),
+            React.createElement(
+              "div",
+              {
+                style: {
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  width: `${dimensions.width}px`,
+                  height: `${dimensions.height}px`,
+                  transformStyle: "preserve-3d",
+                  transition: "all 0.8s cubic-bezier(0.34, 1.56, 0.64, 1), width 0.4s ease, height 0.4s ease",
+                  transform: `translateZ(0px) ${isPressed ? "translateY(1px) scale(0.98)" : "translateY(0) scale(1)"}`,
+                  zIndex: 10,
+                },
+              },
+              React.createElement(
+                "div",
+                {
+                  style: {
+                    height: `${dimensions.height}px`,
+                    width: `${dimensions.width}px`,
+                    borderRadius: "100px",
+                    boxShadow: isPressed
+                      ? "0px 0px 0px 1px rgba(0, 0, 0, 0.5), 0px 1px 2px 0px rgba(0, 0, 0, 0.3)"
+                      : isHovered
+                        ? "0px 0px 0px 1px rgba(0, 0, 0, 0.4), 0px 12px 6px 0px rgba(0, 0, 0, 0.05), 0px 8px 5px 0px rgba(0, 0, 0, 0.1), 0px 4px 4px 0px rgba(0, 0, 0, 0.15), 0px 1px 2px 0px rgba(0, 0, 0, 0.2)"
+                        : "0px 0px 0px 1px rgba(0, 0, 0, 0.3), 0px 36px 14px 0px rgba(0, 0, 0, 0.02), 0px 20px 12px 0px rgba(0, 0, 0, 0.08), 0px 9px 9px 0px rgba(0, 0, 0, 0.12), 0px 2px 5px 0px rgba(0, 0, 0, 0.15)",
+                    transition: "all 0.8s cubic-bezier(0.34, 1.56, 0.64, 1), width 0.4s ease, height 0.4s ease, box-shadow 0.15s cubic-bezier(0.4, 0, 0.2, 1)",
+                    background: "rgb(0 0 0 / 0)",
+                  },
+                },
+                React.createElement("div", {
+                  ref: shaderRef,
+                  className: "shader-container-exploded fallback-metal",
+                  style: {
+                    borderRadius: "100px",
+                    overflow: "hidden",
+                    position: "relative",
+                    width: `${dimensions.shaderWidth}px`,
+                    maxWidth: `${dimensions.shaderWidth}px`,
+                    height: `${dimensions.shaderHeight}px`,
+                    transition: "width 0.4s ease, height 0.4s ease",
+                  },
+                }),
+              ),
+            ),
+            React.createElement(
+              "button",
+              {
+                ref: buttonRef,
+                onClick: handleClick,
+                onMouseEnter: handleMouseEnter,
+                onMouseLeave: handleMouseLeave,
+                onMouseDown: () => setIsPressed(true),
+                onMouseUp: () => setIsPressed(false),
+                onTouchStart: () => setIsPressed(true),
+                onTouchEnd: () => setIsPressed(false),
+                style: {
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  width: `${dimensions.width}px`,
+                  height: `${dimensions.height}px`,
+                  background: "transparent",
+                  border: "none",
+                  cursor: "pointer",
+                  outline: "none",
+                  zIndex: 40,
+                  transformStyle: "preserve-3d",
+                  transform: "translateZ(25px)",
+                  transition: "all 0.8s cubic-bezier(0.34, 1.56, 0.64, 1), width 0.4s ease, height 0.4s ease",
+                  overflow: "hidden",
+                  borderRadius: "100px",
+                  WebkitTapHighlightColor: "transparent",
+                },
+                "aria-label": label,
+              },
+              ripples.map((ripple) =>
+                React.createElement("span", {
+                  key: ripple.id,
+                  style: {
+                    position: "absolute",
+                    left: `${ripple.x}px`,
+                    top: `${ripple.y}px`,
+                    width: "20px",
+                    height: "20px",
+                    borderRadius: "50%",
+                    background: "radial-gradient(circle, rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 0) 70%)",
+                    pointerEvents: "none",
+                    animation: "ripple-animation 0.6s ease-out",
+                  },
+                }),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    function GlassButton({ children = "Generate", onClick }) {
+      return React.createElement(
+        "div",
+        { className: "glass-button-wrap cursor-pointer rounded-full" },
+        React.createElement(
+          "button",
+          { className: "glass-button", onClick, type: "button" },
+          React.createElement("span", { className: "glass-button-text" }, children, React.createElement(ZapIcon)),
+        ),
+        React.createElement("div", { className: "glass-button-shadow rounded-full" }),
+      );
+    }
+
+    function ShinyButton({ children = "Get unlimited access", onClick, className = "" }) {
+      return React.createElement(
+        "button",
+        { className: `shiny-cta ${className}`.trim(), onClick, type: "button" },
+        React.createElement("span", null, children),
+      );
+    }
+
+
+
+    function PricingCardDemo() {
+      const features = [
+        "Up to 3 projects",
+        "Basic templates",
+        "Community support",
+        "1GB storage",
+      ];
+
+      const lockedFeatures = [
+        "Unlimited projects",
+        "Premium templates",
+        "Priority support",
+      ];
+
+      return React.createElement(
+        "section",
+        { className: "pricing-card-shell", "aria-label": "Starter pricing plan" },
+        React.createElement(
+          "div",
+          { className: "pricing-card-inner" },
+          React.createElement(
+            "div",
+            { className: "pricing-header" },
+            React.createElement(
+              "div",
+              { className: "pricing-plan" },
+              React.createElement(
+                "div",
+                { className: "pricing-plan-name" },
+                React.createElement(Users, { "aria-hidden": "true" }),
+                React.createElement("span", null, "Starter"),
+              ),
+              React.createElement("span", { className: "pricing-badge" }, "For Individuals"),
+            ),
+            React.createElement(
+              "div",
+              { className: "pricing-price" },
+              React.createElement("span", { className: "pricing-main-price" }, "$10"),
+              React.createElement("span", { className: "pricing-period" }, "/ month"),
+              React.createElement("span", { className: "pricing-original-price" }, "$12"),
+            ),
+            React.createElement(
+              "button",
+              {
+                className: "pricing-action",
+                type: "button",
+                onClick: () => alert("Selected Starter plan!"),
+              },
+              "Get Started",
+            ),
+          ),
+          React.createElement(
+            "div",
+            { className: "pricing-body" },
+            React.createElement(
+              "ul",
+              { className: "pricing-list" },
+              features.map((item) =>
+                React.createElement(
+                  "li",
+                  { className: "pricing-list-item", key: item },
+                  React.createElement("span", { className: "pricing-list-icon check" }, React.createElement(CheckCircle2, { "aria-hidden": "true" })),
+                  React.createElement("span", null, item),
+                ),
+              ),
+            ),
+            React.createElement(
+              "div",
+              { className: "pricing-separator" },
+              React.createElement("span", null),
+              React.createElement("strong", null, "Pro features"),
+              React.createElement("span", null),
+            ),
+            React.createElement(
+              "ul",
+              { className: "pricing-list" },
+              lockedFeatures.map((item) =>
+                React.createElement(
+                  "li",
+                  { className: "pricing-list-item locked", key: item },
+                  React.createElement("span", { className: "pricing-list-icon x" }, React.createElement(XCircleIcon, { "aria-hidden": "true" })),
+                  React.createElement("span", null, item),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    class Pixel {
+      constructor(canvas, context, x, y, color, speed, delay) {
+        this.width = canvas.width;
+        this.height = canvas.height;
+        this.ctx = context;
+        this.x = x;
+        this.y = y;
+        this.color = color;
+        this.speed = this.getRandomValue(0.1, 0.9) * speed;
+        this.size = 0;
+        this.sizeStep = Math.random() * 0.4;
+        this.minSize = 0.5;
+        this.maxSizeInteger = 2;
+        this.maxSize = this.getRandomValue(this.minSize, this.maxSizeInteger);
+        this.delay = delay;
+        this.counter = 0;
+        this.counterStep = Math.random() * 4 + (this.width + this.height) * 0.01;
+        this.isIdle = false;
+        this.isReverse = false;
+        this.isShimmer = false;
+      }
+
+      getRandomValue(min, max) {
+        return Math.random() * (max - min) + min;
+      }
+
+      draw() {
+        const centerOffset = this.maxSizeInteger * 0.5 - this.size * 0.5;
+        this.ctx.fillStyle = this.color;
+        this.ctx.fillRect(this.x + centerOffset, this.y + centerOffset, this.size, this.size);
+      }
+
+      appear() {
+        this.isIdle = false;
+        if (this.counter <= this.delay) {
+          this.counter += this.counterStep;
+          return;
+        }
+        if (this.size >= this.maxSize) this.isShimmer = true;
+        if (this.isShimmer) this.shimmer();
+        else this.size += this.sizeStep;
+        this.draw();
+      }
+
+      disappear() {
+        this.isShimmer = false;
+        this.counter = 0;
+        if (this.size <= 0) {
+          this.isIdle = true;
+          return;
+        }
+        this.size -= 0.1;
+        this.draw();
+      }
+
+      shimmer() {
+        if (this.size >= this.maxSize) this.isReverse = true;
+        else if (this.size <= this.minSize) this.isReverse = false;
+        this.size += this.isReverse ? -this.speed : this.speed;
+      }
+    }
+
+    class PixelCanvasElement extends HTMLElement {
+      constructor() {
+        super();
+        this.canvas = document.createElement("canvas");
+        this.ctx = this.canvas.getContext("2d");
+        this.pixels = [];
+        this.animation = null;
+        this.timeInterval = 1000 / 60;
+        this.timePrevious = performance.now();
+        this.reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        this._initialized = false;
+        this._resizeObserver = null;
+        this._parent = null;
+        this._cssWidth = 0;
+        this._cssHeight = 0;
+        this._onEnter = () => this.handleAnimation("appear");
+        this._onLeave = () => this.handleAnimation("disappear");
+
+        const shadow = this.attachShadow({ mode: "open" });
+        const style = document.createElement("style");
+        style.textContent = `
+          :host { display: grid; inline-size: 100%; block-size: 100%; overflow: hidden; }
+          canvas { width: 100%; height: 100%; display: block; }
+        `;
+        shadow.appendChild(style);
+        shadow.appendChild(this.canvas);
+      }
+
+      get colors() {
+        return this.dataset.colors?.split(",") || ["#f8fafc", "#f1f5f9", "#cbd5e1"];
+      }
+
+      get gap() {
+        const value = Number(this.dataset.gap) || 5;
+        return Math.max(4, Math.min(50, value));
+      }
+
+      get speed() {
+        const value = Number(this.dataset.speed) || 35;
+        return this.reducedMotion ? 0 : Math.max(0, Math.min(100, value)) * 0.001;
+      }
+
+      get noFocus() {
+        return this.hasAttribute("data-no-focus");
+      }
+
+      get variant() {
+        return this.dataset.variant || "default";
+      }
+
+      connectedCallback() {
+        if (this._initialized) return;
+        this._initialized = true;
+        this._parent = this.parentElement;
+
+        requestAnimationFrame(() => {
+          this.handleResize();
+          const ro = new ResizeObserver(() => requestAnimationFrame(() => this.handleResize()));
+          ro.observe(this);
+          this._resizeObserver = ro;
+        });
+
+        this._parent?.addEventListener("mouseenter", this._onEnter);
+        this._parent?.addEventListener("mouseleave", this._onLeave);
+        if (!this.noFocus) {
+          this._parent?.addEventListener("focus", this._onEnter, { capture: true });
+          this._parent?.addEventListener("blur", this._onLeave, { capture: true });
+        }
+      }
+
+      disconnectedCallback() {
+        this._initialized = false;
+        this._resizeObserver?.disconnect();
+        this._parent?.removeEventListener("mouseenter", this._onEnter);
+        this._parent?.removeEventListener("mouseleave", this._onLeave);
+        if (!this.noFocus) {
+          this._parent?.removeEventListener("focus", this._onEnter, { capture: true });
+          this._parent?.removeEventListener("blur", this._onLeave, { capture: true });
+        }
+        if (this.animation) cancelAnimationFrame(this.animation);
+        this.animation = null;
+        this._parent = null;
+      }
+
+      handleResize() {
+        if (!this.ctx || !this._initialized) return;
+        const rect = this.getBoundingClientRect();
+        if (rect.width === 0 || rect.height === 0) return;
+
+        const width = Math.floor(rect.width);
+        const height = Math.floor(rect.height);
+        const dpr = window.devicePixelRatio || 1;
+        this._cssWidth = width;
+        this._cssHeight = height;
+        this.canvas.width = width * dpr;
+        this.canvas.height = height * dpr;
+        this.canvas.style.width = `${width}px`;
+        this.canvas.style.height = `${height}px`;
+        this.ctx.setTransform(1, 0, 0, 1, 0, 0);
+        this.ctx.scale(dpr, dpr);
+        this.createPixels();
+      }
+
+      getDistanceToCenter(x, y) {
+        const dx = x - this._cssWidth / 2;
+        const dy = y - this._cssHeight / 2;
+        return Math.sqrt(dx * dx + dy * dy);
+      }
+
+      getDistanceToBottomLeft(x, y) {
+        const dx = x;
+        const dy = this._cssHeight - y;
+        return Math.sqrt(dx * dx + dy * dy);
+      }
+
+      createPixels() {
+        if (!this.ctx) return;
+        this.pixels = [];
+        for (let x = 0; x < this._cssWidth; x += this.gap) {
+          for (let y = 0; y < this._cssHeight; y += this.gap) {
+            const color = this.colors[Math.floor(Math.random() * this.colors.length)];
+            const delay = this.reducedMotion ? 0 : this.variant === "icon" ? this.getDistanceToCenter(x, y) : this.getDistanceToBottomLeft(x, y);
+            this.pixels.push(new Pixel(this.canvas, this.ctx, x, y, color, this.speed, delay));
+          }
+        }
+      }
+
+      handleAnimation(name) {
+        if (this.animation) cancelAnimationFrame(this.animation);
+        const animate = () => {
+          this.animation = requestAnimationFrame(animate);
+          const timeNow = performance.now();
+          const timePassed = timeNow - this.timePrevious;
+          if (timePassed < this.timeInterval) return;
+          this.timePrevious = timeNow - (timePassed % this.timeInterval);
+          if (!this.ctx) return;
+          this.ctx.clearRect(0, 0, this._cssWidth, this._cssHeight);
+          let allIdle = true;
+          for (const pixel of this.pixels) {
+            pixel[name]();
+            if (!pixel.isIdle) allIdle = false;
+          }
+          if (allIdle) {
+            cancelAnimationFrame(this.animation);
+            this.animation = null;
+          }
+        };
+        animate();
+      }
+    }
+
+    if (!customElements.get("pixel-canvas")) {
+      customElements.define("pixel-canvas", PixelCanvasElement);
+    }
+
+    function PixelCanvas({ gap = 10, speed = 25, colors = ["#e0f2fe", "#7dd3fc", "#0ea5e9"], variant = "icon", noFocus = false }) {
+      const attrs = {
+        "data-gap": gap,
+        "data-speed": speed,
+        "data-colors": colors.join(","),
+        "data-variant": variant,
+      };
+      if (noFocus) attrs["data-no-focus"] = "";
+      return React.createElement("pixel-canvas", attrs);
+    }
+
+    function PixelCanvasDemo() {
+      return React.createElement(
+        "button",
+        { className: "pixel-demo-button", type: "button", "aria-label": "Pixel canvas code button" },
+        React.createElement(PixelCanvas, {
+          gap: 10,
+          speed: 25,
+          colors: ["#e0f2fe", "#7dd3fc", "#0ea5e9"],
+          variant: "icon",
+        }),
+        React.createElement(
+          "div",
+          { className: "pixel-demo-content" },
+          React.createElement(CodeIcon, { className: "pixel-demo-icon", "aria-hidden": "true" }),
+        ),
+      );
+    }
+
+
+
+    function LiquidGlassCard({ children, className = "", expandable = false, width = "410px", height = "90px", expandedHeight = "325px", borderRadius = "18px" }) {
+      const [isExpanded, setIsExpanded] = useState(false);
+      const handleClick = (event) => {
+        if (!expandable) return;
+        if (event.target.closest("a, button, input, select, textarea")) return;
+        setIsExpanded((value) => !value);
+      };
+
+      const classes = [
+        "liquid-glass-card",
+        expandable ? "expandable" : "static",
+        expandable && isExpanded ? "expanded" : "",
+        className,
+      ].filter(Boolean).join(" ");
+
+      return React.createElement(
+        "div",
+        {
+          className: classes,
+          onClick: handleClick,
+          style: {
+            width,
+            height: expandable && isExpanded ? expandedHeight : height,
+            borderRadius,
+          },
+        },
+        React.createElement("div", { className: "liquid-glass-bend" }),
+        React.createElement("div", { className: "liquid-glass-face" }),
+        React.createElement("div", { className: "liquid-glass-edge" }),
+        React.createElement("div", { className: "liquid-glass-content" }, children),
+      );
+    }
+
+    function LiquidNotificationRow({ title, line, subline, time = "12:34", wordmark = false }) {
+      return React.createElement(
+        "div",
+        { className: "liquid-notification-row" },
+        React.createElement("img", {
+          className: "liquid-notification-icon",
+          src: "https://ui-layouts.com/apple-touch-icon.png",
+          alt: "UI-Layouts icon",
+          width: "56",
+          height: "56",
+        }),
+        React.createElement(
+          "div",
+          { className: "liquid-notification-text" },
+          wordmark
+            ? React.createElement(
+                "div",
+                { className: "liquid-notification-title" },
+                React.createElement(
+                  "span",
+                  { className: "ui-layouts-wordmark", "aria-label": "UI Layouts" },
+                  React.createElement("span", null, "UI"),
+                  React.createElement("span", null, "Layouts"),
+                  React.createElement("span", { className: "plus" }, "+"),
+                ),
+              )
+            : React.createElement("div", { className: "liquid-notification-title" }, title),
+          React.createElement("div", { className: "liquid-notification-line" }, line),
+          subline ? React.createElement("div", { className: "liquid-notification-subline" }, subline) : null,
+        ),
+        React.createElement("div", { className: "liquid-notification-time" }, time),
+      );
+    }
+
+    function LiquidNotificationDemo() {
+      return React.createElement(
+        "div",
+        { className: "liquid-notification-stage" },
+        React.createElement(
+          "svg",
+          { width: "0", height: "0", style: { position: "absolute" }, "aria-hidden": "true" },
+          React.createElement(
+            "defs",
+            null,
+            React.createElement(
+              "filter",
+              { id: "glass-blur", x: "0", y: "0", width: "100%", height: "100%", filterUnits: "objectBoundingBox" },
+              React.createElement("feTurbulence", { type: "fractalNoise", baseFrequency: "0.003 0.007", numOctaves: "1", result: "turbulence" }),
+              React.createElement("feDisplacementMap", { in: "SourceGraphic", in2: "turbulence", scale: "200", xChannelSelector: "R", yChannelSelector: "G" }),
+            ),
+          ),
+        ),
+        React.createElement(
+          LiquidGlassCard,
+          { expandable: true, width: "410px", height: "90px", expandedHeight: "325px" },
+          React.createElement(LiquidNotificationRow, {
+            title: "UI-Layouts",
+            line: "New components are available for you",
+            subline: "Liquid-Glass",
+          }),
+          React.createElement("img", {
+            className: "liquid-notification-preview",
+            src: "https://ui-layouts.com/og.jpg",
+            alt: "UI Layouts preview",
+            width: "400",
+            height: "400",
+          }),
+        ),
+        React.createElement(
+          LiquidGlassCard,
+          { width: "410px", height: "90px" },
+          React.createElement(LiquidNotificationRow, {
+            wordmark: true,
+            line: "New components are available for you",
+          }),
+        ),
+      );
+    }
+
+
+
+
+    function ButtonItem({ number, children }) {
+      return React.createElement(
+        "div",
+        { className: "button-item" },
+        React.createElement("span", { className: "button-number" }, number),
+        children,
+      );
+    }
+
+    function ButtonsDemo() {
+      return React.createElement(
+        "div",
+        { className: "buttons-stack" },
+        React.createElement(ButtonItem, { number: "1" }, React.createElement(LiquidMetalButton, { label: "Get Started" })),
+        React.createElement(ButtonItem, { number: "2" }, React.createElement(GlassButton, null, "Generate")),
+        React.createElement(ButtonItem, { number: "3" }, React.createElement(ShinyButton, null, "Get unlimited access")),
+        React.createElement(ButtonItem, { number: "4" }, React.createElement(PricingCardDemo)),
+        React.createElement(ButtonItem, { number: "5" }, React.createElement(PixelCanvasDemo)),
+        React.createElement(ButtonItem, { number: "6" }, React.createElement(LiquidNotificationDemo)),
+      );
+    }
+
+    createRoot(document.getElementById("root")).render(React.createElement(ButtonsDemo));
+  </script>
+</body>
+</html>
