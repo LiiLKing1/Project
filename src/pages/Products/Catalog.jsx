@@ -91,6 +91,8 @@ const Catalog = () => {
 
   // View mode: 'large' | 'small' | 'square' | 'list'
   const [viewMode, setViewMode] = useState('list');
+  const [visibleCount, setVisibleCount] = useState(30);
+  const loadMoreRef = React.useRef(null);
 
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -333,6 +335,24 @@ const Catalog = () => {
     (categoryFilter === '' || p.categoryId === categoryFilter)
   );
 
+  // Reset visible count on filter/search change
+  useEffect(() => {
+    setVisibleCount(30);
+  }, [search, categoryFilter, viewMode]);
+
+  // Infinite scroll observer
+  useEffect(() => {
+    if (!loadMoreRef.current) return;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting && visibleCount < filteredProducts.length) {
+        setVisibleCount(prev => prev + 30);
+      }
+    }, { rootMargin: '300px' });
+    
+    observer.observe(loadMoreRef.current);
+    return () => observer.disconnect();
+  }, [visibleCount, filteredProducts.length]);
+
   const totalDistinctProducts = products.filter(p => p.status !== 'archived').length;
   const totalPhysicalStock = products.reduce((acc, p) => p.status !== 'archived' ? acc + Number(p.stockByWarehouse?.[selectedWarehouseId] || 0) : acc, 0);
   const totalCostValue = products.reduce((acc, p) => p.status !== 'archived' ? acc + (Number(p.stockByWarehouse?.[selectedWarehouseId] || 0) * Number(p.costPrice || 0)) : acc, 0);
@@ -444,7 +464,7 @@ const Catalog = () => {
                     <div>Narxlar</div>
                     <div style={{ textAlign:'right' }}>Amal</div>
                   </div>
-                  {filteredProducts.map(p => {
+                  {filteredProducts.slice(0, visibleCount).map(p => {
                     const cat = categories.find(c => c.id === p.categoryId);
                     const stock = p.stockByWarehouse?.[selectedWarehouseId] || 0;
                     return (
@@ -483,7 +503,7 @@ const Catalog = () => {
               {/* ── LARGE CARD VIEW ── */}
               {viewMode === 'large' && (
                 <div className="catalog-grid-large">
-                  {filteredProducts.map(p => {
+                  {filteredProducts.slice(0, visibleCount).map(p => {
                     const cat = categories.find(c => c.id === p.categoryId);
                     const stock = p.stockByWarehouse?.[selectedWarehouseId] || 0;
                     return (
@@ -518,7 +538,7 @@ const Catalog = () => {
               {/* ── SMALL CARD VIEW ── */}
               {viewMode === 'small' && (
                 <div className="catalog-grid-small">
-                  {filteredProducts.map(p => {
+                  {filteredProducts.slice(0, visibleCount).map(p => {
                     const cat = categories.find(c => c.id === p.categoryId);
                     const stock = p.stockByWarehouse?.[selectedWarehouseId] || 0;
                     return (
@@ -569,6 +589,13 @@ const Catalog = () => {
                       </div>
                     );
                   })}
+                </div>
+              )}
+              
+              {/* Load More trigger element */}
+              {visibleCount < filteredProducts.length && (
+                <div ref={loadMoreRef} style={{ height: '40px', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '1rem', color: 'var(--text-secondary)' }}>
+                  Yuklanmoqda...
                 </div>
               )}
             </>

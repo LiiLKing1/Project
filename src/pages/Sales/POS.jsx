@@ -22,6 +22,7 @@ const POS = () => {
   const [cart, setCart] = useState([]);
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState('available_first');
+  const [visibleCount, setVisibleCount] = useState(30);
   
   // Mobile Cart Drawer State
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 1024);
@@ -256,6 +257,18 @@ const POS = () => {
   });
   
   const cleanPhoneSearch = customerSearch.replace(/\s+/g, '').toLowerCase();
+  
+  // Reset visible count when search or sort changes
+  useEffect(() => {
+    setVisibleCount(30);
+  }, [search, sortBy]);
+
+  const handleGridScroll = (e) => {
+    const bottom = e.target.scrollHeight - e.target.scrollTop <= e.target.clientHeight + 150;
+    if (bottom && visibleCount < filteredProducts.length) {
+      setVisibleCount(prev => prev + 30);
+    }
+  };
   const cleanNameSearch = customerSearch.trim().toLowerCase();
   const filteredCustomers = customerSearch.trim() ? customers.filter(c => 
     (c?.fullName || '').toLowerCase().includes(cleanNameSearch) || (c?.phone || '').includes(cleanPhoneSearch)
@@ -497,8 +510,8 @@ const POS = () => {
             </div>
           </div>
 
-          <div className="pos-products-grid" style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1rem', overflowY: 'auto', paddingRight: '1rem', paddingBottom: '2rem' }}>
-            {filteredProducts.map(p => (
+          <div className="pos-products-grid" onScroll={handleGridScroll} style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1rem', overflowY: 'auto', paddingRight: '1rem', paddingBottom: '2rem' }}>
+            {filteredProducts.slice(0, visibleCount).map(p => (
               <div key={p.id} className="glass-panel" onClick={() => addToCart(p)} style={{ padding: '1rem', cursor: p.stock > 0 ? 'pointer' : 'not-allowed', opacity: p.stock > 0 ? 1 : 0.5, transition: 'transform 0.1s' }} onMouseDown={e => p.stock > 0 && (e.currentTarget.style.transform = 'scale(0.98)')} onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'}>
                 <div style={{ fontWeight: '600', marginBottom: '0.5rem', fontSize: '1rem' }}>{p.name}</div>
                 <div style={{ color: 'var(--primary)', fontWeight: '700', fontSize: '1.125rem' }}><CurrencyDisplay amount={p.sellPrice} /></div>

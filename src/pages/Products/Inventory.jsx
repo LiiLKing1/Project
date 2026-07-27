@@ -12,6 +12,8 @@ import CurrencyDisplay from '../../components/CurrencyDisplay';
 const Inventory = () => {
   const [products, setProducts] = useState([]);
   const [search, setSearch] = useState('');
+  const [visibleCount, setVisibleCount] = useState(30);
+  const loadMoreRef = React.useRef(null);
   const [isTakingInventory, setIsTakingInventory] = useState(false);
   const [inventoryItems, setInventoryItems] = useState({}); // { [productId]: actualQty }
   const [loading, setLoading] = useState(true);
@@ -126,6 +128,22 @@ const Inventory = () => {
     (p.name.toLowerCase().includes(search.toLowerCase()) || (p.barcode || '').includes(search))
   );
 
+  useEffect(() => {
+    setVisibleCount(30);
+  }, [search]);
+
+  useEffect(() => {
+    if (!loadMoreRef.current) return;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting && visibleCount < filteredProducts.length) {
+        setVisibleCount(prev => prev + 30);
+      }
+    }, { rootMargin: '300px' });
+    
+    observer.observe(loadMoreRef.current);
+    return () => observer.disconnect();
+  }, [visibleCount, filteredProducts.length]);
+
   return (
     <div className="page-wrapper">
       <div className="page-header">
@@ -193,7 +211,7 @@ const Inventory = () => {
                   <tr>
                     <td colSpan="5" style={{ padding: '3rem', textAlign: 'center', color: '#8A9BB5' }}>Hech narsa topilmadi</td>
                   </tr>
-                ) : filteredProducts.map(p => {
+                ) : filteredProducts.slice(0, visibleCount).map(p => {
                   const expected = Number(p.stockByWarehouse?.[selectedWarehouseId] || 0);
                   const actual = inventoryItems[p.id] !== undefined && inventoryItems[p.id] !== '' ? Number(inventoryItems[p.id]) : null;
                   const diff = actual !== null ? actual - expected : null;
@@ -229,6 +247,11 @@ const Inventory = () => {
                 })}
               </tbody>
             </table>
+            {visibleCount < filteredProducts.length && (
+              <div ref={loadMoreRef} style={{ padding: '1rem', textAlign: 'center', color: '#8A9BB5' }}>
+                Yuklanmoqda...
+              </div>
+            )}
           </div>
         </div>
       )}
