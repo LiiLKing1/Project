@@ -113,10 +113,28 @@ const Topbar = ({ toggleSidebar }) => {
   
   const totalNotifs = visibleDebts.length + visibleOutOfStock.length;
 
+  const handleClearAll = () => {
+    const allIds = [
+      ...visibleDebts.map(d => d.id),
+      ...visibleOutOfStock.map(p => `stock-${p.id}`)
+    ];
+    const updated = [...dismissedNotifs, ...allIds];
+    setDismissedNotifs(updated);
+    localStorage.setItem('dismissedNotifs', JSON.stringify(updated));
+  };
+
   const renderNotifList = () => (
     <div style={{ maxHeight: '60vh', overflowY: 'auto' }}>
       {totalNotifs > 0 ? (
         <>
+          <div style={{ padding: '0.75rem 1rem', display: 'flex', justifyContent: 'flex-end', borderBottom: '1px solid var(--border-color)', backgroundColor: 'var(--bg-main)' }}>
+            <button 
+              onClick={handleClearAll}
+              style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '0.85rem', cursor: 'pointer', fontWeight: 600 }}
+            >
+              Barchasini o'chirish
+            </button>
+          </div>
           {visibleDebts.map(debt => {
             const customer = customers.find(c => c.id === debt.customerId);
             const customerName = customer ? customer.fullName : 'Noma\'lum mijoz';
