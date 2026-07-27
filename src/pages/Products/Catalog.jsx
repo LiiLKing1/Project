@@ -344,14 +344,17 @@ const Catalog = () => {
   useEffect(() => {
     if (!loadMoreRef.current) return;
     const observer = new IntersectionObserver((entries) => {
-      if (entries[0].isIntersecting && visibleCount < filteredProducts.length) {
-        setVisibleCount(prev => prev + 30);
+      if (entries[0].isIntersecting) {
+        setVisibleCount(prev => {
+          if (prev < filteredProducts.length) return prev + 30;
+          return prev;
+        });
       }
     }, { rootMargin: '300px' });
     
     observer.observe(loadMoreRef.current);
     return () => observer.disconnect();
-  }, [visibleCount, filteredProducts.length]);
+  }, [filteredProducts.length]);
 
   const totalDistinctProducts = products.filter(p => p.status !== 'archived').length;
   const totalPhysicalStock = products.reduce((acc, p) => p.status !== 'archived' ? acc + Number(p.stockByWarehouse?.[selectedWarehouseId] || 0) : acc, 0);
