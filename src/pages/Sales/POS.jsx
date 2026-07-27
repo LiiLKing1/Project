@@ -470,30 +470,30 @@ const POS = () => {
         transition={{ type: 'spring', damping: 26, stiffness: 220 }}
         style={{ gap: '1.5rem', overflow: 'hidden', height: '100%', flex: 1, display: 'flex', flexDirection: 'column' }}
       >
-          <div className="flex-between">
-            <h1 className="h1">Sotuv Oynasi</h1>
-            <div style={{ display: 'flex', gap: '1rem', flex: 1, maxWidth: '500px', justifyContent: 'flex-end' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div className="flex-between">
+              <h1 className="h1" style={{ margin: 0 }}>Sotuv Oynasi</h1>
               <select 
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
-                style={{ padding: '0.85rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-surface)', outline: 'none', cursor: 'pointer' }}
+                style={{ padding: '0.6rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-surface)', outline: 'none', cursor: 'pointer', fontSize: '0.875rem' }}
               >
                 <option value="available_first">Mavjudlari oldin</option>
                 <option value="name_asc">Nomi bo'yicha (A-Z)</option>
                 <option value="qty_desc">Qoldiq ko'p</option>
                 <option value="qty_asc">Qoldiq kam</option>
               </select>
-              <div style={{ position: 'relative', width: '100%', maxWidth: '300px' }}>
-                <Search size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
-                <input 
-                  type="text" 
-                  placeholder="Shtrix-kod yoki nom..." 
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  style={{ width: '100%', paddingLeft: '2.5rem', fontSize: '1rem', padding: '0.85rem 1rem 0.85rem 2.5rem' }}
-                  autoFocus
-                />
-              </div>
+            </div>
+            <div style={{ position: 'relative', width: '100%' }}>
+              <Search size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
+              <input 
+                type="text" 
+                placeholder="Shtrix-kod yoki nom..." 
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                style={{ width: '100%', paddingLeft: '2.5rem', fontSize: '1rem', padding: '0.85rem 1rem 0.85rem 2.5rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}
+                autoFocus
+              />
             </div>
           </div>
 
