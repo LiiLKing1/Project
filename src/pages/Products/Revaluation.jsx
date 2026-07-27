@@ -79,10 +79,12 @@ const Revaluation = () => {
     const val = Number(oldPrice) || 0;
     const change = Number(amount) || 0;
     
-    if (change === 0) return val;
+    if (change === 0 && direction !== 'exact') return val;
 
     let newPrice = val;
-    if (unit === 'percent') {
+    if (direction === 'exact') {
+      newPrice = change;
+    } else if (unit === 'percent') {
       const modifier = (val * change) / 100;
       newPrice = direction === 'increase' ? val + modifier : val - modifier;
     } else {
@@ -97,8 +99,8 @@ const Revaluation = () => {
       addToast('Mahsulotlarni tanlang', 'warning');
       return;
     }
-    if (!amount || Number(amount) <= 0) {
-      addToast('O\'zgarish miqdorini kiriting', 'warning');
+    if (amount === '' || isNaN(amount) || Number(amount) < 0) {
+      addToast('O\'zgarish miqdorini to\'g\'ri kiriting', 'warning');
       return;
     }
     if (!(await confirm({ message: `${selectedIds.length} ta mahsulot narxi o'zgartiriladi. Tasdiqlaysizmi?` }))) return;
@@ -243,35 +245,42 @@ const Revaluation = () => {
             <div style={{ display: 'flex', gap: '8px' }}>
               <button 
                 className="btn" 
-                style={{ flex: 1, padding: '10px', fontSize: 14, fontWeight: 500, backgroundColor: direction === 'increase' ? '#10B981' : '#fff', color: direction === 'increase' ? '#fff' : '#1A2538', border: direction === 'increase' ? '1px solid #10B981' : '1px solid #DCE8F5' }}
+                style={{ flex: 1, padding: '10px', fontSize: 13, fontWeight: 500, backgroundColor: direction === 'increase' ? '#10B981' : '#fff', color: direction === 'increase' ? '#fff' : '#1A2538', border: direction === 'increase' ? '1px solid #10B981' : '1px solid #DCE8F5' }}
                 onClick={() => setDirection('increase')}
               >Oshirish (+)</button>
               <button 
                 className="btn" 
-                style={{ flex: 1, padding: '10px', fontSize: 14, fontWeight: 500, backgroundColor: direction === 'decrease' ? '#EF4B4B' : '#fff', color: direction === 'decrease' ? '#fff' : '#1A2538', border: direction === 'decrease' ? '1px solid #EF4B4B' : '1px solid #DCE8F5' }}
+                style={{ flex: 1, padding: '10px', fontSize: 13, fontWeight: 500, backgroundColor: direction === 'decrease' ? '#EF4B4B' : '#fff', color: direction === 'decrease' ? '#fff' : '#1A2538', border: direction === 'decrease' ? '1px solid #EF4B4B' : '1px solid #DCE8F5' }}
                 onClick={() => setDirection('decrease')}
               >Tushirish (-)</button>
+              <button 
+                className="btn" 
+                style={{ flex: 1, padding: '10px', fontSize: 13, fontWeight: 500, backgroundColor: direction === 'exact' ? '#4A90E2' : '#fff', color: direction === 'exact' ? '#fff' : '#1A2538', border: direction === 'exact' ? '1px solid #4A90E2' : '1px solid #DCE8F5' }}
+                onClick={() => setDirection('exact')}
+              >Aniq narx (=)</button>
             </div>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <label style={{ fontSize: 14, fontWeight: 500, color: '#1A2538' }}>Birlik</label>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button 
-                className="btn" 
-                style={{ flex: 1, padding: '10px', fontSize: 14, fontWeight: 500, backgroundColor: unit === 'percent' ? '#4A90E2' : '#fff', color: unit === 'percent' ? '#fff' : '#1A2538', border: unit === 'percent' ? '1px solid #4A90E2' : '1px solid #DCE8F5' }}
-                onClick={() => setUnit('percent')}
-              >Foiz (%)</button>
-              <button 
-                className="btn" 
-                style={{ flex: 1, padding: '10px', fontSize: 14, fontWeight: 500, backgroundColor: unit === 'fixed' ? '#4A90E2' : '#fff', color: unit === 'fixed' ? '#fff' : '#1A2538', border: unit === 'fixed' ? '1px solid #4A90E2' : '1px solid #DCE8F5' }}
-                onClick={() => setUnit('fixed')}
-              >Summa</button>
+          {direction !== 'exact' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <label style={{ fontSize: 14, fontWeight: 500, color: '#1A2538' }}>Birlik</label>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button 
+                  className="btn" 
+                  style={{ flex: 1, padding: '10px', fontSize: 14, fontWeight: 500, backgroundColor: unit === 'percent' ? '#4A90E2' : '#fff', color: unit === 'percent' ? '#fff' : '#1A2538', border: unit === 'percent' ? '1px solid #4A90E2' : '1px solid #DCE8F5' }}
+                  onClick={() => setUnit('percent')}
+                >Foiz (%)</button>
+                <button 
+                  className="btn" 
+                  style={{ flex: 1, padding: '10px', fontSize: 14, fontWeight: 500, backgroundColor: unit === 'fixed' ? '#4A90E2' : '#fff', color: unit === 'fixed' ? '#fff' : '#1A2538', border: unit === 'fixed' ? '1px solid #4A90E2' : '1px solid #DCE8F5' }}
+                  onClick={() => setUnit('fixed')}
+                >Summa</button>
+              </div>
             </div>
-          </div>
+          )}
 
           <FormInput 
-            label="O'zgarish miqdori" 
+            label={direction === 'exact' ? "Yangi narxni kiriting" : "O'zgarish miqdori"} 
             type="number" 
             value={amount} 
             onChange={e => setAmount(e.target.value)} 
@@ -286,7 +295,7 @@ const Revaluation = () => {
             className="btn btn-primary" 
             style={{ width: '100%', padding: '12px', marginTop: 'auto', fontWeight: 600 }} 
             onClick={handleApply}
-            disabled={isProcessing || selectedIds.length === 0 || !amount}
+            disabled={isProcessing || selectedIds.length === 0 || amount === ''}
           >
             {isProcessing ? 'Bajarilmoqda...' : 'Tasdiqlash va saqlash'}
           </button>
