@@ -9,6 +9,7 @@ import Dashboard from './pages/Dashboard/Dashboard';
 import POS from './pages/Sales/POS';
 import Catalog from './pages/Products/Catalog';
 import Inventory from './pages/Products/Inventory';
+import StockUpdate from './pages/Products/StockUpdate';
 import Transfer from './pages/Products/Transfer';
 import Revaluation from './pages/Products/Revaluation';
 import WriteOff from './pages/Products/WriteOff';
@@ -59,6 +60,7 @@ function App() {
           {/* Products / Mahsulotlar */}
           <Route path="products" element={<PermissionRoute permKey="products"><Catalog /></PermissionRoute>} />
           <Route path="products/inventory" element={<PermissionRoute permKey="products"><Inventory /></PermissionRoute>} />
+          <Route path="products/stock-update" element={<PermissionRoute permKey="products"><StockUpdate /></PermissionRoute>} />
           <Route path="products/transfer" element={<PermissionRoute permKey="products"><Transfer /></PermissionRoute>} />
           <Route path="products/revaluation" element={<PermissionRoute permKey="products"><Revaluation /></PermissionRoute>} />
           <Route path="products/write-off" element={<PermissionRoute permKey="products"><WriteOff /></PermissionRoute>} />

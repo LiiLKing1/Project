@@ -21,6 +21,7 @@ const POS = () => {
   const [customers, setCustomers] = useState([]);
   const [cart, setCart] = useState([]);
   const [search, setSearch] = useState('');
+  const [sortBy, setSortBy] = useState('available_first');
   
   // Mobile Cart Drawer State
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 1024);
@@ -239,7 +240,20 @@ const POS = () => {
 
   const filteredProducts = products.filter(p => 
     p.name.toLowerCase().includes(search.toLowerCase()) || p.barcode.includes(search)
-  );
+  ).sort((a, b) => {
+    if (sortBy === 'name_asc') {
+      return a.name.localeCompare(b.name);
+    } else if (sortBy === 'qty_desc') {
+      return b.stock - a.stock;
+    } else if (sortBy === 'qty_asc') {
+      return a.stock - b.stock;
+    } else if (sortBy === 'available_first') {
+      if (a.stock > 0 && b.stock <= 0) return -1;
+      if (b.stock > 0 && a.stock <= 0) return 1;
+      return a.name.localeCompare(b.name);
+    }
+    return 0;
+  });
   
   const cleanPhoneSearch = customerSearch.replace(/\s+/g, '').toLowerCase();
   const cleanNameSearch = customerSearch.trim().toLowerCase();
@@ -458,16 +472,28 @@ const POS = () => {
       >
           <div className="flex-between">
             <h1 className="h1">Sotuv Oynasi</h1>
-            <div style={{ position: 'relative', width: '100%', maxWidth: '350px' }}>
-              <Search size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
-              <input 
-                type="text" 
-                placeholder="Shtrix-kod yoki nom..." 
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                style={{ width: '100%', paddingLeft: '2.5rem', fontSize: '1rem', padding: '1rem 1rem 1rem 2.5rem' }}
-                autoFocus
-              />
+            <div style={{ display: 'flex', gap: '1rem', flex: 1, maxWidth: '500px', justifyContent: 'flex-end' }}>
+              <select 
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                style={{ padding: '0.85rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-surface)', outline: 'none', cursor: 'pointer' }}
+              >
+                <option value="available_first">Mavjudlari oldin</option>
+                <option value="name_asc">Nomi bo'yicha (A-Z)</option>
+                <option value="qty_desc">Qoldiq ko'p</option>
+                <option value="qty_asc">Qoldiq kam</option>
+              </select>
+              <div style={{ position: 'relative', width: '100%', maxWidth: '300px' }}>
+                <Search size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
+                <input 
+                  type="text" 
+                  placeholder="Shtrix-kod yoki nom..." 
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  style={{ width: '100%', paddingLeft: '2.5rem', fontSize: '1rem', padding: '0.85rem 1rem 0.85rem 2.5rem' }}
+                  autoFocus
+                />
+              </div>
             </div>
           </div>
 

@@ -63,6 +63,7 @@ const Sidebar = ({ isOpen, closeSidebar }) => {
       title: 'Mahsulotlar',
       items: [
         { path: '/products', name: 'Katalog', desc: 'Barcha tovarlar ro\'yxati' },
+        { path: '/products/stock-update', name: 'Tezkor Qoldiq', desc: 'Mahsulotlar sonini o\'zgartirish' },
         { path: '/orders', name: 'Buyurtmalar', desc: 'Ta\'minotchiga buyurtma' },
         { path: '/products/inventory', name: 'Inventarizatsiya', desc: 'Ombor nazorati' },
         { path: '/products/transfer', name: 'Transfer', desc: 'Omborlararo ko\'chirish' },
