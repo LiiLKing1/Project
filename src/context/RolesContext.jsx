@@ -65,6 +65,7 @@ export const RolesProvider = ({ children }) => {
         const ownerDocSnap = await getDoc(ownerDocRef);
         if (ownerDocSnap.exists()) {
           profileData.status = ownerDocSnap.data().status || 'pending'; // Default to pending if missing
+          profileData.emailVerified = ownerDocSnap.data().emailVerified || currentUser.emailVerified;
         } else {
           // If root doc doesn't exist, they are definitely pending and we should create it
           profileData.status = 'pending';
@@ -135,6 +136,7 @@ export const RolesProvider = ({ children }) => {
           role: 'admin',
           storeOwnerId: currentUser.uid,
           status: status,
+          emailVerified: ownerDocSnap.exists() ? ownerDocSnap.data().emailVerified : (currentUser.emailVerified || false),
           createdAt: new Date().toISOString()
         };
         await setDoc(adminProfileRef, newAdminProfile);

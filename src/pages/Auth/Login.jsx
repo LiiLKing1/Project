@@ -7,7 +7,7 @@ import { Mail, Lock, Eye, EyeOff, KeyRound, Laptop, User, UserPlus } from 'lucid
 import TitleBar from '../../components/TitleBar';
 import { APP_NAME } from '../../config/appConfig';
 import { db } from '../../firebase';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { getAuth, sendEmailVerification } from 'firebase/auth';
 import './Login.css';
 
@@ -31,14 +31,26 @@ const Login = () => {
   const isElectron = window.electronAPI && window.electronAPI.isElectron;
 
   React.useEffect(() => {
-    if (currentUser) {
-      // If it's an owner and email is not verified, force verify-email route
-      if (!currentUser.emailVerified && !currentUser.email.endsWith('@pos.com')) {
-        navigate('/verify-email');
-      } else {
-        navigate(redirectPath);
+    const checkVerification = async () => {
+      if (currentUser) {
+        // If it's an owner and email is not verified, check Firestore as Admin might have verified them
+        if (!currentUser.emailVerified && !currentUser.email.endsWith('@pos.com')) {
+          try {
+            const userDoc = await getDoc(doc(db, "users", currentUser.uid));
+            if (userDoc.exists() && userDoc.data().emailVerified === true) {
+              navigate(redirectPath);
+            } else {
+              navigate('/verify-email');
+            }
+          } catch (error) {
+            navigate('/verify-email');
+          }
+        } else {
+          navigate(redirectPath);
+        }
       }
-    }
+    };
+    checkVerification();
   }, [currentUser, navigate, redirectPath]);
 
   const handleGoogleLogin = async () => {

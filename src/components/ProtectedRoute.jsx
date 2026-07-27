@@ -22,7 +22,7 @@ const ProtectedRoute = ({ children }) => {
     );
   }
 
-  if (userProfile?.role === 'owner' && currentUser && !currentUser.emailVerified) {
+  if (userProfile?.role === 'owner' && currentUser && !currentUser.emailVerified && !userProfile?.emailVerified) {
     return <Navigate to="/verify-email" replace />;
   }
 
