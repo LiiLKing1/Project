@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Save, Package } from 'lucide-react';
 import { db } from '../../firebase';
-import { collection, onSnapshot, query, doc, updateDoc } from '../../services/firebaseMock';
+import { collection, onSnapshot, query, doc, updateDoc, writeBatch } from '../../services/firebaseMock';
 import { useRoles } from '../../context/RolesContext';
 import { useWarehouse } from '../../context/WarehouseContext';
 import { useToast } from '../../context/ToastContext';
@@ -15,6 +15,8 @@ const StockUpdate = () => {
   
   // Local state for stock inputs before saving
   const [stockInputs, setStockInputs] = useState({});
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [bulkQty, setBulkQty] = useState('');
 
   const { userProfile } = useRoles();
   const { selectedWarehouseId } = useWarehouse();
@@ -73,6 +75,51 @@ const StockUpdate = () => {
     }
   };
 
+  const handleSelectAll = (e) => {
+    if (e.target.checked) {
+      setSelectedIds(filteredProducts.map(p => p.id));
+    } else {
+      setSelectedIds([]);
+    }
+  };
+
+  const toggleSelect = (id) => {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  };
+
+  const handleBulkSave = async () => {
+    if (bulkQty === '' || isNaN(bulkQty)) {
+      addToast("Ommaviy miqdorni kiriting", "warning");
+      return;
+    }
+    
+    setUpdatingId('bulk');
+    try {
+      const batch = writeBatch(db);
+      selectedIds.forEach(id => {
+        const productRef = doc(db, `users/${storeId}/products`, id);
+        batch.update(productRef, {
+          [`stockByWarehouse.${selectedWarehouseId}`]: Number(bulkQty)
+        });
+      });
+      await batch.commit();
+      addToast(`${selectedIds.length} ta mahsulot qoldig'i yangilandi`, "success");
+      
+      setStockInputs(prev => {
+        const next = { ...prev };
+        selectedIds.forEach(id => { next[id] = Number(bulkQty); });
+        return next;
+      });
+      
+      setSelectedIds([]);
+      setBulkQty('');
+    } catch (error) {
+      addToast(error.message, "error");
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
   const filteredProducts = products.filter(p => 
     p.status === 'active' && 
     (p.name.toLowerCase().includes(search.toLowerCase()) || (p.barcode || '').includes(search))
@@ -101,12 +148,44 @@ const StockUpdate = () => {
           <div style={{ color: 'var(--text-secondary)', fontSize: 14 }}>
             Ombor: <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>{selectedWarehouseId === 'main' ? 'Asosiy Ombor' : selectedWarehouseId}</span>
           </div>
+          
+          {selectedIds.length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--primary-light)', padding: '0.5rem 1rem', borderRadius: 'var(--radius-md)' }}>
+              <span style={{ fontWeight: 600, color: 'var(--primary)', marginRight: '1rem' }}>{selectedIds.length} ta tanlandi</span>
+              <input 
+                type="number"
+                placeholder="Yangi qoldiq..."
+                value={bulkQty}
+                onChange={e => setBulkQty(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !updatingId) handleBulkSave();
+                }}
+                style={{ padding: '0.4rem 0.75rem', width: '130px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', outline: 'none' }}
+              />
+              <button 
+                className="btn btn-primary"
+                onClick={handleBulkSave}
+                disabled={updatingId === 'bulk'}
+                style={{ padding: '0.4rem 1rem' }}
+              >
+                {updatingId === 'bulk' ? '...' : 'Saqlash'}
+              </button>
+            </div>
+          )}
         </div>
 
         <div style={{ overflowX: 'auto' }}>
           <table className="page-table">
             <thead>
               <tr>
+                <th style={{ width: '40px', textAlign: 'center' }}>
+                  <input 
+                    type="checkbox" 
+                    checked={filteredProducts.length > 0 && selectedIds.length === filteredProducts.length}
+                    onChange={handleSelectAll}
+                    style={{ cursor: 'pointer', width: '16px', height: '16px' }}
+                  />
+                </th>
                 <th>Mahsulot</th>
                 <th>Shtrix kod</th>
                 <th style={{ textAlign: 'center' }}>Joriy Qoldiq</th>
@@ -117,7 +196,7 @@ const StockUpdate = () => {
             <tbody>
               {filteredProducts.length === 0 ? (
                 <tr>
-                  <td colSpan="5" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                  <td colSpan="6" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
                     {loading ? 'Yuklanmoqda...' : 'Hech narsa topilmadi'}
                   </td>
                 </tr>
@@ -128,6 +207,14 @@ const StockUpdate = () => {
                 
                 return (
                   <tr key={p.id}>
+                    <td style={{ textAlign: 'center' }}>
+                      <input 
+                        type="checkbox" 
+                        checked={selectedIds.includes(p.id)}
+                        onChange={() => toggleSelect(p.id)}
+                        style={{ cursor: 'pointer', width: '16px', height: '16px' }}
+                      />
+                    </td>
                     <td style={{ fontWeight: 600, color: 'var(--text-main)' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         <div style={{ width: 32, height: 32, borderRadius: 8, background: 'var(--bg-surface)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary)' }}>
