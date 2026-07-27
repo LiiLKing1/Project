@@ -12,6 +12,7 @@ import Drawer from '../../components/Drawer';
 import FormInput from '../../components/FormInput';
 import Receipt from '../../components/Receipt';
 import CurrencyDisplay from '../../components/CurrencyDisplay';
+import AnimatedNumber from '../../components/AnimatedNumber';
 import { motion, AnimatePresence } from 'framer-motion';
 
 
@@ -477,8 +478,8 @@ const POS = () => {
                 <div style={{ color: 'var(--primary)', fontWeight: '700', fontSize: '1.125rem' }}><CurrencyDisplay amount={p.sellPrice} /></div>
                 <div className="flex-between" style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
                   <span>{p.barcode}</span>
-                  <span style={{ fontWeight: 600, color: p.stock <= p.minStock ? 'var(--danger)' : 'var(--success)' }}>
-                    Qoldiq: {p.stock}
+                  <span style={{ fontWeight: 600, color: p.stock <= p.minStock ? 'var(--danger)' : 'var(--success)', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                    Qoldiq: <AnimatedNumber value={p.stock} />
                   </span>
                 </div>
               </div>
@@ -560,7 +561,7 @@ const POS = () => {
                     <div className="flex-center" style={{ gap: '0.5rem' }}>
                       <button className="btn btn-outline" style={{ padding: '0.25rem' }} onClick={() => updateQty(item.id, -1, item.stock)}><Minus size={16} /></button>
                       {isMobile ? (
-                        <span style={{ fontWeight: 600, width: '30px', textAlign: 'center' }}>{item.qty}</span>
+                        <span style={{ fontWeight: 600, width: '30px', textAlign: 'center', display: 'inline-flex', justifyContent: 'center' }}><AnimatedNumber value={item.qty} /></span>
                       ) : (
                         <input 
                           type="text" 
@@ -674,7 +675,7 @@ const POS = () => {
                       </div>
                       <div className="flex-center" style={{ gap: '0.5rem' }}>
                         <button className="btn btn-outline" style={{ padding: '0.25rem' }} onClick={() => updateQty(item.id, -1, item.stock)}><Minus size={16} /></button>
-                        <span style={{ fontWeight: 600, width: '30px', textAlign: 'center' }}>{item.qty}</span>
+                        <span style={{ fontWeight: 600, width: '30px', textAlign: 'center', display: 'inline-flex', justifyContent: 'center' }}><AnimatedNumber value={item.qty} /></span>
                         <button className="btn btn-outline" style={{ padding: '0.25rem' }} onClick={() => updateQty(item.id, 1, item.stock)}><Plus size={16} /></button>
                         <button className="btn btn-ghost" style={{ color: 'var(--danger)', padding: '0.25rem', marginLeft: '0.5rem' }} onClick={() => removeFromCart(item.id)}><Trash2 size={16} /></button>
                       </div>

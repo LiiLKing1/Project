@@ -1,5 +1,6 @@
 import React from 'react';
 import { useSettings } from '../context/SettingsContext';
+import AnimatedNumber from './AnimatedNumber';
 
 const CurrencyDisplay = ({ amount, overrideCurrency }) => {
   const { settings } = useSettings();
@@ -9,28 +10,30 @@ const CurrencyDisplay = ({ amount, overrideCurrency }) => {
   const usdRate = settings.usdRate || 12500;
   const rubRate = settings.rubRate || 140;
 
-  const formatUZS = (v) => new Intl.NumberFormat('uz-UZ').format(v || 0) + ' UZS';
-
-  let formattedMain = '';
-  if (currency === 'UZS') {
-    formattedMain = formatUZS(amount);
-  } else if (currency === 'USD') {
-    formattedMain = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount || 0);
-  } else if (currency === 'RUB') {
-    formattedMain = new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', minimumFractionDigits: 0 }).format(amount || 0);
-  }
+  const renderMain = () => {
+    if (currency === 'UZS') {
+      return <AnimatedNumber value={amount} locales="uz-UZ" suffix="UZS" />;
+    } else if (currency === 'USD') {
+      return <AnimatedNumber value={amount} format={{ style: 'currency', currency: 'USD' }} />;
+    } else if (currency === 'RUB') {
+      return <AnimatedNumber value={amount} locales="ru-RU" format={{ style: 'currency', currency: 'RUB', minimumFractionDigits: 0 }} />;
+    }
+    return <span>{amount}</span>;
+  };
 
   return (
     <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start', lineHeight: '1.2' }}>
-      <span>{formattedMain}</span>
+      <div style={{ display: 'inline-flex', alignItems: 'center' }}>
+        {renderMain()}
+      </div>
       {currency === 'USD' && showUsdConversion && (
-        <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 500, marginTop: '2px' }}>
-          ~{formatUZS((amount || 0) * usdRate)}
+        <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 500, marginTop: '2px', display: 'inline-flex', alignItems: 'center' }}>
+          ~<AnimatedNumber value={(amount || 0) * usdRate} locales="uz-UZ" suffix="UZS" />
         </span>
       )}
       {currency === 'RUB' && showUsdConversion && (
-        <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 500, marginTop: '2px' }}>
-          ~{formatUZS((amount || 0) * rubRate)}
+        <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 500, marginTop: '2px', display: 'inline-flex', alignItems: 'center' }}>
+          ~<AnimatedNumber value={(amount || 0) * rubRate} locales="uz-UZ" suffix="UZS" />
         </span>
       )}
     </div>
