@@ -18,6 +18,7 @@ import { useNavigate } from 'react-router-dom';
 import { useSettings } from '../../context/SettingsContext';
 import { useWarehouse } from '../../context/WarehouseContext';
 import CurrencyDisplay from '../../components/CurrencyDisplay';
+import { PriceWithDiff } from '../../components/PriceWithDiff';
 
 /* ─── helpers ─────────────────────────────────────────── */
 const pct = (a, b) => b > 0 ? Math.round((a / b) * 100) : 0;
@@ -339,7 +340,11 @@ const Dashboard = () => {
 
             <div style={{ padding: '4px 18px 0', marginBottom: 4 }}>
               <div style={{ fontSize: 28, fontWeight: 800, color: '#0F172A', letterSpacing: '-1px' }}>
-                <CurrencyDisplay amount={revenue} />
+                <PriceWithDiff 
+                  value={revenue} 
+                  diff={parseFloat(totalRevTrend) / 100 || 0} 
+                  curr={curr} 
+                />
               </div>
               <div style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>Jami tushum</div>
             </div>
