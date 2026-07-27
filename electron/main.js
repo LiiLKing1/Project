@@ -3,6 +3,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import http from 'http';
 import fs from 'fs';
+import { syncToDrive } from './driveBackup.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -184,4 +185,9 @@ ipcMain.on('window-maximize', () => {
 
 ipcMain.on('window-close', () => {
   if (mainWindow) mainWindow.close();
+});
+
+ipcMain.on('sync-to-drive', (event, payload) => {
+  // Background operation, no need to await or block frontend
+  syncToDrive(payload).catch(console.error);
 });

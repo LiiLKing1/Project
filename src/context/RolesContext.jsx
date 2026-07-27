@@ -117,17 +117,29 @@ export const RolesProvider = ({ children }) => {
       } else {
         const ownerDocRef = doc(db, `users/${currentUser.uid}`);
         const ownerDocSnap = await getDoc(ownerDocRef);
-        const status = ownerDocSnap.exists() ? ownerDocSnap.data().status : 'pending';
+        let status = 'pending';
 
         if (!ownerDocSnap.exists()) {
-          await setDoc(ownerDocRef, {
-            email: currentUser.email,
-            displayName: currentUser.displayName || currentUser.email?.split('@')[0] || 'Admin',
-            role: 'owner',
-            status: 'pending',
-            emailVerified: currentUser.emailVerified || false,
-            createdAt: new Date().toISOString()
-          }, { merge: true });
+          // Tizimga birinchi marta kirganda Firebase'ga yozilmaydi, Drive'dagi pending_users ga yoziladi
+          if (window.electronAPI && window.electronAPI.syncToDrive) {
+            window.electronAPI.syncToDrive({
+              storeId: 'admin',
+              collectionName: 'pending_users',
+              docId: currentUser.uid,
+              action: 'CREATE',
+              data: {
+                uid: currentUser.uid,
+                email: currentUser.email,
+                displayName: currentUser.displayName || currentUser.email?.split('@')[0] || 'Admin',
+                role: 'owner',
+                status: 'pending',
+                emailVerified: currentUser.emailVerified || false,
+                createdAt: new Date().toISOString()
+              }
+            });
+          }
+        } else {
+          status = ownerDocSnap.data().status || 'pending';
         }
 
         const newAdminProfile = {
@@ -139,12 +151,16 @@ export const RolesProvider = ({ children }) => {
           emailVerified: ownerDocSnap.exists() ? ownerDocSnap.data().emailVerified : (currentUser.emailVerified || false),
           createdAt: new Date().toISOString()
         };
-        await setDoc(adminProfileRef, newAdminProfile);
+        
+        // Tizimda mavjud bo'lmasa, profillarni ham faqat Drive ga tashlaymiz yoki o'tkazib yuboramiz.
+        if (ownerDocSnap.exists()) {
+          await setDoc(adminProfileRef, newAdminProfile);
+          const rolesRef = doc(db, `users/${currentUser.uid}/settings/roles`);
+          await setDoc(rolesRef, DEFAULT_ROLES);
+        }
+
         setUserProfile(newAdminProfile);
         localStorage.setItem('userProfile', JSON.stringify(newAdminProfile));
-        
-        const rolesRef = doc(db, `users/${currentUser.uid}/settings/roles`);
-        await setDoc(rolesRef, DEFAULT_ROLES);
         
         setHasOnboarded(false); // Newly created user hasn't onboarded
         localStorage.setItem('hasOnboarded', JSON.stringify(false));

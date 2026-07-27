@@ -14,6 +14,7 @@ function App() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [usersList, setUsersList] = useState([]);
+  const [pendingUsers, setPendingUsers] = useState([]);
   const [search, setSearch] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -33,13 +34,28 @@ function App() {
   useEffect(() => {
     if (!user) return;
     
+    // 1. Fetch Active/Blocked users from Firebase
     const q = query(collection(db, 'users'));
     const unsub = onSnapshot(q, (snapshot) => {
       const docs = snapshot.docs
         .map(d => ({ id: d.id, ...d.data() }))
-        .filter(d => d.role === 'owner' && d.emailVerified === true); // Only show verified owners
+        .filter(d => d.role === 'owner'); // Show owners
       setUsersList(docs);
     });
+    
+    // 2. Fetch Pending Waitlist from Google Drive (via Vercel API)
+    const fetchPending = async () => {
+      try {
+        const res = await fetch('/api/pending-users');
+        if (res.ok) {
+          const data = await res.json();
+          setPendingUsers(data.users || []);
+        }
+      } catch (err) {
+        console.error("Pending users fetch error:", err);
+      }
+    };
+    fetchPending();
     
     return () => unsub();
   }, [user]);
@@ -86,17 +102,50 @@ function App() {
     setIsLoading(false);
   };
 
-  const changeStatus = async (uid, newStatus) => {
+  const changeStatus = async (userObj, newStatus) => {
     try {
       if (newStatus === 'deleted') {
-        const { deleteDoc } = await import('firebase/firestore');
         if(window.confirm("Rostdan ham bu arizani o'chirib yubormoqchimisiz?")) {
-          await deleteDoc(doc(db, 'users', uid));
+          if (userObj.fileId) {
+             // It's a pending user from Drive
+             await fetch('/api/approve-user', {
+               method: 'POST',
+               headers: { 'Content-Type': 'application/json' },
+               body: JSON.stringify({ fileId: userObj.fileId })
+             });
+             setPendingUsers(prev => prev.filter(u => u.id !== userObj.id));
+          } else {
+             // It's in Firebase
+             const { deleteDoc } = await import('firebase/firestore');
+             await deleteDoc(doc(db, 'users', userObj.id));
+          }
           alert("Ariza o'chirildi!");
         }
         return;
       }
-      await updateDoc(doc(db, 'users', uid), { status: newStatus });
+      
+      if (newStatus === 'active' && userObj.fileId) {
+        // APPROVE: Create in Firebase, then delete from Drive
+        await setDoc(doc(db, 'users', userObj.uid || userObj.id), {
+          email: userObj.email,
+          displayName: userObj.displayName || 'Noma\'lum',
+          role: 'owner',
+          status: 'active',
+          emailVerified: userObj.emailVerified || false,
+          createdAt: userObj.createdAt || new Date().toISOString()
+        });
+        
+        await fetch('/api/approve-user', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fileId: userObj.fileId })
+        });
+        setPendingUsers(prev => prev.filter(u => u.id !== userObj.id));
+        alert("Foydalanuvchi muvaffaqiyatli tasdiqlandi!");
+        return;
+      }
+      
+      await updateDoc(doc(db, 'users', userObj.id), { status: newStatus });
     } catch (err) {
       alert("Xatolik: " + err.message);
     }
@@ -117,7 +166,8 @@ function App() {
     );
   }
 
-  const filteredUsers = usersList.filter(u => 
+  const combinedUsers = [...pendingUsers, ...usersList];
+  const filteredUsers = combinedUsers.filter(u => 
     (u.displayName?.toLowerCase() || '').includes(search.toLowerCase()) ||
     (u.email?.toLowerCase() || '').includes(search.toLowerCase())
   );
@@ -182,16 +232,16 @@ function App() {
                   </td>
                   <td className="actions-cell">
                     {u.status !== 'active' && (
-                      <button className="btn-action approve" onClick={() => changeStatus(u.id, 'active')} title="Tasdiqlash/Faollashtirish">
+                      <button className="btn-action approve" onClick={() => changeStatus(u, 'active')} title="Tasdiqlash/Faollashtirish">
                         <UserCheck size={16} /> Faollashtirish
                       </button>
                     )}
-                    {u.status !== 'blocked' && (
-                      <button className="btn-action block" onClick={() => changeStatus(u.id, 'blocked')} title="Bloklash (To'lov qilinmagan)">
+                    {u.status !== 'blocked' && !u.fileId && (
+                      <button className="btn-action block" onClick={() => changeStatus(u, 'blocked')} title="Bloklash (To'lov qilinmagan)">
                         <UserX size={16} /> Bloklash
                       </button>
                     )}
-                    <button className="btn-action block" onClick={() => changeStatus(u.id, 'deleted')} title="Arizani o'chirish" style={{backgroundColor: '#FEE2E2', color: '#DC2626'}}>
+                    <button className="btn-action block" onClick={() => changeStatus(u, 'deleted')} title="Arizani o'chirish" style={{backgroundColor: '#FEE2E2', color: '#DC2626'}}>
                       O'chirish
                     </button>
                   </td>

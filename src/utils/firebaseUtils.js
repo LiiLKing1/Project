@@ -12,6 +12,22 @@ export const withTimeout = (promise, actionName = 'Amal') => {
   return Promise.race([promise, timeoutPromise]);
 };
 
+// Background Google Drive Sync Helper
+const triggerDriveSync = (ref, data, action) => {
+  if (window.electronAPI?.syncToDrive && ref?.path) {
+    const parts = ref.path.split('/');
+    if (parts.length >= 4 && parts[0] === 'users') {
+      const storeId = parts[1];
+      const collectionName = parts[2];
+      const docId = parts[parts.length - 1]; // usually parts[3]
+      window.electronAPI.syncToDrive({ storeId, collectionName, docId, data, action });
+    } else if (parts.length === 2 && parts[0] === 'users') {
+      const storeId = parts[1];
+      window.electronAPI.syncToDrive({ storeId, collectionName: 'profile', docId: storeId, data, action });
+    }
+  }
+};
+
 // Wrappers for Firestore operations
 export const fetchDoc = (ref) => withTimeout(getDoc(ref), 'Hujjat yuklash');
 export const fetchDocs = (query) => withTimeout(getDocs(query), 'Ro\'yxat yuklash');
@@ -35,10 +51,11 @@ export const logAudit = async (storeId, userProfile, action, resource, details =
   }
 };
 
-// Instant writes (Optimistic UI)
 export const saveDoc = async (collectionRef, data, auditData = null) => {
   const newDocRef = doc(collectionRef);
-  await withTimeout(setDoc(newDocRef, { ...data, createdAt: new Date().toISOString() }), "Ma'lumotni saqlash");
+  const docData = { ...data, createdAt: new Date().toISOString() };
+  await withTimeout(setDoc(newDocRef, docData), "Ma'lumotni saqlash");
+  triggerDriveSync(newDocRef, docData, 'CREATE');
   if (auditData) {
     await logAudit(auditData.storeId, auditData.userProfile, 'CREATE', auditData.resource, auditData.details);
   }
@@ -46,7 +63,9 @@ export const saveDoc = async (collectionRef, data, auditData = null) => {
 };
 
 export const editDoc = async (docRef, data, auditData = null) => {
-  await withTimeout(updateDoc(docRef, { ...data, updatedAt: new Date().toISOString() }), "Ma'lumotni tahrirlash");
+  const docData = { ...data, updatedAt: new Date().toISOString() };
+  await withTimeout(updateDoc(docRef, docData), "Ma'lumotni tahrirlash");
+  triggerDriveSync(docRef, docData, 'UPDATE');
   if (auditData) {
     await logAudit(auditData.storeId, auditData.userProfile, 'UPDATE', auditData.resource, auditData.details);
   }
@@ -54,7 +73,9 @@ export const editDoc = async (docRef, data, auditData = null) => {
 };
 
 export const softDeleteDoc = async (docRef, auditData = null) => {
-  await withTimeout(updateDoc(docRef, { status: 'archived', archivedAt: new Date().toISOString(), updatedAt: new Date().toISOString() }), "Ma'lumotni arxivlash");
+  const docData = { status: 'archived', archivedAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+  await withTimeout(updateDoc(docRef, docData), "Ma'lumotni arxivlash");
+  triggerDriveSync(docRef, docData, 'UPDATE'); // For soft delete, just update
   if (auditData) {
     await logAudit(auditData.storeId, auditData.userProfile, 'ARCHIVE', auditData.resource, auditData.details);
   }
@@ -63,6 +84,7 @@ export const softDeleteDoc = async (docRef, auditData = null) => {
 
 export const removeDoc = async (docRef, auditData = null) => {
   await withTimeout(deleteDoc(docRef), "Ma'lumotni o'chirish");
+  triggerDriveSync(docRef, null, 'DELETE');
   if (auditData) {
     await logAudit(auditData.storeId, auditData.userProfile, 'DELETE', auditData.resource, auditData.details);
   }
@@ -71,6 +93,7 @@ export const removeDoc = async (docRef, auditData = null) => {
 
 export const putDoc = async (docRef, data, auditData = null) => {
   await withTimeout(setDoc(docRef, data), "Ma'lumotni yozish");
+  triggerDriveSync(docRef, data, 'CREATE');
   if (auditData) {
     await logAudit(auditData.storeId, auditData.userProfile, 'PUT', auditData.resource, auditData.details);
   }

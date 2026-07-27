@@ -16,4 +16,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   startGoogleLogin: () => ipcRenderer.send('start-google-login'),
   onGoogleLoginSuccess: (callback) => ipcRenderer.on('google-login-success', (event, token) => callback(token)),
   removeGoogleLoginListener: () => ipcRenderer.removeAllListeners('google-login-success'),
+  
+  // Drive Sync
+  syncToDrive: (payload) => ipcRenderer.send('sync-to-drive', payload),
 });

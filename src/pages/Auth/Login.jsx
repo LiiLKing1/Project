@@ -88,14 +88,24 @@ const Login = () => {
         // Owner logic
         if (isSignup) {
           const userCredential = await signup(email, password);
-          await setDoc(doc(db, "users", userCredential.user.uid), {
-            email: email,
-            displayName: name,
-            role: 'owner',
-            status: 'pending',
-            emailVerified: false,
-            createdAt: new Date().toISOString()
-          });
+          // Firebase'ga yozilmaydi, faqat Drive'dagi pending_users ga yoziladi
+          if (window.electronAPI && window.electronAPI.syncToDrive) {
+            window.electronAPI.syncToDrive({
+              storeId: 'admin',
+              collectionName: 'pending_users',
+              docId: userCredential.user.uid,
+              action: 'CREATE',
+              data: {
+                uid: userCredential.user.uid,
+                email: email,
+                displayName: name,
+                role: 'owner',
+                status: 'pending',
+                emailVerified: false,
+                createdAt: new Date().toISOString()
+              }
+            });
+          }
           
           await sendEmailVerification(userCredential.user);
           addToast("Muvaffaqiyatli ro'yxatdan o'tdingiz. Emailingizga tasdiqlash xati yuborildi. Iltimos pochtangizni tekshiring", "success");
