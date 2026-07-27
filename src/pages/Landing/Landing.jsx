@@ -1,20 +1,16 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { gsap } from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { ScrollSmoother } from 'gsap/ScrollSmoother';
 import { APP_NAME } from '../../config/appConfig';
 import TitleBar from '../../components/TitleBar';
 import { useAuth } from '../../context/AuthContext';
 import { ChevronRight, BarChart2, ShoppingCart, Users, Package } from 'lucide-react';
-import { LiquidGlassCard } from '@/components/ui/liquid-glass';
 import DashMockup from "./DashMockup";
 
-/* ══════════════════════════════════════════════════════════
-   FINANCIAL HERO — hero-financial.tsx template based
-   BG: Silk WebGL canvas (from preview(2).html) — dark/silk
-   Nav: Glassmorphism pill — used as hero nav background
-   H1: Large, bold, centered
-   Button: GlassButton from preview(2).html button #2
-   Mockup: Real dashboard screenshot (iframe approach)
-   ══════════════════════════════════════════════════════════ */
+// Register GSAP plugins
+gsap.registerPlugin(ScrollTrigger);
 
 /* ── Intersection fade animation ─────────────────────────── */
 function TimelineAnim({ children, delay = 0, className = '', style = {} }) {
@@ -33,91 +29,129 @@ function TimelineAnim({ children, delay = 0, className = '', style = {} }) {
   return (
     <div ref={ref} className={className} style={{
       opacity: visible ? 1 : 0,
-      filter: visible ? 'blur(0px)' : 'blur(12px)',
-      transform: visible ? 'translateY(0)' : 'translateY(16px)',
-      transition: `opacity 0.6s ease ${delay}ms, filter 0.6s ease ${delay}ms, transform 0.6s ease ${delay}ms`,
+      filter: visible ? 'blur(0px)' : 'blur(10px)',
+      transform: visible ? 'translateY(0)' : 'translateY(20px)',
+      transition: `opacity 0.65s ease ${delay}ms, filter 0.65s ease ${delay}ms, transform 0.65s ease ${delay}ms`,
       ...style,
     }}>{children}</div>
   );
 }
 
-/* ── Silk WebGL Canvas background (from preview(2).html) ─── */
-function useSilkCanvas(canvasRef) {
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const gl = canvas.getContext('webgl', { antialias: false, alpha: false, powerPreference: 'high-performance' });
-    if (!gl) {
-      canvas.parentElement?.classList.add('silk-fallback');
-      return;
-    }
-    const vert = `attribute vec2 aPosition;varying vec2 vUv;void main(){vUv=aPosition*0.5+0.5;gl_Position=vec4(aPosition,0.0,1.0);}`;
-    const frag = `precision highp float;varying vec2 vUv;uniform float uTime;uniform vec3 uColor;uniform float uSpeed;uniform float uScale;uniform float uRotation;uniform float uNoiseIntensity;uniform vec2 uResolution;const float e=2.71828182845904523536;float noise(vec2 t){float G=e;vec2 r=(G*sin(G*t));return fract(r.x*r.y*(1.0+t.x));}vec2 rotateUvs(vec2 uv,float angle){float c=cos(angle);float s=sin(angle);mat2 rot=mat2(c,-s,s,c);return rot*uv;}void main(){float rnd=noise(gl_FragCoord.xy);vec2 uv=vUv;float aspect=uResolution.x/max(uResolution.y,1.0);uv.x=(uv.x-0.5)*aspect+0.5;uv=rotateUvs(uv*uScale,uRotation);vec2 tex=uv*uScale;float tOffset=uSpeed*uTime*0.12;tex.y+=0.03*sin(8.0*tex.x-tOffset);float pattern=0.6+0.4*sin(5.0*(tex.x+tex.y+cos(3.0*tex.x+5.0*tex.y)+0.02*tOffset)+sin(20.0*(tex.x+tex.y-0.1*tOffset)));vec4 col=vec4(uColor,1.0)*vec4(pattern)-rnd/15.0*uNoiseIntensity;col.a=1.0;gl_FragColor=col;}`;
+/* ── Slime Navbar — stretches upward when scrolling down ─── */
+function SlimeNavbar({ navigate, isElectron }) {
+  const [stretch, setStretch] = useState(0);
+  const [scrolled, setScrolled] = useState(false);
+  const lastScrollY = useRef(0);
+  const lastTime = useRef(Date.now());
+  const velocity = useRef(0);
+  const rafId = useRef(null);
+  const settling = useRef(false);
 
-    const makeShader = (type, src) => {
-      const s = gl.createShader(type);
-      gl.shaderSource(s, src);
-      gl.compileShader(s);
-      return s;
-    };
-    const prog = gl.createProgram();
-    gl.attachShader(prog, makeShader(gl.VERTEX_SHADER, vert));
-    gl.attachShader(prog, makeShader(gl.FRAGMENT_SHADER, frag));
-    gl.linkProgram(prog);
-    gl.useProgram(prog);
-
-    const buf = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1,1,-1,-1,1,-1,1,1,-1,1,1]), gl.STATIC_DRAW);
-    const pos = gl.getAttribLocation(prog, 'aPosition');
-    gl.enableVertexAttribArray(pos);
-    gl.vertexAttribPointer(pos, 2, gl.FLOAT, false, 0, 0);
-
-    const u = {
-      time: gl.getUniformLocation(prog, 'uTime'),
-      color: gl.getUniformLocation(prog, 'uColor'),
-      speed: gl.getUniformLocation(prog, 'uSpeed'),
-      scale: gl.getUniformLocation(prog, 'uScale'),
-      rotation: gl.getUniformLocation(prog, 'uRotation'),
-      noiseIntensity: gl.getUniformLocation(prog, 'uNoiseIntensity'),
-      resolution: gl.getUniformLocation(prog, 'uResolution'),
-    };
-
-    // Light blue-white silk (like the hero-financial sky feel but animated)
-    gl.uniform3f(u.color, 0.88, 0.93, 1.0);   // #E0EDFF — light blue-white
-    gl.uniform1f(u.speed, 3.5);
-    gl.uniform1f(u.scale, 1.2);
-    gl.uniform1f(u.rotation, 0);
-    gl.uniform1f(u.noiseIntensity, 1.2);
-
-    let start = performance.now();
-    let raf;
-    const resize = () => {
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      const w = Math.max(1, Math.floor(window.innerWidth * dpr));
-      const h = Math.max(1, Math.floor(window.innerHeight * dpr));
-      if (canvas.width !== w || canvas.height !== h) {
-        canvas.width = w; canvas.height = h;
-        gl.viewport(0, 0, w, h);
-        gl.uniform2f(u.resolution, w, h);
+  const springBack = useCallback(() => {
+    if (settling.current) return;
+    settling.current = true;
+    let t0 = null;
+    const from = velocity.current;
+    const step = (ts) => {
+      if (!t0) t0 = ts;
+      const elapsed = (ts - t0) / 550;
+      const t = Math.min(elapsed, 1);
+      const v = Math.exp(-6 * t) * Math.cos(13 * t);
+      const s = Math.max(0, from * v * 0.04);
+      setStretch(s < 0.004 ? 0 : s);
+      if (t < 1 && s > 0.003) {
+        rafId.current = requestAnimationFrame(step);
+      } else {
+        setStretch(0);
+        settling.current = false;
       }
     };
-    const render = (now) => {
-      resize();
-      gl.uniform1f(u.time, (now - start) * 0.001);
-      gl.drawArrays(gl.TRIANGLES, 0, 6);
-      raf = requestAnimationFrame(render);
-    };
-    window.addEventListener('resize', resize, { passive: true });
-    raf = requestAnimationFrame(render);
-    return () => {
-      cancelAnimationFrame(raf);
-      window.removeEventListener('resize', resize);
-    };
+    rafId.current = requestAnimationFrame(step);
   }, []);
+
+  useEffect(() => {
+    const onScroll = () => {
+      const now = Date.now();
+      const sy = window.scrollY;
+      const dt = Math.max(1, now - lastTime.current);
+      const dy = sy - lastScrollY.current;
+      velocity.current = (dy / dt) * 16;
+      lastScrollY.current = sy;
+      lastTime.current = now;
+      setScrolled(sy > 60);
+
+      if (!settling.current && velocity.current > 1.5) {
+        setStretch(Math.min(velocity.current / 28, 1));
+      }
+
+      clearTimeout(window.__slimeNav);
+      window.__slimeNav = setTimeout(() => { springBack(); }, 55);
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      clearTimeout(window.__slimeNav);
+      if (rafId.current) cancelAnimationFrame(rafId.current);
+    };
+  }, [springBack]);
+
+  const extraPad = stretch * 18;
+  const moveUp = -stretch * 12;
+
+  return (
+    <div style={{
+      position: 'fixed',
+      top: isElectron ? 40 : 0,
+      left: 0,
+      right: 0,
+      zIndex: 1000,
+      display: 'flex',
+      justifyContent: 'center',
+      padding: `${24 + stretch * 3}px 28px 0`,
+      pointerEvents: 'none',
+      transform: `translateY(${moveUp}px)`,
+      transformOrigin: 'top center',
+      willChange: 'transform, padding',
+    }}>
+      <div className="nav-glass-wrap" style={{ width: '100%', maxWidth: 1160, display: 'block' }}>
+        <div className="nav-glass-shadow" />
+        <div className="nav-glass-inner" style={{
+          padding: `${13 + extraPad * 0.4}px 22px`,
+          background: scrolled
+            ? 'linear-gradient(-75deg, rgba(255,255,255,.35), rgba(255,255,255,.6), rgba(255,255,255,.35))'
+            : 'linear-gradient(-75deg, rgba(255,255,255,.18), rgba(255,255,255,.40), rgba(255,255,255,.18))',
+          boxShadow: scrolled
+            ? 'inset 0 1px 2px rgba(0,0,0,.05), inset 0 -1px 2px rgba(255,255,255,.6), 0 8px 32px -8px rgba(59,130,246,.22), 0 0 0.2em 0.35em inset rgba(255,255,255,.3)'
+            : 'inset 0 1px 2px rgba(0,0,0,.04), inset 0 -1px 2px rgba(255,255,255,.45), 0 4px 20px rgba(0,0,0,.07), 0 0 0.2em 0.35em inset rgba(255,255,255,.2)',
+          transition: 'background 0.4s ease, box-shadow 0.4s ease',
+          borderRadius: `${999 - stretch * 55}px`,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, position: 'relative', zIndex: 4 }}>
+            <div style={{ filter: 'drop-shadow(0 3px 6px rgba(59,130,246,.4))' }}>
+              <div style={{ width: 30, height: 30, clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)', background: 'linear-gradient(135deg,#3b82f6,#60a5fa)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', paddingBottom: 3 }}>
+                <BarChart2 size={13} color="#fff"/>
+              </div>
+            </div>
+            <span style={{ fontSize: 15, fontWeight: 700, color: '#000', letterSpacing: '-.3px' }}>{APP_NAME}</span>
+          </div>
+          <nav className="fin-nav-links" style={{ display: 'flex', alignItems: 'center', gap: 28, position: 'relative', zIndex: 4 }}>
+            <button className="fin-nav-link" style={{ fontSize: 13.5 }} onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}>Xususiyatlar</button>
+            <button className="fin-nav-link" style={{ fontSize: 13.5 }} onClick={() => document.getElementById('about')?.scrollIntoView({ behavior: 'smooth' })}>Biz haqimizda</button>
+            <button className="fin-nav-link" style={{ fontSize: 13.5 }} onClick={() => document.getElementById('cta')?.scrollIntoView({ behavior: 'smooth' })}>Narxlar</button>
+            <button
+              style={{ fontSize: 13, fontWeight: 600, padding: '7px 18px', borderRadius: 999, background: 'linear-gradient(135deg,#3b82f6,#60a5fa)', color: '#fff', border: 'none', cursor: 'pointer', pointerEvents: 'auto', transition: 'opacity .2s, transform .15s', letterSpacing: '-.2px', boxShadow: '0 2px 12px rgba(59,130,246,.4)' }}
+              onClick={() => navigate('/login')}
+              onMouseEnter={e => { e.currentTarget.style.opacity = '0.85'; e.currentTarget.style.transform = 'scale(0.97)'; }}
+              onMouseLeave={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.transform = 'scale(1)'; }}
+            >Kirish →</button>
+          </nav>
+        </div>
+      </div>
+    </div>
+  );
 }
 
-/* ── GlassButton — button #2 from preview(2).html ─────────── */
+/* ── GlassButton ─────────────────────────────────────────── */
 function GlassButton({ children, onClick, style = {} }) {
   return (
     <div className="lnd-glass-btn-wrap" style={style}>
@@ -136,10 +170,10 @@ function GlassButton({ children, onClick, style = {} }) {
 
 /* ── Features ─────────────────────────────────────────────── */
 const features = [
-  { icon: <ShoppingCart size={20}/>, color: '#3B82F6', bg: '#EFF6FF', label: 'KASSA TIZIMI',   heading: "Kassani to'liq nazorat qiling.",   body: "Mahsulot skanerlash, to'lov qabul qilish, chek chiqarish — hammasi bir ekranda. Naqd, karta va aralash to'lovlar." },
-  { icon: <Package size={20}/>,      color: '#10B981', bg: '#ECFDF5', label: 'OMBOR & INVENTAR', heading: 'Tovar har doim nazoratda.',          body: "Kirim-chiqim, qoldiqlar, minimal zaxira ogohlantirishlari va omborlararo transfer. Inventarizatsiya daqiqalarda." },
-  { icon: <Users size={20}/>,        color: '#F59E0B', bg: '#FEF3C7', label: 'MIJOZLAR CRM',    heading: "Mijozlarni yaxshiroq tushining.",    body: "Bonus tizimi, nasiya hisobi, xarid tarixi. Har bir mijoz haqida to'liq ma'lumot bir joyda." },
-  { icon: <BarChart2 size={20}/>,    color: '#8B5CF6', bg: '#F5F3FF', label: 'HISOBOTLAR',      heading: 'Raqamlarda haqiqat bor.',           body: "Kunlik, oylik va davriy hisobotlar. Foyda-zarar, eng ko'p sotiladigan tovarlar, kassa balansi — vizual va aniq." },
+  { icon: <ShoppingCart size={20}/>, color: '#3B82F6', bg: '#EFF6FF', label: 'KASSA TIZIMI',    heading: "Kassani to'liq nazorat qiling.",  body: "Mahsulot skanerlash, to'lov qabul qilish, chek chiqarish — hammasi bir ekranda. Naqd, karta va aralash to'lovlar." },
+  { icon: <Package size={20}/>,      color: '#10B981', bg: '#ECFDF5', label: 'OMBOR & INVENTAR', heading: 'Tovar har doim nazoratda.',         body: "Kirim-chiqim, qoldiqlar, minimal zaxira ogohlantirishlari va omborlararo transfer. Inventarizatsiya daqiqalarda." },
+  { icon: <Users size={20}/>,        color: '#F59E0B', bg: '#FEF3C7', label: 'MIJOZLAR CRM',    heading: "Mijozlarni yaxshiroq tushining.",   body: "Bonus tizimi, nasiya hisobi, xarid tarixi. Har bir mijoz haqida to'liq ma'lumot bir joyda." },
+  { icon: <BarChart2 size={20}/>,    color: '#8B5CF6', bg: '#F5F3FF', label: 'HISOBOTLAR',      heading: 'Raqamlarda haqiqat bor.',          body: "Kunlik, oylik va davriy hisobotlar. Foyda-zarar, eng ko'p sotiladigan tovarlar, kassa balansi — vizual va aniq." },
 ];
 
 /* ══ MAIN ════════════════════════════════════════════════════ */
@@ -147,6 +181,91 @@ export default function Landing() {
   const navigate = useNavigate();
   const { currentUser } = useAuth();
   const isElectron = window.electronAPI?.isElectron;
+  const smootherRef = useRef(null);
+  const mockupRef = useRef(null);
+  const mockupWrapRef = useRef(null);
+
+  /* ── GSAP Smooth Scroll ── */
+  useEffect(() => {
+    // Only run on non-mobile browsers
+    if (window.innerWidth < 768) return;
+    
+    // Simple CSS smooth scroll is enough — ScrollSmoother needs ScrollSmoother plugin (Club GSAP)
+    // Use native smooth scroll instead as fallback
+    document.documentElement.style.scrollBehavior = 'smooth';
+
+    // GSAP ScrollTrigger for mockup zoom
+    const ctx = gsap.context(() => {
+      if (!mockupRef.current || !mockupWrapRef.current) return;
+
+      const tl = gsap.timeline({
+        scrollTrigger: {
+          trigger: mockupWrapRef.current,
+          start: 'top 85%',
+          end: 'top 10%',
+          scrub: 1.2,
+          pin: false,
+        }
+      });
+
+      // Phase 1: zoom in from small to full
+      tl.fromTo(mockupRef.current,
+        { scale: 0.72, opacity: 0.5, y: 40 },
+        { scale: 1.0, opacity: 1, y: 0, ease: 'power2.out', duration: 1 }
+      );
+    });
+
+    // Separate ScrollTrigger for sticky+bounce fill effect
+    if (mockupWrapRef.current) {
+      ScrollTrigger.create({
+        trigger: mockupWrapRef.current,
+        start: 'top 15%',
+        end: '+=320',
+        pin: true,
+        pinSpacing: true,
+        onEnter: () => {
+          // Bounce overshoot when stuck
+          gsap.fromTo(mockupRef.current,
+            { scale: 1.0 },
+            {
+              scale: 1.04,
+              duration: 0.22,
+              ease: 'power2.out',
+              yoyo: true,
+              repeat: 1,
+              onComplete: () => {
+                gsap.to(mockupRef.current, { scale: 1.0, duration: 0.18, ease: 'power2.inOut' });
+              }
+            }
+          );
+        },
+        onLeave: () => {
+          // Shrink and fade as it exits
+          gsap.to(mockupRef.current, {
+            scale: 0.9,
+            opacity: 0.7,
+            y: -20,
+            duration: 0.4,
+            ease: 'power2.in'
+          });
+        },
+        onLeaveBack: () => {
+          gsap.to(mockupRef.current, {
+            scale: 1.0,
+            opacity: 1,
+            y: 0,
+            duration: 0.35,
+            ease: 'power2.out'
+          });
+        }
+      });
+    }
+
+    return () => {
+      ctx.revert();
+      ScrollTrigger.getAll().forEach(t => t.kill());
+    };
+  }, []);
 
   return (
     <div style={{
@@ -157,6 +276,7 @@ export default function Landing() {
       overflowX: 'hidden',
     }}>
       <TitleBar transparent hideLogo />
+      <SlimeNavbar navigate={navigate} isElectron={isElectron} />
 
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
@@ -164,113 +284,77 @@ export default function Landing() {
         html { scroll-behavior: smooth; }
         ::selection { background: rgba(59,130,246,.15); }
 
-        /* ── @property for glass button gradient angle ── */
-        @property --angle-1 {
-          syntax: "<angle>"; inherits: false; initial-value: -75deg;
-        }
-        @property --angle-2 {
-          syntax: "<angle>"; inherits: false; initial-value: -45deg;
-        }
+        @property --angle-1 { syntax: "<angle>"; inherits: false; initial-value: -75deg; }
+        @property --angle-2 { syntax: "<angle>"; inherits: false; initial-value: -45deg; }
 
-        /* ── Sky photo background ── */
         .sky-bg {
           position: fixed; inset: 0; z-index: 0; pointer-events: none;
           background-image: url('https://images.unsplash.com/photo-1597200381847-30ec200eeb9a?q=80&w=1600&auto=format&fit=crop');
-          background-size: cover; background-position: center;
-          opacity: 0.5;
+          background-size: cover; background-position: center; opacity: 0.45;
         }
-        /* Sky tint overlay */
         .sky-tint {
           position: fixed; inset: 0; z-index: 0; pointer-events: none;
           background: linear-gradient(180deg, rgba(219,234,254,.55) 0%, rgba(241,245,249,.3) 60%, rgba(247,249,252,.8) 100%);
         }
 
-        /* ── Nav ── */
         .fin-nav-link {
-          color: #64748B; text-decoration: none; font-size: 14px; font-weight: 500;
+          color: #475569; text-decoration: none; font-size: 14px; font-weight: 500;
           transition: color .2s; background: none; border: none; cursor: pointer;
           font-family: inherit; letter-spacing: -.1px;
         }
         .fin-nav-link:hover { color: #3b82f6; }
 
-        /* ── Glass Button #2 (from preview(2).html) ─────────────────── */
+        /* Glass Button */
         .lnd-glass-btn-wrap {
           position: relative; z-index: 2; border-radius: 999vw;
           background: transparent; pointer-events: none;
           transition: all 400ms cubic-bezier(0.25, 1, 0.5, 1);
           font-size: 16px; display: inline-block;
         }
-        .lnd-glass-btn-wrap:has(.lnd-glass-btn:active) {
-          transform: rotate3d(1, 0, 0, 25deg);
-        }
+        .lnd-glass-btn-wrap:has(.lnd-glass-btn:active) { transform: rotate3d(1, 0, 0, 25deg); }
         .lnd-glass-btn-shadow {
           --shadow-cuttoff-fix: 2em;
           position: absolute;
-          width: calc(100% + var(--shadow-cuttoff-fix));
-          height: calc(100% + var(--shadow-cuttoff-fix));
-          top: calc(0% - var(--shadow-cuttoff-fix) / 2);
-          left: calc(0% - var(--shadow-cuttoff-fix) / 2);
-          filter: blur(clamp(2px, 0.125em, 12px));
-          overflow: visible; pointer-events: none; border-radius: 999vw;
+          width: calc(100% + var(--shadow-cuttoff-fix)); height: calc(100% + var(--shadow-cuttoff-fix));
+          top: calc(0% - var(--shadow-cuttoff-fix) / 2); left: calc(0% - var(--shadow-cuttoff-fix) / 2);
+          filter: blur(clamp(2px, 0.125em, 12px)); overflow: visible; pointer-events: none; border-radius: 999vw;
         }
         .lnd-glass-btn-shadow::after {
           content: ""; position: absolute; z-index: 0; inset: 0; border-radius: 999vw;
           background: linear-gradient(180deg, rgba(0,0,0,0.22), rgba(0,0,0,0.11));
           width: calc(100% - var(--shadow-cuttoff-fix) - 0.25em);
           height: calc(100% - var(--shadow-cuttoff-fix) - 0.25em);
-          top: calc(var(--shadow-cuttoff-fix) - 0.5em);
-          left: calc(var(--shadow-cuttoff-fix) - 0.875em);
+          top: calc(var(--shadow-cuttoff-fix) - 0.5em); left: calc(var(--shadow-cuttoff-fix) - 0.875em);
           padding: 0.125em; box-sizing: border-box;
           -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
           mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
           -webkit-mask-composite: xor; mask-composite: exclude;
-          transition: all 400ms cubic-bezier(0.25, 1, 0.5, 1);
-          overflow: visible; opacity: 1;
+          transition: all 400ms cubic-bezier(0.25, 1, 0.5, 1); overflow: visible; opacity: 1;
         }
         .lnd-glass-btn {
           --border-width: clamp(1px, 0.0625em, 4px);
           all: unset; cursor: pointer; position: relative;
-          -webkit-tap-highlight-color: rgba(0,0,0,0);
-          pointer-events: auto; z-index: 3;
+          -webkit-tap-highlight-color: rgba(0,0,0,0); pointer-events: auto; z-index: 3;
           background: linear-gradient(-75deg, rgba(255,255,255,.08), rgba(255,255,255,.28), rgba(255,255,255,.08));
           border-radius: 999vw;
-          box-shadow:
-            inset 0 0.125em 0.125em rgba(0,0,0,.05),
-            inset 0 -0.125em 0.125em rgba(255,255,255,.50),
-            0 0.25em 0.125em -0.125em rgba(0,0,0,.20),
-            0 0 0.1em 0.25em inset rgba(255,255,255,.20),
-            0 0 0 0 rgba(255,255,255,1);
-          backdrop-filter: blur(clamp(1px, 0.125em, 4px));
-          -webkit-backdrop-filter: blur(clamp(1px, 0.125em, 4px));
+          box-shadow: inset 0 0.125em 0.125em rgba(0,0,0,.05), inset 0 -0.125em 0.125em rgba(255,255,255,.50), 0 0.25em 0.125em -0.125em rgba(0,0,0,.20), 0 0 0.1em 0.25em inset rgba(255,255,255,.20), 0 0 0 0 rgba(255,255,255,1);
+          backdrop-filter: blur(clamp(1px, 0.125em, 4px)); -webkit-backdrop-filter: blur(clamp(1px, 0.125em, 4px));
           transition: all 400ms cubic-bezier(0.25, 1, 0.5, 1);
         }
         .lnd-glass-btn:hover {
-          transform: scale(0.975);
-          backdrop-filter: blur(0.01em);
-          -webkit-backdrop-filter: blur(0.01em);
-          box-shadow:
-            inset 0 0.125em 0.125em rgba(0,0,0,.05),
-            inset 0 -0.125em 0.125em rgba(255,255,255,.50),
-            0 0.15em 0.05em -0.1em rgba(0,0,0,.25),
-            0 0 0.05em 0.1em inset rgba(255,255,255,.50),
-            0 0 0 0 rgba(255,255,255,1);
+          transform: scale(0.975); backdrop-filter: blur(0.01em); -webkit-backdrop-filter: blur(0.01em);
+          box-shadow: inset 0 0.125em 0.125em rgba(0,0,0,.05), inset 0 -0.125em 0.125em rgba(255,255,255,.50), 0 0.15em 0.05em -0.1em rgba(0,0,0,.25), 0 0 0.05em 0.1em inset rgba(255,255,255,.50), 0 0 0 0 rgba(255,255,255,1);
         }
         .lnd-glass-btn-text {
-          position: relative; display: flex; align-items: center;
-          justify-content: center; gap: 0.5em;
-          user-select: none; -webkit-user-select: none;
-          font-family: Inter, ui-sans-serif, sans-serif;
-          letter-spacing: -0.04em; font-weight: 600; font-size: 1em; line-height: 1;
-          color: #000;
-          transition: all 400ms cubic-bezier(0.25, 1, 0.5, 1);
-          padding-inline: 1.6em; padding-block: 0.9em; min-height: 48px;
+          position: relative; display: flex; align-items: center; justify-content: center; gap: 0.5em;
+          user-select: none; -webkit-user-select: none; font-family: Inter, ui-sans-serif, sans-serif;
+          letter-spacing: -0.04em; font-weight: 600; font-size: 1em; line-height: 1; color: #000;
+          transition: all 400ms cubic-bezier(0.25, 1, 0.5, 1); padding-inline: 1.6em; padding-block: 0.9em; min-height: 48px;
         }
         .lnd-glass-btn-text::after {
           content: ""; display: block; position: absolute; z-index: 1;
-          width: calc(100% - var(--border-width));
-          height: calc(100% - var(--border-width));
-          top: calc(0% + var(--border-width) / 2);
-          left: calc(0% + var(--border-width) / 2);
+          width: calc(100% - var(--border-width)); height: calc(100% - var(--border-width));
+          top: calc(0% + var(--border-width) / 2); left: calc(0% + var(--border-width) / 2);
           box-sizing: border-box; border-radius: 999vw; overflow: clip;
           background: linear-gradient(var(--angle-2), rgba(255,255,255,0) 0%, rgba(255,255,255,.50) 40% 50%, rgba(255,255,255,0) 55%);
           mix-blend-mode: screen; pointer-events: none;
@@ -284,15 +368,12 @@ export default function Landing() {
           width: calc(100% + var(--border-width)); height: calc(100% + var(--border-width));
           top: calc(0% - var(--border-width) / 2); left: calc(0% - var(--border-width) / 2);
           padding: var(--border-width); box-sizing: border-box;
-          background:
-            conic-gradient(from var(--angle-1) at 50% 50%, rgba(255,255,255,.78), rgba(255,255,255,.05) 5% 40%, rgba(255,255,255,.72) 50%, rgba(255,255,255,.05) 60% 95%, rgba(255,255,255,.78)),
-            linear-gradient(180deg, rgba(255,255,255,.58), rgba(255,255,255,.22));
+          background: conic-gradient(from var(--angle-1) at 50% 50%, rgba(255,255,255,.78), rgba(255,255,255,.05) 5% 40%, rgba(255,255,255,.72) 50%, rgba(255,255,255,.05) 60% 95%, rgba(255,255,255,.78)), linear-gradient(180deg, rgba(255,255,255,.58), rgba(255,255,255,.22));
           -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
           mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
           -webkit-mask-composite: xor; mask-composite: exclude;
           transition: all 400ms cubic-bezier(0.25, 1, 0.5, 1), --angle-1 500ms ease;
-          box-shadow: inset 0 0 0 calc(var(--border-width) / 2) rgba(255,255,255,.50);
-          pointer-events: none;
+          box-shadow: inset 0 0 0 calc(var(--border-width) / 2) rgba(255,255,255,.50); pointer-events: none;
         }
         .lnd-glass-btn:hover::after { --angle-1: -125deg; }
         .lnd-glass-btn:active::after { --angle-1: -75deg; }
@@ -300,99 +381,60 @@ export default function Landing() {
           filter: blur(clamp(2px, 0.0625em, 6px)); -webkit-filter: blur(clamp(2px, 0.0625em, 6px));
           transition: filter 400ms cubic-bezier(0.25, 1, 0.5, 1);
         }
-        .lnd-glass-btn-wrap:has(.lnd-glass-btn:hover) .lnd-glass-btn-shadow::after {
-          top: calc(var(--shadow-cuttoff-fix) - 0.875em); opacity: 1;
-        }
-        .lnd-glass-btn-wrap:has(.lnd-glass-btn:active) .lnd-glass-btn { 
-          box-shadow:
-            inset 0 0.125em 0.125em rgba(0,0,0,.05),
-            inset 0 -0.125em 0.125em rgba(255,255,255,.50),
-            0 0.125em 0.125em -0.125em rgba(0,0,0,.20),
-            0 0 0.1em 0.25em inset rgba(255,255,255,.20),
-            0 0.225em 0.05em 0 rgba(0,0,0,.05),
-            0 0.25em 0 0 rgba(255,255,255,.75),
-            inset 0 0.25em 0.05em 0 rgba(0,0,0,.15);
+        .lnd-glass-btn-wrap:has(.lnd-glass-btn:hover) .lnd-glass-btn-shadow::after { top: calc(var(--shadow-cuttoff-fix) - 0.875em); opacity: 1; }
+        .lnd-glass-btn-wrap:has(.lnd-glass-btn:active) .lnd-glass-btn {
+          box-shadow: inset 0 0.125em 0.125em rgba(0,0,0,.05), inset 0 -0.125em 0.125em rgba(255,255,255,.50), 0 0.125em 0.125em -0.125em rgba(0,0,0,.20), 0 0 0.1em 0.25em inset rgba(255,255,255,.20), 0 0.225em 0.05em 0 rgba(0,0,0,.05), 0 0.25em 0 0 rgba(255,255,255,.75), inset 0 0.25em 0.05em 0 rgba(0,0,0,.15);
         }
 
-        /* ── Navbar glass (GlassButton #2 style) ── */
+        /* Navbar glass */
         .nav-glass-wrap {
           position: relative; z-index: 2; border-radius: 999vw;
-          background: transparent; pointer-events: none;
-          font-size: 14px; display: block;
+          background: transparent; pointer-events: none; font-size: 14px; display: block;
         }
         .nav-glass-wrap .nav-glass-shadow {
-          --shadow-cuttoff-fix: 2em;
-          position: absolute;
-          width: calc(100% + var(--shadow-cuttoff-fix));
-          height: calc(100% + var(--shadow-cuttoff-fix));
-          top: calc(0% - var(--shadow-cuttoff-fix) / 2);
-          left: calc(0% - var(--shadow-cuttoff-fix) / 2);
-          filter: blur(clamp(2px, 0.125em, 12px));
-          overflow: visible; pointer-events: none; border-radius: 999vw;
+          --shadow-cuttoff-fix: 2em; position: absolute;
+          width: calc(100% + var(--shadow-cuttoff-fix)); height: calc(100% + var(--shadow-cuttoff-fix));
+          top: calc(0% - var(--shadow-cuttoff-fix) / 2); left: calc(0% - var(--shadow-cuttoff-fix) / 2);
+          filter: blur(clamp(2px, 0.125em, 12px)); overflow: visible; pointer-events: none; border-radius: 999vw;
         }
         .nav-glass-wrap .nav-glass-shadow::after {
           content: ""; position: absolute; z-index: 0; inset: 0; border-radius: 999vw;
-          background: linear-gradient(180deg, rgba(0,0,0,0.35), rgba(0,0,0,0.15));
+          background: linear-gradient(180deg, rgba(0,0,0,0.22), rgba(0,0,0,0.09));
           width: calc(100% - var(--shadow-cuttoff-fix) - 0.25em);
           height: calc(100% - var(--shadow-cuttoff-fix) - 0.25em);
-          top: calc(var(--shadow-cuttoff-fix) - 0.5em);
-          left: calc(var(--shadow-cuttoff-fix) - 0.875em);
+          top: calc(var(--shadow-cuttoff-fix) - 0.5em); left: calc(var(--shadow-cuttoff-fix) - 0.875em);
           padding: 0.125em; box-sizing: border-box;
           -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
           mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-          -webkit-mask-composite: xor; mask-composite: exclude;
-          overflow: visible; opacity: 1;
+          -webkit-mask-composite: xor; mask-composite: exclude; overflow: visible; opacity: 1;
         }
         .nav-glass-inner {
-          --border-width: 4px;
-          pointer-events: auto;
-          position: relative;
-          background: linear-gradient(-75deg, rgba(255,255,255,.15), rgba(255,255,255,.35), rgba(255,255,255,.15));
-          border-radius: 999vw;
-          box-shadow:
-            inset 0 0.125em 0.125em rgba(0,0,0,.04),
-            inset 0 -0.125em 0.125em rgba(255,255,255,.45),
-            0 0.25em 0.125em -0.125em rgba(0,0,0,.25),
-            0 0 0.2em 0.35em inset rgba(255,255,255,.2);
-          backdrop-filter: blur(clamp(8px, 1em, 24px));
-          -webkit-backdrop-filter: blur(clamp(8px, 1em, 24px));
-          padding: 10px 16px;
-          display: flex; align-items: center; justify-content: space-between;
-          z-index: 3;
-          transition: all 400ms cubic-bezier(0.25, 1, 0.5, 1);
+          --border-width: 3px; pointer-events: auto; position: relative;
+          backdrop-filter: blur(clamp(10px, 1.2em, 28px)); -webkit-backdrop-filter: blur(clamp(10px, 1.2em, 28px));
+          display: flex; align-items: center; justify-content: space-between; z-index: 3;
         }
         .nav-glass-inner::after {
-          content: ""; position: absolute; z-index: 1; inset: 0; border-radius: 999vw;
+          content: ""; position: absolute; z-index: 1; inset: 0; border-radius: inherit;
           width: calc(100% + var(--border-width)); height: calc(100% + var(--border-width));
           top: calc(0% - var(--border-width) / 2); left: calc(0% - var(--border-width) / 2);
           padding: var(--border-width); box-sizing: border-box;
-          background:
-            conic-gradient(from var(--angle-1) at 50% 50%, rgba(255,255,255,.75), rgba(255,255,255,.04) 5% 40%, rgba(255,255,255,.68) 50%, rgba(255,255,255,.04) 60% 95%, rgba(255,255,255,.75)),
-            linear-gradient(180deg, rgba(255,255,255,.55), rgba(255,255,255,.20));
+          background: conic-gradient(from var(--angle-1) at 50% 50%, rgba(255,255,255,.75), rgba(255,255,255,.04) 5% 40%, rgba(255,255,255,.68) 50%, rgba(255,255,255,.04) 60% 95%, rgba(255,255,255,.75)), linear-gradient(180deg, rgba(255,255,255,.55), rgba(255,255,255,.20));
           -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
           mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
           -webkit-mask-composite: xor; mask-composite: exclude;
-          box-shadow: inset 0 0 0 calc(var(--border-width) / 2) rgba(255,255,255,.45);
-          pointer-events: none;
+          box-shadow: inset 0 0 0 calc(var(--border-width) / 2) rgba(255,255,255,.45); pointer-events: none;
           transition: all 400ms cubic-bezier(0.25, 1, 0.5, 1), --angle-1 500ms ease;
         }
-        .nav-glass-inner .fin-nav-link { color: #000; font-weight: 600; padding: 4px 8px; border-radius: 8px; transition: all .2s; }
-        .nav-glass-inner .fin-nav-link:hover { color: #000; background: rgba(0,0,0,.05); }
-        .nav-glass-wrap:hover .nav-glass-shadow {
-          filter: blur(clamp(4px, 0.125em, 8px)); -webkit-filter: blur(clamp(4px, 0.125em, 8px));
-        }
-        .nav-glass-wrap:hover .nav-glass-shadow::after {
-          top: calc(var(--shadow-cuttoff-fix) - 0.7em); opacity: 1;
-        }
-        .nav-glass-wrap:hover .nav-glass-inner::after { 
-          --angle-1: -125deg; 
-        }
+        .nav-glass-inner .fin-nav-link { color: #1e293b; font-weight: 600; padding: 4px 8px; border-radius: 8px; transition: all .2s; }
+        .nav-glass-inner .fin-nav-link:hover { color: #3b82f6; background: rgba(59,130,246,.07); }
+        .nav-glass-wrap:hover .nav-glass-inner::after { --angle-1: -125deg; }
 
         /* Feature cards */
         .fin-feat-card {
-          background: rgba(255,255,255,.85); border: 1.5px solid rgba(255,255,255,.9);
+          background: rgba(255,255,255,.9); border: 1.5px solid rgba(255,255,255,.95);
           border-radius: 20px; padding: 28px 26px;
-          transition: all .25s; box-shadow: 0 2px 12px rgba(0,0,0,.05);
+          transition: border-color .25s, box-shadow .25s, transform .25s;
+          box-shadow: 0 2px 12px rgba(0,0,0,.05);
           backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
         }
         .fin-feat-card:hover {
@@ -400,189 +442,139 @@ export default function Landing() {
           box-shadow: 0 12px 32px -8px rgba(59,130,246,.18);
         }
 
-        /* Mockup float anim */
-        @keyframes dashFloat {
-          0%,100% { transform: translateY(0px); }
-          50%      { transform: translateY(-10px); }
-        }
-
         /* Responsive */
         @media (max-width: 900px) {
           .fin-feat-grid { grid-template-columns: 1fr !important; }
-          .fin-stat-grid { grid-template-columns: repeat(2,1fr) !important; }
           .fin-about-grid { grid-template-columns: 1fr !important; }
           .fin-nav-links { display: none !important; }
           .fin-h1 { font-size: clamp(38px, 9vw, 60px) !important; letter-spacing: -2px !important; }
         }
       `}</style>
 
-      {/* ══ SKY PHOTO BACKGROUND (Unsplash) ══════════════════ */}
       <div className="sky-bg" aria-hidden="true" />
       <div className="sky-tint" aria-hidden="true" />
 
-      {/* ══ HERO SECTION ══════════════════════════════════════ */}
+      {/* ══ HERO ══ */}
       <section style={{
-        minHeight: '100vh', position: 'relative', overflow: 'hidden',
+        minHeight: '100vh', position: 'relative', overflow: 'visible',
         display: 'flex', flexDirection: 'column', alignItems: 'center',
         zIndex: 1,
       }}>
-        {/* SVG diagonal streaks (hero-financial.tsx exact SVG) */}
+        {/* SVG streaks */}
         <svg width="358" height="483" viewBox="0 0 358 483" style={{ position: 'absolute', top: 0, left: 0, zIndex: 1, pointerEvents: 'none' }} fill="none" xmlns="http://www.w3.org/2000/svg">
           <defs>
-            <filter id="f0" x="-137.641" y="-120.646" width="440.285" height="602.787" filterUnits="userSpaceOnUse" colorInterpolationFilters="sRGB">
-              <feFlood floodOpacity="0" result="BackgroundImageFix"/>
-              <feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
-              <feGaussianBlur stdDeviation="32" result="effect1_foregroundBlur_0_1"/>
-            </filter>
-            <filter id="f1" x="-71.707" y="-215.486" width="429.598" height="599.69" filterUnits="userSpaceOnUse" colorInterpolationFilters="sRGB">
-              <feFlood floodOpacity="0" result="BackgroundImageFix"/>
-              <feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
-              <feGaussianBlur stdDeviation="32" result="effect1_foregroundBlur_0_1"/>
-            </filter>
-            <linearGradient id="g0" x1="-50.9961" y1="-33.114" x2="-50.9961" y2="507.886" gradientUnits="userSpaceOnUse">
-              <stop stopColor="#91bbfb"/><stop offset="1" stopColor="#E6F1FF"/>
-            </linearGradient>
-            <linearGradient id="g1" x1="8.04686" y1="-135.113" x2="8.04686" y2="405.887" gradientUnits="userSpaceOnUse">
-              <stop stopColor="#8dbafd"/><stop offset="1" stopColor="#c1d9f8"/>
-            </linearGradient>
+            <filter id="f0" x="-137.641" y="-120.646" width="440.285" height="602.787" filterUnits="userSpaceOnUse" colorInterpolationFilters="sRGB"><feFlood floodOpacity="0" result="BackgroundImageFix"/><feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur stdDeviation="32" result="effect1_foregroundBlur_0_1"/></filter>
+            <filter id="f1" x="-71.707" y="-215.486" width="429.598" height="599.69" filterUnits="userSpaceOnUse" colorInterpolationFilters="sRGB"><feFlood floodOpacity="0" result="BackgroundImageFix"/><feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur stdDeviation="32" result="effect1_foregroundBlur_0_1"/></filter>
+            <linearGradient id="g0" x1="-50.9961" y1="-33.114" x2="-50.9961" y2="507.886" gradientUnits="userSpaceOnUse"><stop stopColor="#91bbfb"/><stop offset="1" stopColor="#E6F1FF"/></linearGradient>
+            <linearGradient id="g1" x1="8.04686" y1="-135.113" x2="8.04686" y2="405.887" gradientUnits="userSpaceOnUse"><stop stopColor="#8dbafd"/><stop offset="1" stopColor="#c1d9f8"/></linearGradient>
           </defs>
-          <g filter="url(#f0)">
-            <rect x="-86.9961" y="-33.114" width="72" height="541" rx="36" transform="rotate(-30.8182 -86.9961 -33.114)" fill="url(#g0)"/>
-          </g>
-          <g filter="url(#f1)">
-            <rect x="-17" y="-135.113" width="50.0937" height="541" rx="25.0469" transform="rotate(-30.8182 -17 -135.113)" fill="url(#g1)"/>
-          </g>
+          <g filter="url(#f0)"><rect x="-86.9961" y="-33.114" width="72" height="541" rx="36" transform="rotate(-30.8182 -86.9961 -33.114)" fill="url(#g0)"/></g>
+          <g filter="url(#f1)"><rect x="-17" y="-135.113" width="50.0937" height="541" rx="25.0469" transform="rotate(-30.8182 -17 -135.113)" fill="url(#g1)"/></g>
         </svg>
 
-        {/* Top blue gradient */}
-        <div style={{
-          position: 'absolute', top: 0, left: 0, width: '100%', height: '600px', zIndex: 1, pointerEvents: 'none',
-          background: 'linear-gradient(to bottom, rgba(219,234,254,.85) 0%, rgba(191,219,254,.6) 40%, transparent 100%)',
-        }} />
+        <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '600px', zIndex: 1, pointerEvents: 'none', background: 'linear-gradient(to bottom, rgba(219,234,254,.85) 0%, rgba(191,219,254,.6) 40%, transparent 100%)' }} />
 
-        {/* NAV SPACER */}
-        <div style={{ height: isElectron ? 40 : 20, flexShrink: 0, zIndex: 2 }} />
+        {/* Nav spacer */}
+        <div style={{ height: isElectron ? 110 : 96, flexShrink: 0, zIndex: 2 }} />
 
-        {/* ── GLASSMORPHISM NAV — GlassButton #2 style ─────── */}
-        <header style={{ position: 'relative', zIndex: 10, width: '100%', maxWidth: 1200, margin: '16px auto 0', padding: '0 24px' }}>
+        {/* ── Hero text — pushed down ── */}
+        <div style={{ position: 'relative', zIndex: 10, textAlign: 'center', padding: '90px 24px 52px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 28 }}>
+
           <TimelineAnim delay={0}>
-            <div className="nav-glass-wrap">
-              <div className="nav-glass-shadow" />
-              <div className="nav-glass-inner">
-                {/* Logo */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, position: 'relative', zIndex: 4 }}>
-                  <div style={{ filter: 'drop-shadow(0 3px 6px rgba(59,130,246,.4))' }}>
-                    <div style={{ width: 30, height: 30, clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)', background: 'linear-gradient(135deg,#3b82f6,#60a5fa)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', paddingBottom: 3 }}>
-                      <BarChart2 size={13} color="#fff"/>
-                    </div>
-                  </div>
-                  <span style={{ fontSize: 15, fontWeight: 700, color: '#000', letterSpacing: '-.3px' }}>{APP_NAME}</span>
-                </div>
-                {/* Nav links */}
-                <nav className="fin-nav-links" style={{ display: 'flex', alignItems: 'center', gap: 32, position: 'relative', zIndex: 4, paddingRight: 10 }}>
-                  <button className="fin-nav-link" style={{ fontSize: 13.5 }} onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}>Xususiyatlar</button>
-                  <button className="fin-nav-link" style={{ fontSize: 13.5 }} onClick={() => document.getElementById('about')?.scrollIntoView({ behavior: 'smooth' })}>Biz haqimizda</button>
-                  <button className="fin-nav-link" style={{ fontSize: 13.5 }} onClick={() => document.getElementById('cta')?.scrollIntoView({ behavior: 'smooth' })}>Narxlar</button>
-                </nav>
-              </div>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(239,246,255,.9)', color: '#2563eb', fontSize: 12, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', padding: '6px 16px', borderRadius: 999, border: '1px solid #BFDBFE', backdropFilter: 'blur(8px)', boxShadow: '0 2px 8px rgba(59,130,246,.1)' }}>
+              <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#3b82f6', boxShadow: '0 0 6px #3b82f6' }} />
+              POS &amp; ERP Tizim
             </div>
           </TimelineAnim>
-        </header>
 
-        {/* ── HERO TEXT CENTER ────────────────────────────────── */}
-        <div style={{ position: 'relative', zIndex: 10, textAlign: 'center', padding: '52px 24px 36px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 22 }}>
-
-          {/* H1 — large & bold, hero-financial style */}
-          <TimelineAnim delay={100}>
+          <TimelineAnim delay={130}>
             <h1 className="fin-h1" style={{
-              fontSize: 'clamp(40px, 6vw, 76px)',
-              fontWeight: 800,
-              lineHeight: 0.95,
-              letterSpacing: '-3.5px',
-              color: '#0f172a',
-              maxWidth: 1200,
+              fontSize: 'clamp(42px, 6.5vw, 84px)',
+              fontWeight: 800, lineHeight: 0.95, letterSpacing: '-3.5px',
+              color: '#0f172a', maxWidth: 1100,
             }}>
-              Do'koningiz uchun <span style={{
-                background: 'linear-gradient(135deg, #2563eb 0%, #3b82f6 50%, #60a5fa 100%)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                backgroundClip: 'text',
-              }}>zamonaviy</span><br/>
-              <span style={{
-                background: 'linear-gradient(135deg, #2563eb 0%, #3b82f6 50%, #60a5fa 100%)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                backgroundClip: 'text',
-              }}>tizim</span> — hammasi bir joyda.
+              Do'koningiz uchun <span style={{ background: 'linear-gradient(135deg, #1d4ed8 0%, #3b82f6 45%, #60a5fa 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>zamonaviy</span><br/>
+              <span style={{ background: 'linear-gradient(135deg, #1d4ed8 0%, #3b82f6 45%, #60a5fa 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>tizim</span> — hammasi bir joyda.
             </h1>
           </TimelineAnim>
 
-          {/* Subtitle — medium weight */}
-          <TimelineAnim delay={250}>
+          <TimelineAnim delay={290}>
             <p style={{
-              fontSize: 'clamp(16px, 2vw, 20px)',
-              fontWeight: 500,
-              lineHeight: 1.65,
-              color: '#334155',
-              maxWidth: 600,
-              letterSpacing: '-.1px',
+              fontSize: 'clamp(16px, 2vw, 19px)', fontWeight: 450, lineHeight: 1.72,
+              color: '#475569', maxWidth: 580, letterSpacing: '-.1px', marginTop: 8,
             }}>
-              {APP_NAME} — kassa, ombor, mijozlar va moliyaviy hisobotlarni bitta zamonaviy POS & ERP tizimida birlashtirgan platforma. Biznesingizni real vaqtda kuzating, xarajatlarni kamaytiring va daromadingizni oshiring.
+              {APP_NAME} — kassa, ombor, mijozlar va moliyaviy hisobotlarni bitta zamonaviy POS &amp; ERP tizimida birlashtirgan platforma. Biznesingizni real vaqtda kuzating, xarajatlarni kamaytiring va daromadingizni oshiring.
             </p>
           </TimelineAnim>
 
-          {/* Glass Button (button #2 from preview(2).html) */}
-          <TimelineAnim delay={400}>
-            <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
-              <GlassButton onClick={() => navigate('/login')} style={{ fontSize: 17 }}>
-                Bepul boshlash
-              </GlassButton>
-            </div>
-          </TimelineAnim>
-        </div>
-
-        {/* ── DASHBOARD MOCKUP (real dashboard look) ──────────── */}
-        <div style={{ width: '100%', maxWidth: 1400, margin: '0 auto', padding: '0 24px', position: 'relative', zIndex: 10, marginTop: 40, paddingBottom: 80 }}>
-          <TimelineAnim delay={550}>
-            <div style={{
-              width: '100%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}>
-              <LiquidGlassCard
-                glowIntensity="md"
-                shadowIntensity="lg"
-                borderRadius="32px"
-                blurIntensity="md"
-                draggable
-                className="w-full"
-                style={{ padding: '56px 48px' }}
+          <TimelineAnim delay={460}>
+            <div style={{ display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center', marginTop: 8 }}>
+              <GlassButton onClick={() => navigate('/login')} style={{ fontSize: 17 }}>Bepul boshlash</GlassButton>
+              <button
+                onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}
+                style={{ fontSize: 14, fontWeight: 600, color: '#64748b', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, padding: '12px 4px', letterSpacing: '-.1px' }}
               >
-                <DashMockup />
-              </LiquidGlassCard>
+                Xususiyatlarni ko'rish <ChevronRight size={16}/>
+              </button>
             </div>
           </TimelineAnim>
         </div>
 
-        {/* Bottom fade */}
-        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 80, background: 'linear-gradient(to top, #f7f9fc, transparent)', zIndex: 5, pointerEvents: 'none' }} />
+        {/* ── SCROLL-ZOOM MOCKUP ── */}
+        {/* Outer wrapper for ScrollTrigger pin */}
+        <div
+          ref={mockupWrapRef}
+          style={{
+            width: '100%',
+            padding: '0 24px',
+            marginTop: 10,
+            paddingBottom: 80,
+            zIndex: 10,
+            position: 'relative',
+          }}
+        >
+          {/* Inner element that GSAP animates */}
+          <div
+            ref={mockupRef}
+            style={{
+              width: '100%',
+              maxWidth: 1360,
+              margin: '0 auto',
+              // Start scaled down — GSAP animates to 1
+              transform: 'scale(0.72)',
+              opacity: 0.5,
+              transformOrigin: 'top center',
+              willChange: 'transform, opacity',
+            }}
+          >
+            {/* Glass shell — no hover effects */}
+            <div style={{
+              borderRadius: 28,
+              overflow: 'hidden',
+              background: 'rgba(255,255,255,0.35)',
+              backdropFilter: 'blur(18px)',
+              WebkitBackdropFilter: 'blur(18px)',
+              border: '1.5px solid rgba(255,255,255,0.65)',
+              boxShadow: '0 32px 80px -16px rgba(59,130,246,0.22), 0 0 0 1px rgba(255,255,255,0.4) inset',
+              padding: '40px 36px',
+            }}>
+              <DashMockup />
+            </div>
+          </div>
+        </div>
+
+        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 100, background: 'linear-gradient(to top, #f7f9fc, transparent)', zIndex: 5, pointerEvents: 'none' }} />
       </section>
 
-      {/* ══ FEATURES ══════════════════════════════════════════ */}
-      <section id="features" style={{ maxWidth: 1200, margin: '0 auto', padding: '100px 48px', position: 'relative', zIndex: 1 }}>
-        <TimelineAnim delay={0}>
+      {/* ══ FEATURES ══ */}
+      <section id="features" style={{ maxWidth: 1200, margin: '0 auto', padding: '120px 48px 100px', position: 'relative', zIndex: 1 }}>
+        <TimelineAnim>
           <div style={{ textAlign: 'center', marginBottom: 56 }}>
             <div style={{ display: 'inline-block', background: 'rgba(239,246,255,.9)', color: '#3b82f6', fontSize: 11.5, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', padding: '5px 14px', borderRadius: 999, marginBottom: 16, border: '1px solid #BFDBFE', backdropFilter: 'blur(8px)' }}>Xususiyatlar</div>
-            <h2 style={{ fontSize: 'clamp(28px,3.5vw,44px)', fontWeight: 700, letterSpacing: '-1.5px', color: '#0f172a', lineHeight: 1.15 }}>
-              Biznes uchun kerakli hamma narsa
-            </h2>
-            <p style={{ fontSize: 17, color: '#64748B', marginTop: 14, maxWidth: 480, margin: '14px auto 0', lineHeight: 1.65 }}>
-              Kichik do'kondan katta tarmoqgacha — bir tizimda.
-            </p>
+            <h2 style={{ fontSize: 'clamp(28px,3.5vw,44px)', fontWeight: 700, letterSpacing: '-1.5px', color: '#0f172a', lineHeight: 1.15 }}>Biznes uchun kerakli hamma narsa</h2>
+            <p style={{ fontSize: 17, color: '#64748B', marginTop: 14, maxWidth: 480, margin: '14px auto 0', lineHeight: 1.65 }}>Kichik do'kondan katta tarmoqgacha — bir tizimda.</p>
           </div>
         </TimelineAnim>
-
         <div className="fin-feat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 20 }}>
           {features.map((f, i) => (
             <TimelineAnim key={i} delay={i * 80}>
@@ -597,22 +589,16 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* ══ ABOUT ══════════════════════════════════════════════ */}
+      {/* ══ ABOUT ══ */}
       <section id="about" style={{ background: 'rgba(255,255,255,.7)', backdropFilter: 'blur(12px)', padding: '100px 0', position: 'relative', zIndex: 1 }}>
         <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 48px' }}>
           <TimelineAnim>
             <div className="fin-about-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 80, alignItems: 'center' }}>
               <div>
                 <div style={{ display: 'inline-block', background: '#FEF3C7', color: '#D97706', fontSize: 11, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', padding: '5px 14px', borderRadius: 999, marginBottom: 20, border: '1px solid #FDE68A' }}>Biz haqimizda</div>
-                <h2 style={{ fontSize: 'clamp(28px,3.5vw,44px)', fontWeight: 700, letterSpacing: '-1.5px', color: '#0f172a', lineHeight: 1.15, marginBottom: 20 }}>
-                  Savdo uchun<br/>yaratilgan tizim.
-                </h2>
-                <p style={{ fontSize: 16, color: '#64748B', lineHeight: 1.75, marginBottom: 20 }}>
-                  {APP_NAME} — o'zbek tadbirkorlarining haqiqiy ehtiyojlari asosida yaratilgan. Kichik do'kondan tortib katta savdo tarmog'igacha samarali ishlaydi.
-                </p>
-                <p style={{ fontSize: 16, color: '#64748B', lineHeight: 1.75 }}>
-                  Firebase bulutida saqlanadigan ma'lumotlar istalgan qurilmadan — veb-brauzer yoki Windows ilovasi orqali — bir xil ko'rinadi va sinxronlashadi.
-                </p>
+                <h2 style={{ fontSize: 'clamp(28px,3.5vw,44px)', fontWeight: 700, letterSpacing: '-1.5px', color: '#0f172a', lineHeight: 1.15, marginBottom: 20 }}>Savdo uchun<br/>yaratilgan tizim.</h2>
+                <p style={{ fontSize: 16, color: '#64748B', lineHeight: 1.75, marginBottom: 20 }}>{APP_NAME} — o'zbek tadbirkorlarining haqiqiy ehtiyojlari asosida yaratilgan. Kichik do'kondan tortib katta savdo tarmog'igacha samarali ishlaydi.</p>
+                <p style={{ fontSize: 16, color: '#64748B', lineHeight: 1.75 }}>Firebase bulutida saqlanadigan ma'lumotlar istalgan qurilmadan — veb-brauzer yoki Windows ilovasi orqali — bir xil ko'rinadi va sinxronlashadi.</p>
                 <div style={{ display: 'flex', gap: 48, marginTop: 36, flexWrap: 'wrap' }}>
                   {[{ n: '10+', l: 'Modul' }, { n: '24/7', l: 'Bulutda' }, { n: '100%', l: 'Sinxron' }].map((s, i) => (
                     <div key={i}>
@@ -640,21 +626,15 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* ══ CTA ════════════════════════════════════════════════ */}
+      {/* ══ CTA ══ */}
       <section id="cta" style={{ maxWidth: 1200, margin: '0 auto', padding: '100px 48px', position: 'relative', zIndex: 1 }}>
         <TimelineAnim>
           <div style={{ background: 'rgba(239,246,255,.8)', border: '1.5px solid #BFDBFE', borderRadius: 24, padding: '64px 48px', textAlign: 'center', position: 'relative', overflow: 'hidden', backdropFilter: 'blur(12px)', boxShadow: '0 4px 24px rgba(59,130,246,.07)' }}>
             <div style={{ display: 'inline-block', background: 'rgba(239,246,255,.9)', color: '#3b82f6', fontSize: 11, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', padding: '5px 14px', borderRadius: 999, marginBottom: 20, border: '1px solid #BFDBFE' }}>Hoziroq boshlang</div>
-            <h2 style={{ fontSize: 'clamp(32px,4.5vw,56px)', fontWeight: 700, letterSpacing: '-2.5px', color: '#0f172a', lineHeight: 1.1, marginBottom: 20, maxWidth: 600, margin: '0 auto 20px' }}>
-              Ro'yxatdan o'ting.<br/>Yuklab oling.
-            </h2>
-            <p style={{ fontSize: 16, color: '#64748B', marginBottom: 36, maxWidth: 440, margin: '0 auto 36px', lineHeight: 1.65 }}>
-              Bepul boshlang. Hech qanday kredit karta kerak emas.
-            </p>
+            <h2 style={{ fontSize: 'clamp(32px,4.5vw,56px)', fontWeight: 700, letterSpacing: '-2.5px', color: '#0f172a', lineHeight: 1.1, marginBottom: 20, maxWidth: 600, margin: '0 auto 20px' }}>Ro'yxatdan o'ting.<br/>Yuklab oling.</h2>
+            <p style={{ fontSize: 16, color: '#64748B', marginBottom: 36, maxWidth: 440, margin: '0 auto 36px', lineHeight: 1.65 }}>Bepul boshlang. Hech qanday kredit karta kerak emas.</p>
             <div style={{ display: 'flex', gap: 14, justifyContent: 'center', flexWrap: 'wrap' }}>
-              <GlassButton onClick={() => navigate('/login')} style={{ fontSize: 16 }}>
-                Veb-saytda ochish
-              </GlassButton>
+              <GlassButton onClick={() => navigate('/login')} style={{ fontSize: 16 }}>Veb-saytda ochish</GlassButton>
               <a href="/downloads/Savdogar-Setup.exe" download className="fin-nav-link"
                 style={{ padding: '13px 26px', fontSize: 14, display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,.8)', border: '1.5px solid #E2E8F0', borderRadius: 12, backdropFilter: 'blur(8px)', fontWeight: 600, color: '#0f172a', textDecoration: 'none', boxShadow: '0 2px 8px rgba(0,0,0,.05)' }}>
                 ↓ Windows (.exe) yuklab olish
@@ -665,7 +645,7 @@ export default function Landing() {
         </TimelineAnim>
       </section>
 
-      {/* ══ FOOTER ════════════════════════════════════════════ */}
+      {/* ══ FOOTER ══ */}
       <footer style={{ borderTop: '1px solid rgba(226,232,240,.6)', padding: '30px 48px', maxWidth: 1200, margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16, position: 'relative', zIndex: 1 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{ width: 26, height: 26, borderRadius: 8, background: 'linear-gradient(135deg,#3b82f6,#60a5fa)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
