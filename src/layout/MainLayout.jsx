@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
@@ -7,7 +7,20 @@ import './layout.css';
 
 const MainLayout = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isTopbarHidden, setIsTopbarHidden] = useState(false);
+  const lastScrollY = useRef(0);
   const isElectron = window.electronAPI && window.electronAPI.isElectron;
+
+  const handleScroll = (e) => {
+    if (window.innerWidth > 1024) return;
+    const currentScrollY = e.target.scrollTop;
+    if (currentScrollY > 50 && currentScrollY > lastScrollY.current) {
+      setIsTopbarHidden(true);
+    } else if (currentScrollY < lastScrollY.current - 10 || currentScrollY <= 50) {
+      setIsTopbarHidden(false);
+    }
+    lastScrollY.current = currentScrollY;
+  };
 
   const toggleSidebar = () => {
     setIsSidebarOpen(!isSidebarOpen);
@@ -30,8 +43,10 @@ const MainLayout = () => {
         <Sidebar isOpen={isSidebarOpen} closeSidebar={closeSidebar} />
         
         <div className="main-content">
-          <Topbar toggleSidebar={toggleSidebar} />
-          <main className="page-content">
+          <div className={`topbar-wrapper ${isTopbarHidden ? 'hidden' : ''}`}>
+            <Topbar toggleSidebar={toggleSidebar} />
+          </div>
+          <main className="page-content" onScroll={handleScroll}>
             <Outlet />
           </main>
         </div>

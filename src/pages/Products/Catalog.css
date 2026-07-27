@@ -177,6 +177,8 @@
     flex-direction: column;
     align-items: stretch;
     padding: 14px;
+    top: -1rem;
+    z-index: 40;
   }
 
   .catalog-search-wrap {
