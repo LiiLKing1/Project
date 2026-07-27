@@ -120,6 +120,16 @@ export const RolesProvider = ({ children }) => {
         let status = 'pending';
 
         if (!ownerDocSnap.exists()) {
+          const pendingData = {
+            uid: currentUser.uid,
+            email: currentUser.email,
+            displayName: currentUser.displayName || currentUser.email?.split('@')[0] || 'Admin',
+            role: 'owner',
+            status: 'pending',
+            emailVerified: currentUser.emailVerified || false,
+            createdAt: new Date().toISOString()
+          };
+          
           // Tizimga birinchi marta kirganda Firebase'ga yozilmaydi, Drive'dagi pending_users ga yoziladi
           if (window.electronAPI && window.electronAPI.syncToDrive) {
             window.electronAPI.syncToDrive({
@@ -127,16 +137,19 @@ export const RolesProvider = ({ children }) => {
               collectionName: 'pending_users',
               docId: currentUser.uid,
               action: 'CREATE',
-              data: {
-                uid: currentUser.uid,
-                email: currentUser.email,
-                displayName: currentUser.displayName || currentUser.email?.split('@')[0] || 'Admin',
-                role: 'owner',
-                status: 'pending',
-                emailVerified: currentUser.emailVerified || false,
-                createdAt: new Date().toISOString()
-              }
+              data: pendingData
             });
+          } else {
+            // Vercel orqali brauzerdan Drive'ga yozish
+            try {
+              await fetch('/api/register-pending', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userData: pendingData })
+              });
+            } catch (err) {
+              console.error("Vercel API xatosi:", err);
+            }
           }
         } else {
           status = ownerDocSnap.data().status || 'pending';

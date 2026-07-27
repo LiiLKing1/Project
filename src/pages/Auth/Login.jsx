@@ -88,6 +88,16 @@ const Login = () => {
         // Owner logic
         if (isSignup) {
           const userCredential = await signup(email, password);
+          const pendingData = {
+            uid: userCredential.user.uid,
+            email: email,
+            displayName: name,
+            role: 'owner',
+            status: 'pending',
+            emailVerified: false,
+            createdAt: new Date().toISOString()
+          };
+          
           // Firebase'ga yozilmaydi, faqat Drive'dagi pending_users ga yoziladi
           if (window.electronAPI && window.electronAPI.syncToDrive) {
             window.electronAPI.syncToDrive({
@@ -95,16 +105,19 @@ const Login = () => {
               collectionName: 'pending_users',
               docId: userCredential.user.uid,
               action: 'CREATE',
-              data: {
-                uid: userCredential.user.uid,
-                email: email,
-                displayName: name,
-                role: 'owner',
-                status: 'pending',
-                emailVerified: false,
-                createdAt: new Date().toISOString()
-              }
+              data: pendingData
             });
+          } else {
+            // Vercel orqali brauzerdan Drive'ga yozish
+            try {
+              await fetch('/api/register-pending', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userData: pendingData })
+              });
+            } catch (err) {
+              console.error("Vercel API xatosi:", err);
+            }
           }
           
           await sendEmailVerification(userCredential.user);
