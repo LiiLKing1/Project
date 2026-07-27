@@ -71,6 +71,27 @@ function App() {
     setIsLoading(false);
   };
 
+  // Tizim tiklash uchun vaqtinchalik Admin yaratish funksiyasi
+  const handleAdminSignup = async () => {
+    if(!email || !password) return alert("Email va parolni kiriting");
+    setIsLoading(true);
+    try {
+      const userCred = await createUserWithEmailAndPassword(auth, email, password);
+      await setDoc(doc(db, 'users', userCred.user.uid), {
+        email: email,
+        displayName: 'Asosiy Admin',
+        role: 'owner',
+        status: 'active',
+        emailVerified: true,
+        createdAt: new Date().toISOString()
+      });
+      alert("Asosiy Admin hisobi muvaffaqiyatli tiklandi! Endi bemalol ishlatsangiz bo'ladi.");
+    } catch (err) {
+      alert("Xatolik: " + err.message);
+    }
+    setIsLoading(false);
+  };
+
   const handleCreateUser = async (e) => {
     e.preventDefault();
     setIsLoading(true);
@@ -161,6 +182,22 @@ function App() {
             <input type="password" placeholder="Parol" value={password} onChange={e => setPassword(e.target.value)} required />
             <button type="submit" disabled={isLoading}>{isLoading ? 'Yuklanmoqda...' : 'Kirish'}</button>
           </form>
+          
+          <div style={{marginTop: '1rem', textAlign: 'center'}}>
+            <p style={{fontSize: '0.85rem', color: '#6b7280', marginBottom: '0.5rem'}}>
+              Barcha akkauntlar o'chib ketgan bo'lsa:
+            </p>
+            <button 
+              type="button" 
+              onClick={handleAdminSignup}
+              style={{
+                background: 'transparent', border: '1px dashed #8052ff', color: '#8052ff', 
+                padding: '0.5rem 1rem', borderRadius: '0.5rem', cursor: 'pointer', fontSize: '0.85rem'
+              }}
+            >
+              Yangi Asosiy Admin Yaratish
+            </button>
+          </div>
         </div>
       </div>
     );
