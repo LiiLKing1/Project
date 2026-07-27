@@ -18,6 +18,9 @@ const Revaluation = () => {
   const [unit, setUnit] = useState('percent'); // 'percent' or 'fixed'
   const [targetPrice, setTargetPrice] = useState('sellPrice'); // 'sellPrice' or 'costPrice'
   const [direction, setDirection] = useState('increase'); // 'increase' or 'decrease'
+  
+  const [visibleCount, setVisibleCount] = useState(30);
+  const loadMoreRef = React.useRef(null);
 
   const { userProfile } = useRoles();
   const { addToast } = useToast();
@@ -36,6 +39,25 @@ const Revaluation = () => {
     p.status === 'active' && 
     (p.name.toLowerCase().includes(search.toLowerCase()) || (p.barcode || '').includes(search))
   );
+
+  useEffect(() => {
+    setVisibleCount(30);
+  }, [search]);
+
+  useEffect(() => {
+    if (!loadMoreRef.current) return;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting) {
+        setVisibleCount(prev => {
+          if (prev < filteredProducts.length) return prev + 30;
+          return prev;
+        });
+      }
+    }, { rootMargin: '300px' });
+    
+    observer.observe(loadMoreRef.current);
+    return () => observer.disconnect();
+  }, [filteredProducts.length]);
 
   const toggleSelectAll = () => {
     if (selectedIds.length === filteredProducts.length) {
@@ -164,7 +186,7 @@ const Revaluation = () => {
                 </tr>
               </thead>
               <tbody>
-                {filteredProducts.map(p => (
+                {filteredProducts.slice(0, visibleCount).map(p => (
                   <tr key={p.id} style={{ backgroundColor: selectedIds.includes(p.id) ? '#F4F8FF' : 'transparent' }}>
                     <td style={{ textAlign: 'center' }}>
                       <div onClick={() => toggleSelect(p.id)} style={{ cursor: 'pointer', color: selectedIds.includes(p.id) ? '#4A90E2' : '#8A9BB5' }}>
@@ -188,6 +210,11 @@ const Revaluation = () => {
                 ))}
               </tbody>
             </table>
+            {visibleCount < filteredProducts.length && (
+              <div ref={loadMoreRef} style={{ height: '40px', display: 'flex', justifyContent: 'center', alignItems: 'center', color: '#8A9BB5' }}>
+                Yuklanmoqda...
+              </div>
+            )}
           </div>
         </div>
 

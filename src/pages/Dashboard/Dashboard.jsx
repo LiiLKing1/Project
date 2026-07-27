@@ -80,7 +80,14 @@ const Dashboard = () => {
     const d = new Date(s.createdAt);
     if (timeFilter === 'kecha') { const y = new Date(now); y.setDate(y.getDate()-1); return d.toDateString()===y.toDateString(); }
     if (timeFilter === 'bugun') return d.toDateString() === now.toDateString();
-    if (timeFilter === 'hafta') return (now-d)/864e5 <= 7;
+    if (timeFilter === 'hafta') {
+      const curr = new Date();
+      const day = curr.getDay();
+      const diff = curr.getDate() - day + (day === 0 ? -6 : 1);
+      const startOfWeek = new Date(curr.setDate(diff));
+      startOfWeek.setHours(0,0,0,0);
+      return d >= startOfWeek;
+    }
     if (timeFilter === 'oy')   return d.getMonth()===now.getMonth() && d.getFullYear()===now.getFullYear();
     if (timeFilter === 'yil')  return d.getFullYear()===now.getFullYear();
     return true;
@@ -112,6 +119,14 @@ const Dashboard = () => {
     });
     return { totalCost: costAcc, grossProfit: profitAcc };
   }, [filteredSales, productsMap]);
+
+  const totalInventoryCost = useMemo(() => {
+    return products.reduce((acc, p) => {
+      if (p.status === 'archived') return acc;
+      const stock = Number(p.stockByWarehouse?.[selectedWarehouseId] || 0);
+      return acc + (Math.max(0, stock) * Number(p.costPrice || 0));
+    }, 0);
+  }, [products, selectedWarehouseId]);
 
   const profitMarginPct = revenue > 0 ? Math.round((grossProfit / revenue) * 100) : 0;
 
@@ -147,16 +162,18 @@ const Dashboard = () => {
   /* chart data */
   const chartBars = useMemo(() => {
     if (timeFilter==='hafta') {
-      const DAYS = ['Yak','Du','Se','Chor','Pay','Ju','Shan'];
+      const DAYS = ['Du','Se','Chor','Pay','Ju','Shan','Yak'];
+      const jsDays = [1, 2, 3, 4, 5, 6, 0];
       const map = {}; DAYS.forEach(d=>map[d]=0);
-      filteredSales.forEach(s => { const k=DAYS[new Date(s.createdAt).getDay()]; if(map[k]!==undefined) map[k]+=Number(s.finalTotal||0); });
-      const result = [];
-      for (let i = 6; i >= 0; i--) {
-        const d = new Date(now); d.setDate(d.getDate() - i);
-        const name = DAYS[d.getDay()];
-        result.push({ name, jami: map[name], active: i === 0 });
-      }
-      return result;
+      
+      filteredSales.forEach(s => { 
+        const dayIdx = new Date(s.createdAt).getDay();
+        const k = DAYS[jsDays.indexOf(dayIdx)]; 
+        if(map[k]!==undefined) map[k]+=Number(s.finalTotal||0); 
+      });
+      
+      const todayName = DAYS[jsDays.indexOf(new Date().getDay())];
+      return DAYS.map(name => ({ name, jami: map[name], active: name === todayName }));
     }
     if (timeFilter==='oy') {
       const dim = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
@@ -221,8 +238,8 @@ const Dashboard = () => {
       onClick: () => navigate('/sales'),
     },
     {
-      label: 'Tovarlar Tannarxi',
-      value: <CurrencyDisplay amount={totalCost} />,
+      label: 'Ombor Qoldig\'i (Tannarx)',
+      value: <CurrencyDisplay amount={totalInventoryCost} />,
       icon: '📦',
       iconBg: 'rgba(239,68,68,.3)',
       foot: `${products.length} ta mahsulot`,
