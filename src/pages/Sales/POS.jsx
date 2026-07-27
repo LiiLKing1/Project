@@ -457,7 +457,7 @@ const POS = () => {
   }, [isCartDrawerOpen, isMobile]);
 
   return (
-    <div className="pos-layout" style={{ overflow: 'hidden', display: isMobile ? 'block' : undefined }}>
+    <div className="pos-layout" style={{ overflow: 'hidden', height: '100%', display: isMobile ? 'flex' : undefined, flexDirection: isMobile ? 'column' : undefined }}>
       {/* Products Section */}
       <motion.div 
         className="flex-col pos-products-wrapper" 
@@ -468,7 +468,7 @@ const POS = () => {
           opacity: isMobile && isCartDrawerOpen ? 0.3 : 1 
         }}
         transition={{ type: 'spring', damping: 26, stiffness: 220 }}
-        style={{ gap: '1.5rem', overflow: 'hidden' }}
+        style={{ gap: '1.5rem', overflow: 'hidden', height: '100%', flex: 1, display: 'flex', flexDirection: 'column' }}
       >
           <div className="flex-between">
             <h1 className="h1">Sotuv Oynasi</h1>
@@ -497,7 +497,7 @@ const POS = () => {
             </div>
           </div>
 
-          <div className="pos-products-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1rem', overflowY: 'auto', paddingRight: '1rem', paddingBottom: '2rem' }}>
+          <div className="pos-products-grid" style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1rem', overflowY: 'auto', paddingRight: '1rem', paddingBottom: '2rem' }}>
             {filteredProducts.map(p => (
               <div key={p.id} className="glass-panel" onClick={() => addToCart(p)} style={{ padding: '1rem', cursor: p.stock > 0 ? 'pointer' : 'not-allowed', opacity: p.stock > 0 ? 1 : 0.5, transition: 'transform 0.1s' }} onMouseDown={e => p.stock > 0 && (e.currentTarget.style.transform = 'scale(0.98)')} onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'}>
                 <div style={{ fontWeight: '600', marginBottom: '0.5rem', fontSize: '1rem' }}>{p.name}</div>
