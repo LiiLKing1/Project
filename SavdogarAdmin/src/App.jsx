@@ -14,7 +14,6 @@ function App() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [usersList, setUsersList] = useState([]);
-  const [pendingUsers, setPendingUsers] = useState([]);
   const [search, setSearch] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -43,19 +42,7 @@ function App() {
       setUsersList(docs);
     });
     
-    // 2. Fetch Pending Waitlist from Google Drive (via Vercel API)
-    const fetchPending = async () => {
-      try {
-        const res = await fetch('/api/pending-users');
-        if (res.ok) {
-          const data = await res.json();
-          setPendingUsers(data.users || []);
-        }
-      } catch (err) {
-        console.error("Pending users fetch error:", err);
-      }
-    };
-    fetchPending();
+    // Barcha foydalanuvchilar (pending va active) Firebase'dan olinadi
     
     return () => unsub();
   }, [user]);
@@ -127,42 +114,10 @@ function App() {
     try {
       if (newStatus === 'deleted') {
         if(window.confirm("Rostdan ham bu arizani o'chirib yubormoqchimisiz?")) {
-          if (userObj.fileId) {
-             // It's a pending user from Drive
-             await fetch('/api/approve-user', {
-               method: 'POST',
-               headers: { 'Content-Type': 'application/json' },
-               body: JSON.stringify({ fileId: userObj.fileId })
-             });
-             setPendingUsers(prev => prev.filter(u => u.id !== userObj.id));
-          } else {
-             // It's in Firebase
-             const { deleteDoc } = await import('firebase/firestore');
-             await deleteDoc(doc(db, 'users', userObj.id));
-          }
+          const { deleteDoc } = await import('firebase/firestore');
+          await deleteDoc(doc(db, 'users', userObj.id));
           alert("Ariza o'chirildi!");
         }
-        return;
-      }
-      
-      if (newStatus === 'active' && userObj.fileId) {
-        // APPROVE: Create in Firebase, then delete from Drive
-        await setDoc(doc(db, 'users', userObj.uid || userObj.id), {
-          email: userObj.email,
-          displayName: userObj.displayName || 'Noma\'lum',
-          role: 'owner',
-          status: 'active',
-          emailVerified: userObj.emailVerified || false,
-          createdAt: userObj.createdAt || new Date().toISOString()
-        });
-        
-        await fetch('/api/approve-user', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ fileId: userObj.fileId })
-        });
-        setPendingUsers(prev => prev.filter(u => u.id !== userObj.id));
-        alert("Foydalanuvchi muvaffaqiyatli tasdiqlandi!");
         return;
       }
       
@@ -203,8 +158,7 @@ function App() {
     );
   }
 
-  const combinedUsers = [...pendingUsers, ...usersList];
-  const filteredUsers = combinedUsers.filter(u => 
+  const filteredUsers = usersList.filter(u => 
     (u.displayName?.toLowerCase() || '').includes(search.toLowerCase()) ||
     (u.email?.toLowerCase() || '').includes(search.toLowerCase())
   );

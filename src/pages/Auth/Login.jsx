@@ -98,27 +98,8 @@ const Login = () => {
             createdAt: new Date().toISOString()
           };
           
-          // Firebase'ga yozilmaydi, faqat Drive'dagi pending_users ga yoziladi
-          if (window.electronAPI && window.electronAPI.syncToDrive) {
-            window.electronAPI.syncToDrive({
-              storeId: 'admin',
-              collectionName: 'pending_users',
-              docId: userCredential.user.uid,
-              action: 'CREATE',
-              data: pendingData
-            });
-          } else {
-            // Vercel orqali brauzerdan Drive'ga yozish
-            try {
-              await fetch('/api/register-pending', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userData: pendingData })
-              });
-            } catch (err) {
-              console.error("Vercel API xatosi:", err);
-            }
-          }
+          // Firebase'ga 'pending' status bilan yozamiz (Admin tasdiqlashi uchun)
+          await setDoc(doc(db, "users", userCredential.user.uid), pendingData);
           
           await sendEmailVerification(userCredential.user);
           addToast("Muvaffaqiyatli ro'yxatdan o'tdingiz. Emailingizga tasdiqlash xati yuborildi. Iltimos pochtangizni tekshiring", "success");

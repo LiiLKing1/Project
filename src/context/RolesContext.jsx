@@ -130,27 +130,8 @@ export const RolesProvider = ({ children }) => {
             createdAt: new Date().toISOString()
           };
           
-          // Tizimga birinchi marta kirganda Firebase'ga yozilmaydi, Drive'dagi pending_users ga yoziladi
-          if (window.electronAPI && window.electronAPI.syncToDrive) {
-            window.electronAPI.syncToDrive({
-              storeId: 'admin',
-              collectionName: 'pending_users',
-              docId: currentUser.uid,
-              action: 'CREATE',
-              data: pendingData
-            });
-          } else {
-            // Vercel orqali brauzerdan Drive'ga yozish
-            try {
-              await fetch('/api/register-pending', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userData: pendingData })
-              });
-            } catch (err) {
-              console.error("Vercel API xatosi:", err);
-            }
-          }
+          // Tizimga birinchi marta kirganda Firebase'ga 'pending' status bilan yoziladi
+          await setDoc(doc(db, "users", currentUser.uid), pendingData);
         } else {
           status = ownerDocSnap.data().status || 'pending';
         }
@@ -165,12 +146,9 @@ export const RolesProvider = ({ children }) => {
           createdAt: new Date().toISOString()
         };
         
-        // Tizimda mavjud bo'lmasa, profillarni ham faqat Drive ga tashlaymiz yoki o'tkazib yuboramiz.
-        if (ownerDocSnap.exists()) {
-          await setDoc(adminProfileRef, newAdminProfile);
-          const rolesRef = doc(db, `users/${currentUser.uid}/settings/roles`);
-          await setDoc(rolesRef, DEFAULT_ROLES);
-        }
+        await setDoc(adminProfileRef, newAdminProfile);
+        const rolesSettingsRef = doc(db, `users/${currentUser.uid}/settings/roles`);
+        await setDoc(rolesSettingsRef, DEFAULT_ROLES);
 
         setUserProfile(newAdminProfile);
         localStorage.setItem('userProfile', JSON.stringify(newAdminProfile));
