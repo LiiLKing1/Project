@@ -14,7 +14,6 @@ import Receipt from '../../components/Receipt';
 import CurrencyDisplay from '../../components/CurrencyDisplay';
 import AnimatedNumber from '../../components/AnimatedNumber';
 import { motion, AnimatePresence } from 'framer-motion';
-import { motion, AnimatePresence } from 'framer-motion';
 
 const normalizeSearchText = (text) => (text || '').toLowerCase().replace(/х/g, 'x').replace(/Х/g, 'x');
 
