@@ -599,8 +599,8 @@ const POS = () => {
 
       {/* Cart Section Desktop */}
       {!isMobile && (
-        <div className="glass-panel flex-col" style={{ width: 'auto', height: '100%', display: 'flex' }}>
-          <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <div className="glass-panel flex-col" style={{ width: 'auto', height: '100%', display: 'flex', overflow: 'hidden' }}>
+          <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '1rem', flexShrink: 0 }}>
             <div className="flex-between">
               <h2 className="h2">Savat</h2>
             </div>
@@ -657,7 +657,7 @@ const POS = () => {
             </div>
           </div>
           
-          <div style={{ flex: 1, overflowY: 'auto', padding: '1rem' }}>
+          <div style={{ flex: 1, overflowY: 'auto', padding: '1rem', minHeight: 0 }}>
             {cart.length === 0 ? (
               <div className="flex-center" style={{ height: '100%', color: 'var(--text-secondary)' }}>Savat bo'sh</div>
             ) : (
@@ -706,7 +706,7 @@ const POS = () => {
             )}
           </div>
 
-          <div style={{ padding: '1.5rem', borderTop: '1px solid var(--border-color)', backgroundColor: 'var(--bg-main)' }}>
+          <div style={{ padding: '1.5rem', borderTop: '1px solid var(--border-color)', backgroundColor: 'var(--bg-main)', flexShrink: 0 }}>
             <div className="flex-between" style={{ marginBottom: '1.5rem' }}>
               <span style={{ fontSize: '1.25rem', color: 'var(--text-secondary)', fontWeight: 500 }}>Jami summa:</span>
               <span className="h1" style={{ color: 'var(--primary)', fontSize: '2rem' }}><CurrencyDisplay amount={subtotal} /></span>
