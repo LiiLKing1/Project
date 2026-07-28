@@ -728,9 +728,9 @@ const POS = () => {
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
             transition={{ type: 'spring', damping: 26, stiffness: 220 }}
-            style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999, background: '#f8fafc', display: 'flex', flexDirection: 'column' }}
+            style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999, background: '#f8fafc', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
           >
-            <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '1rem', background: '#fff' }}>
+            <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '1rem', background: '#fff', flexShrink: 0 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <h2 className="h2" style={{ margin: 0 }}>Savat</h2>
                 <button className="btn btn-ghost" onClick={() => setIsCartDrawerOpen(false)} style={{ padding: '8px', color: 'var(--text-secondary)' }}>
@@ -775,7 +775,7 @@ const POS = () => {
               </div>
             </div>
             
-            <div style={{ flex: 1, overflowY: 'auto', padding: '1rem' }}>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '1rem', minHeight: 0, WebkitOverflowScrolling: 'touch' }}>
               {cart.length === 0 ? (
                 <div className="flex-center" style={{ height: '100%', color: 'var(--text-secondary)' }}>Savat bo'sh</div>
               ) : (
@@ -801,7 +801,7 @@ const POS = () => {
               )}
             </div>
 
-            <div style={{ padding: '1.5rem', borderTop: '1px solid var(--border-color)', backgroundColor: '#fff' }}>
+            <div style={{ padding: '1.5rem', borderTop: '1px solid var(--border-color)', backgroundColor: '#fff', flexShrink: 0 }}>
               <div className="flex-between" style={{ marginBottom: '1.5rem' }}>
                 <span style={{ fontSize: '1.25rem', color: 'var(--text-secondary)', fontWeight: 500 }}>Jami summa:</span>
                 <span className="h1" style={{ color: 'var(--primary)', fontSize: '2rem' }}><CurrencyDisplay amount={subtotal} /></span>
