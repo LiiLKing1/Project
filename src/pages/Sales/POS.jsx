@@ -14,7 +14,39 @@ import Receipt from '../../components/Receipt';
 import CurrencyDisplay from '../../components/CurrencyDisplay';
 import AnimatedNumber from '../../components/AnimatedNumber';
 import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 
+const normalizeSearchText = (text) => (text || '').toLowerCase().replace(/х/g, 'x').replace(/Х/g, 'x');
+
+const HighlightText = ({ text, search }) => {
+  if (!search || !search.trim()) return <span>{text}</span>;
+  const searchTerms = normalizeSearchText(search).trim().split(/\s+/).filter(Boolean);
+  if (searchTerms.length === 0) return <span>{text}</span>;
+
+  const normText = normalizeSearchText(text);
+  const regex = new RegExp(`(${searchTerms.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`, 'gi');
+  
+  let parts = [];
+  let lastIndex = 0;
+  
+  normText.replace(regex, (match, p1, offset) => {
+    if (offset > lastIndex) {
+      parts.push({ text: text.substring(lastIndex, offset), highlight: false });
+    }
+    parts.push({ text: text.substring(offset, offset + match.length), highlight: true });
+    lastIndex = offset + match.length;
+  });
+  
+  if (lastIndex < text.length) {
+    parts.push({ text: text.substring(lastIndex), highlight: false });
+  }
+  
+  return (
+    <span>
+      {parts.map((p, i) => p.highlight ? <span key={i} style={{backgroundColor: '#FFE066', padding: '0 2px', borderRadius: '2px', color: '#1A2538'}}>{p.text}</span> : <span key={i}>{p.text}</span>)}
+    </span>
+  );
+};
 
 const POS = () => {
   const [allProducts, setAllProducts] = useState([]);
@@ -265,9 +297,10 @@ const POS = () => {
   const mDebt = Math.max(0, mDiff);
   const mChange = Math.max(0, -mDiff);
 
-  const searchTerms = search.toLowerCase().trim().split(/\s+/);
-  const filteredProducts = products.filter(p => {
-    const lowerName = (p.name || '').toLowerCase();
+  const searchTerms = normalizeSearchText(search).trim().split(/\s+/);
+  const filteredProducts = allProducts.filter(p => {
+    if (p.status === 'archived') return false;
+    const lowerName = normalizeSearchText(p.name);
     const barcode = p.barcode || '';
     if (!search.trim()) return true;
     return searchTerms.every(term => lowerName.includes(term) || barcode.includes(term));
@@ -547,11 +580,11 @@ const POS = () => {
 
           <div className="pos-products-grid" onScroll={handleGridScroll} style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1rem', overflowY: 'auto', paddingRight: '1rem', paddingBottom: '2rem' }}>
             {filteredProducts.slice(0, visibleCount).map(p => (
-              <motion.div key={p.id} className="glass-panel" onClick={() => addToCart(p)} whileTap={{ scale: p.stock > 0 ? 0.95 : 1 }} style={{ padding: '1rem', cursor: p.stock > 0 ? 'pointer' : 'not-allowed', opacity: p.stock > 0 ? 1 : 0.5 }}>
-                <div style={{ fontWeight: '600', marginBottom: '0.5rem', fontSize: '1rem' }}>{p.name}</div>
-                <div style={{ color: 'var(--primary)', fontWeight: '700', fontSize: '1.125rem' }}><CurrencyDisplay amount={p.sellPrice} /></div>
+              <motion.div key={p.id} className="glass-panel" onClick={() => addToCart(p)} whileTap={{ scale: p.stock > 0 ? 0.94 : 1, backgroundColor: p.stock > 0 ? '#EAF4FC' : '' }} style={{ padding: '1rem', cursor: p.stock > 0 ? 'pointer' : 'not-allowed', opacity: p.stock > 0 ? 1 : 0.5, transition: 'background-color 0.2s' }}>
+                <div style={{ fontWeight: '600', marginBottom: '0.5rem', fontSize: '1rem' }}><HighlightText text={p.name} search={search} /></div>
+                <div style={{ color: 'var(--primary)', fontWeight: '700', fontSize: '1.125rem' }}><CurrencyDisplay amount={p.sellPrice} isSell /></div>
                 <div className="flex-between" style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
-                  <span>{p.barcode}</span>
+                  <span><HighlightText text={p.barcode} search={search} /></span>
                   <span style={{ fontWeight: 600, color: p.stock <= p.minStock ? 'var(--danger)' : 'var(--success)', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
                     Qoldiq: <AnimatedNumber value={p.stock} />
                   </span>
@@ -631,21 +664,8 @@ const POS = () => {
                     <div>
                       <div style={{ fontWeight: '500' }}>{item.name}</div>
                       <div style={{ color: 'var(--primary)', fontWeight: '600', fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem' }}>
-                        <input 
-                          type="number"
-                          value={item.sellPrice}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setCart(prev => prev.map(p => p.id === item.id ? { ...p, sellPrice: val } : p));
-                          }}
-                          onBlur={(e) => {
-                            let num = Number(e.target.value);
-                            if (isNaN(num) || num < 0) num = 0;
-                            setCart(prev => prev.map(p => p.id === item.id ? { ...p, sellPrice: num } : p));
-                          }}
-                          style={{ width: '80px', padding: '2px 4px', border: '1px solid var(--border-color)', borderRadius: '4px', color: 'inherit', fontWeight: 'inherit', background: 'transparent' }}
-                        /> 
-                        <span style={{color: 'var(--text-secondary)'}}>x {item.qty} =</span> <CurrencyDisplay amount={item.sellPrice * item.qty} />
+                        <CurrencyDisplay amount={item.sellPrice} isSell />
+                        <span style={{color: 'var(--text-secondary)'}}>x {item.qty} =</span> <CurrencyDisplay amount={item.sellPrice * item.qty} isSell />
                       </div>
                     </div>
                     <div className="flex-center" style={{ gap: '0.5rem' }}>
@@ -762,21 +782,8 @@ const POS = () => {
                       <div>
                         <div style={{ fontWeight: '500' }}>{item.name}</div>
                         <div style={{ color: 'var(--primary)', fontWeight: '600', fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem' }}>
-                          <input 
-                            type="number"
-                            value={item.sellPrice}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              setCart(prev => prev.map(p => p.id === item.id ? { ...p, sellPrice: val } : p));
-                            }}
-                            onBlur={(e) => {
-                              let num = Number(e.target.value);
-                              if (isNaN(num) || num < 0) num = 0;
-                              setCart(prev => prev.map(p => p.id === item.id ? { ...p, sellPrice: num } : p));
-                            }}
-                            style={{ width: '80px', padding: '2px 4px', border: '1px solid var(--border-color)', borderRadius: '4px', color: 'inherit', fontWeight: 'inherit', background: 'transparent' }}
-                          /> 
-                          <span style={{color: 'var(--text-secondary)'}}>x {item.qty} =</span> <CurrencyDisplay amount={item.sellPrice * item.qty} />
+                          <CurrencyDisplay amount={item.sellPrice} isSell />
+                          <span style={{color: 'var(--text-secondary)'}}>x {item.qty} =</span> <CurrencyDisplay amount={item.sellPrice * item.qty} isSell />
                         </div>
                       </div>
                       <div className="flex-center" style={{ gap: '0.5rem' }}>
@@ -866,17 +873,17 @@ const POS = () => {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                padding: '20px',
+                padding: isMobile ? 0 : '20px',
                 pointerEvents: 'none',
               }}
             >
               <div className="pos-payment-drawer" style={{
                 width: '100%',
                 maxWidth: '960px',
-                height: 'calc(100vh - 40px)',
-                maxHeight: '700px',
+                height: isMobile ? '100%' : 'calc(100vh - 40px)',
+                maxHeight: isMobile ? '100%' : '700px',
                 background: '#F4F8FF',
-                borderRadius: '28px',
+                borderRadius: isMobile ? '0' : '28px',
                 boxShadow: '0 40px 100px -20px rgba(0,0,0,0.45)',
                 display: 'flex',
                 overflow: 'hidden',
@@ -985,7 +992,7 @@ const POS = () => {
                       <div>
                         <div style={{ fontSize: 12, opacity: 0.8, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Yakuniy summa</div>
                         <div style={{ fontSize: 28, fontWeight: 900, letterSpacing: '-1px', marginTop: 2 }}>
-                          <CurrencyDisplay amount={finalTotal} />
+                          <CurrencyDisplay amount={finalTotal} isSell />
                         </div>
                       </div>
                       <div style={{ width: 52, height: 52, borderRadius: '16px', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

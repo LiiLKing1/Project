@@ -2,10 +2,12 @@ import React from 'react';
 import { useSettings } from '../context/SettingsContext';
 import AnimatedNumber from './AnimatedNumber';
 
-const CurrencyDisplay = ({ amount, overrideCurrency }) => {
+const CurrencyDisplay = ({ amount, overrideCurrency, isCost, isSell }) => {
   const { settings } = useSettings();
   
-  const currency = overrideCurrency || settings.currency || 'UZS';
+  let currency = overrideCurrency || settings.currency || 'UZS';
+  if (isCost && settings.costCurrency) currency = settings.costCurrency;
+  if (isSell && settings.sellCurrency) currency = settings.sellCurrency;
   const showUsdConversion = settings.showUsdConversion;
   const usdRate = settings.usdRate || 12500;
   const rubRate = settings.rubRate || 140;

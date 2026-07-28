@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings as SettingsIcon, Save, Store, Globe, LogOut, Gift } from 'lucide-react';
+import { Settings as SettingsIcon, Save, Store, Globe, LogOut, Gift, Trash2, AlertTriangle } from 'lucide-react';
 import CustomSelect from '../../components/CustomSelect';
 import { db } from '../../firebase';
 import { doc, onSnapshot, collection, getDocs, writeBatch, setDoc } from '../../services/firebaseMock';
@@ -26,6 +26,10 @@ const Settings = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
   const [logoutConfirmText, setLogoutConfirmText] = useState('');
+  
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState('all'); // 'all', 'products', 'sales'
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
   
   const { addToast } = useToast();
   const { userProfile } = useRoles();
@@ -106,31 +110,51 @@ const Settings = () => {
 
   const handleRunMigration = async () => {
     if (!storeId) return;
-    if (!(await confirm({ message: "Barcha mahsulotlarning 'stock' qoldig'i yangi 'Filiallar (Multi-Warehouse)' tizimiga o'tkaziladi. Buni faqat bir marta bajaring! Zaxira (Export) olganmisiz?" }))) return;
-    
+    const ok = await confirm({ title: 'Diqqat', message: "Barcha mahsulotlarning 'stock' maydonlari multi-warehouse formatiga o'tkaziladi. Ishonchingiz komilmi?", confirmText: 'Ha, boshlash' });
+    if (!ok) return;
     setIsSaving(true);
     try {
-      const warehouseRef = doc(db, `users/${storeId}/warehouses`, 'main');
-      await setDoc(warehouseRef, { name: 'Asosiy Filial', createdAt: new Date().toISOString() }, { merge: true });
-
-      const prodSnap = await getDocs(collection(db, `users/${storeId}/products`));
-      
+      const snap = await getDocs(collection(db, `users/${storeId}/products`));
       const batch = writeBatch(db);
-      let count = 0;
-      prodSnap.docs.forEach(d => {
+      snap.docs.forEach(d => {
         const data = d.data();
-        if (data.stock !== undefined && !data.stockByWarehouse) {
-           batch.update(d.ref, {
-             stockByWarehouse: { 'main': data.stock || 0 }
-           });
-           count++;
+        let oldStock = Number(data.stock) || 0;
+        let stockByW = data.stockByWarehouse || {};
+        if (Object.keys(stockByW).length === 0) {
+          stockByW['main-warehouse'] = oldStock;
+          batch.update(doc(db, `users/${storeId}/products/${d.id}`), { stockByW });
         }
       });
       await batch.commit();
+      addToast("Migratsiya muvaffaqiyatli yakunlandi", "success");
+    } catch(e) {
+      addToast(e.message, 'error');
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
-      addToast(`Migratsiya yakunlandi. ${count} ta mahsulot yangilandi.`, "success");
-    } catch (err) {
-      addToast(err.message, "error");
+  const handleDeleteData = async () => {
+    if (!storeId) return;
+    setIsSaving(true);
+    try {
+      if (deleteTarget === 'products' || deleteTarget === 'all') {
+        const snap = await getDocs(collection(db, `users/${storeId}/products`));
+        const batch = writeBatch(db);
+        snap.docs.forEach(d => batch.delete(d.ref));
+        await batch.commit();
+      }
+      if (deleteTarget === 'sales' || deleteTarget === 'all') {
+        const snap = await getDocs(collection(db, `users/${storeId}/sales`));
+        const batch = writeBatch(db);
+        snap.docs.forEach(d => batch.delete(d.ref));
+        await batch.commit();
+      }
+      addToast("Ma'lumotlar muvaffaqiyatli o'chirildi", "success");
+      setIsDeleteModalOpen(false);
+      setDeleteConfirmText('');
+    } catch (e) {
+      addToast(e.message, 'error');
     } finally {
       setIsSaving(false);
     }
@@ -256,27 +280,94 @@ const Settings = () => {
           </div>
         </div>
 
-        {/* Xavfsizlik (Sign Out) */}
+        {/* Xavfsizlik (Sign Out va O'chirish) */}
         <div style={{ marginTop: '16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px', borderBottom: '1px solid #DCE8F5', paddingBottom: '12px' }}>
             <div style={{ width: 36, height: 36, borderRadius: '10px', backgroundColor: '#FEF2F2', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#EF4B4B' }}>
-              <LogOut size={20} />
+              <AlertTriangle size={20} />
             </div>
-            <h2 style={{ fontSize: 18, fontWeight: 700, color: '#EF4B4B', margin: 0 }}>Hisobdan chiqish</h2>
+            <h2 style={{ fontSize: 18, fontWeight: 700, color: '#EF4B4B', margin: 0 }}>Xavf Zonasi (Danger Zone)</h2>
           </div>
-          <p style={{ fontSize: 14, color: '#8A9BB5', marginBottom: '16px', lineHeight: '1.5' }}>
-            Tizimdan chiqish uchun quyidagi tugmani bosing. Xavfsizlik maqsadida do'koningiz nomini kiritish talab qilinadi.
-          </p>
-          <button 
-            className="btn btn-outline" 
-            style={{ color: '#EF4B4B', borderColor: '#EF4B4B', display: 'inline-flex', gap: '8px' }}
-            onClick={() => { setLogoutConfirmText(''); setIsLogoutModalOpen(true); }}
-          >
-            <LogOut size={18} /> Sign Out
-          </button>
+          
+          <div style={{ display: 'grid', gap: '24px' }}>
+            {/* O'chirish */}
+            <div style={{ padding: '16px', border: '1px solid #FFE0E0', borderRadius: '12px', backgroundColor: '#FFF5F5' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                <Trash2 size={18} color="#EF4B4B" />
+                <span style={{ fontSize: '15px', fontWeight: 600, color: '#EF4B4B' }}>Ma'lumotlarni tozalash</span>
+              </div>
+              <p style={{ fontSize: 13, color: '#8A9BB5', marginBottom: '16px', lineHeight: '1.5' }}>
+                Barcha mahsulotlar yoki sotuvlar tarixini butunlay o'chirib yuborish. Bu amalni orqaga qaytarib bo'lmaydi!
+              </p>
+              <button 
+                className="btn btn-outline" 
+                style={{ color: '#EF4B4B', borderColor: '#EF4B4B', backgroundColor: '#fff', fontSize: '13px', padding: '6px 12px' }}
+                onClick={() => { setDeleteConfirmText(''); setIsDeleteModalOpen(true); }}
+              >
+                Ma'lumotlarni o'chirish
+              </button>
+            </div>
+
+            {/* Chiqish */}
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                <LogOut size={18} color="#EF4B4B" />
+                <span style={{ fontSize: '15px', fontWeight: 600, color: '#EF4B4B' }}>Hisobdan chiqish</span>
+              </div>
+              <p style={{ fontSize: 13, color: '#8A9BB5', marginBottom: '16px', lineHeight: '1.5' }}>
+                Tizimdan chiqish uchun quyidagi tugmani bosing. Xavfsizlik maqsadida do'koningiz nomini kiritish talab qilinadi.
+              </p>
+              <button 
+                className="btn btn-outline" 
+                style={{ color: '#EF4B4B', borderColor: '#EF4B4B', backgroundColor: '#fff', fontSize: '13px', padding: '6px 12px' }}
+                onClick={() => { setLogoutConfirmText(''); setIsLogoutModalOpen(true); }}
+              >
+                Sign Out
+              </button>
+            </div>
+          </div>
         </div>
 
       </div>
+
+      <Modal isOpen={isDeleteModalOpen} onClose={() => setIsDeleteModalOpen(false)} title="Ma'lumotlarni o'chirish">
+        <div className="flex-col" style={{ gap: '1.5rem' }}>
+          <div style={{ padding: '1rem', backgroundColor: '#FEF2F2', color: '#EF4B4B', borderRadius: '8px', fontSize: 14, lineHeight: '1.5' }}>
+            <strong>DIQQAT:</strong> Bu amalni orqaga qaytarib bo'lmaydi. O'chirilgan ma'lumotlar tiklanmaydi.
+          </div>
+          
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <label style={{ fontSize: 14, fontWeight: 500, color: '#1A2538' }}>Qaysi ma'lumotni o'chirasiz?</label>
+            <CustomSelect 
+              value={deleteTarget} 
+              onChange={v => setDeleteTarget(v)} 
+              options={[
+                {value: 'products', label: "Faqat Mahsulotlar"},
+                {value: 'sales', label: "Faqat Sotuvlar tarixi"},
+                {value: 'all', label: "Barcha ma'lumotlar (Mahsulot + Sotuvlar)"}
+              ]}
+            />
+          </div>
+
+          <FormInput 
+            label="Tasdiqlash uchun 'OCHIRISH' deb yozing" 
+            value={deleteConfirmText} 
+            onChange={(e) => setDeleteConfirmText(e.target.value)}
+            placeholder="OCHIRISH"
+          />
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
+            <button className="btn btn-ghost" onClick={() => setIsDeleteModalOpen(false)}>Bekor qilish</button>
+            <button 
+              className="btn btn-primary" 
+              style={{ backgroundColor: '#EF4B4B' }} 
+              disabled={deleteConfirmText !== 'OCHIRISH' || isSaving}
+              onClick={handleDeleteData}
+            >
+              {isSaving ? 'Bajarilmoqda...' : "O'chirish"}
+            </button>
+          </div>
+        </div>
+      </Modal>
 
       <Modal isOpen={isLogoutModalOpen} onClose={() => setIsLogoutModalOpen(false)} title="Hisobdan chiqishni tasdiqlang">
         <div className="flex-col" style={{ gap: '1rem' }}>

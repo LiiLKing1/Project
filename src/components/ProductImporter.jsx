@@ -150,9 +150,6 @@ const ProductImporter = ({ isOpen, onClose }) => {
       const categoryMap = {};
       categories.forEach(c => { categoryMap[c.name.toLowerCase().trim()] = c.id; });
       
-      const partnerMap = {};
-      partners.forEach(p => { partnerMap[p.companyName.toLowerCase().trim()] = p.id; });
-      
       for (const row of validRows) {
         const { parsed, status } = row;
         
@@ -164,24 +161,6 @@ const ProductImporter = ({ isOpen, onClose }) => {
           categoryMap[parsed.categoryName.toLowerCase().trim()] = catId;
         }
 
-        let partnerId = null;
-        if (parsed.supplier) {
-          partnerId = partnerMap[parsed.supplier.toLowerCase().trim()];
-          if (!partnerId) {
-            const newPartnerRef = doc(collection(db, `users/${storeId}/partners`));
-            batch.set(newPartnerRef, { 
-              companyName: parsed.supplier, 
-              contactPerson: parsed.supplier, 
-              phone: '', 
-              currentPayable: 0, 
-              status: 'active', 
-              createdAt: new Date().toISOString() 
-            });
-            partnerId = newPartnerRef.id;
-            partnerMap[parsed.supplier.toLowerCase().trim()] = partnerId;
-          }
-        }
-        
         let barcode = parsed.barcode;
         if (!barcode) {
           barcode = '200' + Math.floor(Math.random() * 10000000000).toString().padStart(10, '0');
@@ -196,7 +175,6 @@ const ProductImporter = ({ isOpen, onClose }) => {
           sellPrice: parsed.sellPrice,
           minStock: parsed.minStock,
           supplier: parsed.supplier,
-          partnerId: partnerId,
           status: 'active'
         };
         

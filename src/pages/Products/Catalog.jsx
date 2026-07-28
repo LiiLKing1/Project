@@ -332,14 +332,46 @@ const Catalog = () => {
   };
 
 
+  const normalizeSearchText = (text) => (text || '').toLowerCase().replace(/х/g, 'x').replace(/Х/g, 'x');
+
+  const HighlightText = ({ text, search }) => {
+    if (!search || !search.trim()) return <span>{text}</span>;
+    const searchTerms = normalizeSearchText(search).trim().split(/\s+/).filter(Boolean);
+    if (searchTerms.length === 0) return <span>{text}</span>;
+
+    const normText = normalizeSearchText(text);
+    const regex = new RegExp(`(${searchTerms.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`, 'gi');
+    
+    let parts = [];
+    let lastIndex = 0;
+    
+    normText.replace(regex, (match, p1, offset) => {
+      if (offset > lastIndex) {
+        parts.push({ text: text.substring(lastIndex, offset), highlight: false });
+      }
+      parts.push({ text: text.substring(offset, offset + match.length), highlight: true });
+      lastIndex = offset + match.length;
+    });
+    
+    if (lastIndex < text.length) {
+      parts.push({ text: text.substring(lastIndex), highlight: false });
+    }
+    
+    return (
+      <span>
+        {parts.map((p, i) => p.highlight ? <span key={i} style={{backgroundColor: '#FFE066', padding: '0 2px', borderRadius: '2px', color: '#1A2538'}}>{p.text}</span> : <span key={i}>{p.text}</span>)}
+      </span>
+    );
+  };
+
   const formatMoney = (v) => new Intl.NumberFormat('uz-UZ').format(v) + ' UZS';
 
-  const searchTerms = search.toLowerCase().trim().split(/\s+/);
+  const searchTerms = normalizeSearchText(search).trim().split(/\s+/);
   const filteredProducts = products.filter(p => {
     if (p.status === 'archived') return false;
     if (categoryFilter !== '' && p.categoryId !== categoryFilter) return false;
     if (!search.trim()) return true;
-    const lowerName = (p.name || '').toLowerCase();
+    const lowerName = normalizeSearchText(p.name);
     const barcode = p.barcode || '';
     return searchTerms.every(term => lowerName.includes(term) || barcode.includes(term));
   });
@@ -486,8 +518,14 @@ const Catalog = () => {
                         <div className="catalog-row-info">
                           <div style={{ width:40, height:40, borderRadius:'12px', background:'#F0F5FC', color:'#8A9BB5', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}><Package size={18}/></div>
                           <div style={{ minWidth:0 }}>
-                            <div style={{ fontWeight:700, fontSize:'14px', color:'#1A2538', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{p.name}</div>
-                            <div style={{ fontSize:'11px', color:'#8A9BB5', marginTop:2, fontFamily:'monospace' }}>{p.barcode || '—'}</div>
+                            <div style={{ fontWeight:700, fontSize:'14px', color:'#1A2538', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}><HighlightText text={p.name} search={search} /></div>
+                            <div style={{ fontSize:'11px', color:'#8A9BB5', marginTop:2, fontFamily:'monospace' }}><HighlightText text={p.barcode || '—'} search={search} /></div>
+                            {p.supplier && (
+                              <div style={{ fontSize:'10px', color:'#2C6FBF', marginTop:2, display:'flex', alignItems:'center', gap:'4px' }}>
+                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                                {p.supplier} (Y.b narxi: {p.supplierPrice || 0})
+                              </div>
+                            )}
                           </div>
                         </div>
                         
@@ -498,8 +536,8 @@ const Catalog = () => {
                             <div style={{ fontSize:'11px', color:'#8A9BB5' }}>qoldiq</div>
                           </div>
                           <div>
-                            <div style={{ fontWeight:700, color:'#4A90E2', fontSize:'14px' }}><CurrencyDisplay amount={p.sellPrice}/></div>
-                            <div style={{ fontSize:'11px', color:'#8A9BB5' }}>tn: <CurrencyDisplay amount={p.costPrice}/></div>
+                            <div style={{ fontWeight:700, color:'#4A90E2', fontSize:'14px' }}><CurrencyDisplay amount={p.sellPrice} isSell /></div>
+                            <div style={{ fontSize:'11px', color:'#8A9BB5' }}>tn: <CurrencyDisplay amount={p.costPrice} isCost /></div>
                           </div>
                         </div>
 
@@ -527,13 +565,19 @@ const Catalog = () => {
                           <span style={{ padding:'4px 10px', background:'#D1E8F5', color:'#2C6FBF', borderRadius:'999px', fontSize:'11px', fontWeight:700 }}>{cat?.name || 'Boshqa'}</span>
                         </div>
                         <div>
-                          <div style={{ fontWeight:800, fontSize:'16px', color:'#1A2538', marginBottom:4 }}>{p.name}</div>
-                          <div style={{ fontSize:'12px', color:'#8A9BB5', fontFamily:'monospace' }}>{p.barcode || '—'}</div>
+                          <div style={{ fontWeight:800, fontSize:'16px', color:'#1A2538', marginBottom:4 }}><HighlightText text={p.name} search={search} /></div>
+                          <div style={{ fontSize:'12px', color:'#8A9BB5', fontFamily:'monospace' }}><HighlightText text={p.barcode || '—'} search={search} /></div>
+                          {p.supplier && (
+                            <div style={{ fontSize:'11px', color:'#2C6FBF', marginTop:4, display:'flex', alignItems:'center', gap:'4px' }}>
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                              {p.supplier} (Y.b narxi: {p.supplierPrice || 0})
+                            </div>
+                          )}
                         </div>
                         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'10px' }}>
                           <div style={{ background:'#F7FAFF', borderRadius:'12px', padding:'10px' }}>
                             <div style={{ fontSize:'11px', color:'#8A9BB5', marginBottom:4 }}>Sotish narxi</div>
-                            <div style={{ fontWeight:800, color:'#4A90E2', fontSize:'15px' }}><CurrencyDisplay amount={p.sellPrice}/></div>
+                            <div style={{ fontWeight:800, color:'#4A90E2', fontSize:'15px' }}><CurrencyDisplay amount={p.sellPrice} isSell /></div>
                           </div>
                           <div style={{ background:'#F7FAFF', borderRadius:'12px', padding:'10px' }}>
                             <div style={{ fontSize:'11px', color:'#8A9BB5', marginBottom:4 }}>Qoldiq</div>
@@ -561,8 +605,8 @@ const Catalog = () => {
                           <div style={{ width:36, height:36, borderRadius:'10px', background:'#D1E8F5', color:'#4A90E2', display:'flex', alignItems:'center', justifyContent:'center' }}><Package size={16}/></div>
                           <span style={{ width:10, height:10, borderRadius:'50%', background:getStockColor(stock,p.minStock), display:'inline-block' }}/>
                         </div>
-                        <div style={{ fontWeight:700, fontSize:'13px', color:'#1A2538', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{p.name}</div>
-                        <div style={{ fontSize:'11px', color:'#4A90E2', fontWeight:700 }}><CurrencyDisplay amount={p.sellPrice}/></div>
+                        <div style={{ fontWeight:700, fontSize:'13px', color:'#1A2538', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}><HighlightText text={p.name} search={search}/></div>
+                        <div style={{ fontSize:'11px', color:'#4A90E2', fontWeight:700 }}><CurrencyDisplay amount={p.sellPrice} isSell /></div>
                         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
                           <span style={{ fontSize:'11px', color:'#8A9BB5' }}>{stock} {p.unit}</span>
                           <ProductActions p={p}/>
@@ -591,8 +635,8 @@ const Catalog = () => {
                         </div>
                         {/* Body */}
                         <div style={{ padding:'12px 14px' }}>
-                          <div style={{ fontWeight:700, fontSize:'14px', color:'#1A2538', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', marginBottom:4 }}>{p.name}</div>
-                          <div style={{ fontWeight:800, color:'#4A90E2', fontSize:'15px', marginBottom:6 }}><CurrencyDisplay amount={p.sellPrice}/></div>
+                          <div style={{ fontWeight:700, fontSize:'14px', color:'#1A2538', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', marginBottom:4 }}><HighlightText text={p.name} search={search}/></div>
+                          <div style={{ fontWeight:800, color:'#4A90E2', fontSize:'15px', marginBottom:6 }}><CurrencyDisplay amount={p.sellPrice} isSell /></div>
                           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
                             <span style={{ fontSize:'12px', color:'#8A9BB5' }}>{stock} {p.unit}</span>
                             <ProductActions p={p}/>
