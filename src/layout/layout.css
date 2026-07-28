@@ -223,8 +223,8 @@
   .pos-payment-right {
     flex: 1 !important;
     width: 100% !important;
-    padding: 16px !important;
-    overflow-y: auto !important;
+    padding: 0 !important;
+    overflow-y: hidden !important;
   }
 }
 
