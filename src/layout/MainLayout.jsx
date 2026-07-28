@@ -50,7 +50,7 @@ const MainLayout = () => {
           <main className="page-content" onScroll={handleScroll}>
             <Outlet />
           </main>
-          <BottomNav />
+          <BottomNav onMenuClick={toggleSidebar} />
         </div>
       </div>
     </>

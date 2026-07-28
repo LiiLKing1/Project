@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import MainLayout from './layout/MainLayout';
 import ProtectedRoute from './components/ProtectedRoute';
 import PermissionRoute from './components/PermissionRoute';
@@ -53,6 +53,7 @@ function App() {
         <Route path="/verify-email" element={<VerifyEmail />} />
         <Route path="/verify" element={<VerifyAction />} />
         <Route path="/receipt/:storeId/:saleId" element={<ReceiptView />} />
+        <Route path="/catalog" element={<Navigate to="/products" replace />} />
         
         <Route path="/" element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
           <Route index element={<Dashboard />} />
