@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useDeferredValue, useCallback, useRef, memo } from 'react';
 import { db } from '../../firebase';
 import { collection, onSnapshot, query, doc, writeBatch, serverTimestamp } from '../../services/firebaseMock';
 import { useRoles } from '../../context/RolesContext';
@@ -7,11 +7,56 @@ import { useConfirm } from '../../context/ConfirmContext';
 import { Tag, Search, PlusCircle, Save, CheckSquare, Square, CheckCircle } from 'lucide-react';
 import CurrencyDisplay from '../../components/CurrencyDisplay';
 import FormInput from '../../components/FormInput';
+import { useVirtualizer } from '@tanstack/react-virtual';
+
+// Memoized Row Component
+const ProductRow = memo(({ 
+  product, 
+  isSelected, 
+  toggleSelect,
+  targetPrice,
+  amount,
+  direction,
+  calculateNewPrice,
+  style 
+}) => {
+  return (
+    <div style={{ ...style, display: 'flex', borderBottom: '1px solid var(--border-color)', alignItems: 'center', backgroundColor: isSelected ? '#F4F8FF' : 'transparent', padding: '0 1rem' }}>
+      <div style={{ width: '40px', textAlign: 'center', flexShrink: 0 }}>
+        <div onClick={() => toggleSelect(product.id)} style={{ cursor: 'pointer', color: isSelected ? '#4A90E2' : '#8A9BB5', display: 'flex', justifyContent: 'center' }}>
+          {isSelected ? <CheckSquare size={20}/> : <Square size={20}/>}
+        </div>
+      </div>
+      <div style={{ flex: 2, minWidth: 0, paddingRight: '10px' }}>
+        <div style={{ fontWeight: 600, color: '#1A2538', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{product.name}</div>
+        <div style={{ fontSize: 13, color: '#8A9BB5', fontFamily: 'monospace' }}>{product.barcode}</div>
+      </div>
+      <div style={{ flex: 1.5, textAlign: 'right', color: '#8A9BB5', minWidth: 0 }}>
+        <CurrencyDisplay amount={product.costPrice || 0} />
+      </div>
+      <div style={{ flex: 1.5, textAlign: 'right', minWidth: 0 }}>
+        <div style={{ fontWeight: 600, color: '#1A2538' }}><CurrencyDisplay amount={product.sellPrice || 0} /></div>
+        {isSelected && amount > 0 && (
+          <div style={{ fontSize: 12, marginTop: 4, fontWeight: 500, color: direction === 'increase' ? '#10B981' : '#EF4B4B' }}>
+            → <CurrencyDisplay amount={calculateNewPrice(targetPrice === 'sellPrice' ? product.sellPrice : product.costPrice)} />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}, (prevProps, nextProps) => {
+  return prevProps.isSelected === nextProps.isSelected &&
+         prevProps.targetPrice === nextProps.targetPrice &&
+         prevProps.amount === nextProps.amount &&
+         prevProps.direction === nextProps.direction &&
+         prevProps.style.top === nextProps.style.top;
+});
 
 const Revaluation = () => {
   const [products, setProducts] = useState([]);
   const [search, setSearch] = useState('');
-  const [selectedIds, setSelectedIds] = useState([]);
+  const deferredSearch = useDeferredValue(search);
+  const [selectedIds, setSelectedIds] = useState(new Set());
   const [isProcessing, setIsProcessing] = useState(false);
   
   const [amount, setAmount] = useState('');
@@ -19,8 +64,7 @@ const Revaluation = () => {
   const [targetPrice, setTargetPrice] = useState('sellPrice'); // 'sellPrice' or 'costPrice'
   const [direction, setDirection] = useState('increase'); // 'increase' or 'decrease'
   
-  const [visibleCount, setVisibleCount] = useState(30);
-  const loadMoreRef = React.useRef(null);
+  const parentRef = useRef(null);
 
   const { userProfile } = useRoles();
   const { addToast } = useToast();
@@ -35,47 +79,34 @@ const Revaluation = () => {
     return () => unsub();
   }, [storeId]);
 
-  const filteredProducts = products.filter(p => 
-    p.status === 'active' && 
-    (p.name.toLowerCase().includes(search.toLowerCase()) || (p.barcode || '').includes(search))
-  );
+  const filteredProducts = React.useMemo(() => {
+    return products.filter(p => 
+      p.status === 'active' && 
+      (p.name.toLowerCase().includes(deferredSearch.toLowerCase()) || (p.barcode || '').includes(deferredSearch))
+    );
+  }, [products, deferredSearch]);
 
-  useEffect(() => {
-    setVisibleCount(30);
-  }, [search]);
+  const toggleSelectAll = useCallback(() => {
+    if (selectedIds.size === filteredProducts.length && filteredProducts.length > 0) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredProducts.map(p => p.id)));
+    }
+  }, [selectedIds, filteredProducts]);
 
-  useEffect(() => {
-    if (!loadMoreRef.current) return;
-    const observer = new IntersectionObserver((entries) => {
-      if (entries[0].isIntersecting) {
-        setVisibleCount(prev => {
-          if (prev < filteredProducts.length) return prev + 30;
-          return prev;
-        });
+  const toggleSelect = useCallback((id) => {
+    setSelectedIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) {
+        newSet.delete(id);
+      } else {
+        newSet.add(id);
       }
-    }, { rootMargin: '300px' });
-    
-    observer.observe(loadMoreRef.current);
-    return () => observer.disconnect();
-  }, [filteredProducts.length]);
+      return newSet;
+    });
+  }, []);
 
-  const toggleSelectAll = () => {
-    if (selectedIds.length === filteredProducts.length) {
-      setSelectedIds([]);
-    } else {
-      setSelectedIds(filteredProducts.map(p => p.id));
-    }
-  };
-
-  const toggleSelect = (id) => {
-    if (selectedIds.includes(id)) {
-      setSelectedIds(selectedIds.filter(i => i !== id));
-    } else {
-      setSelectedIds([...selectedIds, id]);
-    }
-  };
-
-  const calculateNewPrice = (oldPrice) => {
+  const calculateNewPrice = useCallback((oldPrice) => {
     const val = Number(oldPrice) || 0;
     const change = Number(amount) || 0;
     
@@ -92,10 +123,10 @@ const Revaluation = () => {
     }
     
     return Math.max(0, newPrice); // No negative prices
-  };
+  }, [amount, direction, unit]);
 
   const handleApply = async () => {
-    if (selectedIds.length === 0) {
+    if (selectedIds.size === 0) {
       addToast('Mahsulotlarni tanlang', 'warning');
       return;
     }
@@ -103,43 +134,52 @@ const Revaluation = () => {
       addToast('O\'zgarish miqdorini to\'g\'ri kiriting', 'warning');
       return;
     }
-    if (!(await confirm({ message: `${selectedIds.length} ta mahsulot narxi o'zgartiriladi. Tasdiqlaysizmi?` }))) return;
+    if (!(await confirm({ message: `${selectedIds.size} ta mahsulot narxi o'zgartiriladi. Tasdiqlaysizmi?` }))) return;
 
     setIsProcessing(true);
     try {
-      const batch = writeBatch(db);
+      const idsArray = Array.from(selectedIds);
+      const chunkSize = 400;
       
-      selectedIds.forEach(id => {
-        const prod = products.find(p => p.id === id);
-        if (!prod) return;
+      for (let i = 0; i < idsArray.length; i += chunkSize) {
+        const chunk = idsArray.slice(i, i + chunkSize);
+        const batch = writeBatch(db);
         
-        const oldPrice = prod[targetPrice];
-        const newPrice = calculateNewPrice(oldPrice);
-        
-        if (oldPrice !== newPrice) {
-          const ref = doc(db, `users/${storeId}/products`, id);
-          batch.update(ref, {
-            [targetPrice]: newPrice,
-            updatedAt: new Date().toISOString()
+        chunk.forEach(id => {
+          const prod = products.find(p => p.id === id);
+          if (!prod) return;
+          
+          const oldPrice = prod[targetPrice];
+          const newPrice = calculateNewPrice(oldPrice);
+          
+          if (oldPrice !== newPrice) {
+            const ref = doc(db, `users/${storeId}/products`, id);
+            batch.update(ref, {
+              [targetPrice]: newPrice,
+              updatedAt: new Date().toISOString()
+            });
+          }
+        });
+
+        // Add history log to the first chunk
+        if (i === 0) {
+          const logRef = doc(collection(db, `users/${storeId}/revaluationLogs`));
+          batch.set(logRef, {
+            productIds: idsArray,
+            amount: Number(amount),
+            unit,
+            targetPrice,
+            direction,
+            createdBy: userProfile?.name || 'Admin',
+            createdAt: serverTimestamp()
           });
         }
-      });
 
-      // Optionally log revaluation history
-      const logRef = doc(collection(db, `users/${storeId}/revaluationLogs`));
-      batch.set(logRef, {
-        productIds: selectedIds,
-        amount: Number(amount),
-        unit,
-        targetPrice,
-        direction,
-        createdBy: userProfile?.name || 'Admin',
-        createdAt: serverTimestamp()
-      });
+        await batch.commit();
+      }
 
-      await batch.commit();
       addToast('Narxlar muvaffaqiyatli yangilandi', 'success');
-      setSelectedIds([]);
+      setSelectedIds(new Set());
       setAmount('');
     } catch (err) {
       addToast(err.message, 'error');
@@ -147,6 +187,13 @@ const Revaluation = () => {
       setIsProcessing(false);
     }
   };
+
+  const rowVirtualizer = useVirtualizer({
+    count: filteredProducts.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 64, // estimated row height
+    overscan: 10,
+  });
 
   return (
     <div className="page-wrapper">
@@ -160,8 +207,8 @@ const Revaluation = () => {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 350px', gap: '24px', alignItems: 'start' }}>
         
         {/* Left: Products List */}
-        <div className="page-card" style={{ minHeight: '60vh' }}>
-          <div className="page-card-header">
+        <div className="page-card" style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 180px)' }}>
+          <div className="page-card-header" style={{ flexShrink: 0 }}>
             <div className="search-wrap">
               <Search size={16} className="search-icon" />
               <input 
@@ -173,50 +220,62 @@ const Revaluation = () => {
             </div>
           </div>
 
-          <div style={{ overflowX: 'auto', maxHeight: 'calc(100vh - 250px)' }}>
-            <table className="page-table">
-              <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
-                <tr>
-                  <th style={{ width: '40px', textAlign: 'center' }}>
-                    <div onClick={toggleSelectAll} style={{ cursor: 'pointer', color: selectedIds.length === filteredProducts.length && filteredProducts.length > 0 ? '#4A90E2' : '#8A9BB5' }}>
-                      {selectedIds.length === filteredProducts.length && filteredProducts.length > 0 ? <CheckSquare size={20}/> : <Square size={20}/>}
-                    </div>
-                  </th>
-                  <th>Mahsulot</th>
-                  <th style={{ textAlign: 'right' }}>Tan narx</th>
-                  <th style={{ textAlign: 'right' }}>Sotuv narx</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredProducts.slice(0, visibleCount).map(p => (
-                  <tr key={p.id} style={{ backgroundColor: selectedIds.includes(p.id) ? '#F4F8FF' : 'transparent' }}>
-                    <td style={{ textAlign: 'center' }}>
-                      <div onClick={() => toggleSelect(p.id)} style={{ cursor: 'pointer', color: selectedIds.includes(p.id) ? '#4A90E2' : '#8A9BB5' }}>
-                        {selectedIds.includes(p.id) ? <CheckSquare size={20}/> : <Square size={20}/>}
-                      </div>
-                    </td>
-                    <td>
-                      <div style={{ fontWeight: 600, color: '#1A2538' }}>{p.name}</div>
-                      <div style={{ fontSize: 13, color: '#8A9BB5', fontFamily: 'monospace' }}>{p.barcode}</div>
-                    </td>
-                    <td style={{ textAlign: 'right', color: '#8A9BB5' }}><CurrencyDisplay amount={p.costPrice || 0} /></td>
-                    <td style={{ textAlign: 'right' }}>
-                      <div style={{ fontWeight: 600, color: '#1A2538' }}><CurrencyDisplay amount={p.sellPrice || 0} /></div>
-                      {selectedIds.includes(p.id) && amount > 0 && (
-                        <div style={{ fontSize: 12, marginTop: 4, fontWeight: 500, color: direction === 'increase' ? '#10B981' : '#EF4B4B' }}>
-                          → <CurrencyDisplay amount={calculateNewPrice(targetPrice === 'sellPrice' ? p.sellPrice : p.costPrice)} />
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {visibleCount < filteredProducts.length && (
-              <div ref={loadMoreRef} style={{ height: '40px', display: 'flex', justifyContent: 'center', alignItems: 'center', color: '#8A9BB5' }}>
-                Yuklanmoqda...
+          <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+            {/* Header */}
+            <div style={{ display: 'flex', borderBottom: '2px solid var(--border-color)', padding: '12px 1rem', fontWeight: 600, color: 'var(--text-secondary)', fontSize: 13, textTransform: 'uppercase', flexShrink: 0 }}>
+              <div style={{ width: '40px', textAlign: 'center', flexShrink: 0 }}>
+                <div onClick={toggleSelectAll} style={{ cursor: 'pointer', color: selectedIds.size === filteredProducts.length && filteredProducts.length > 0 ? '#4A90E2' : '#8A9BB5', display: 'flex', justifyContent: 'center' }}>
+                  {selectedIds.size === filteredProducts.length && filteredProducts.length > 0 ? <CheckSquare size={20}/> : <Square size={20}/>}
+                </div>
               </div>
-            )}
+              <div style={{ flex: 2, minWidth: 0, paddingRight: '10px' }}>Mahsulot</div>
+              <div style={{ flex: 1.5, textAlign: 'right', minWidth: 0 }}>Tan narx</div>
+              <div style={{ flex: 1.5, textAlign: 'right', minWidth: 0 }}>Sotuv narx</div>
+            </div>
+
+            {/* Virtualized Body */}
+            <div 
+              ref={parentRef} 
+              style={{ flex: 1, overflow: 'auto', position: 'relative' }}
+            >
+              {filteredProducts.length === 0 ? (
+                <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                  Hech narsa topilmadi
+                </div>
+              ) : (
+                <div
+                  style={{
+                    height: `${rowVirtualizer.getTotalSize()}px`,
+                    width: '100%',
+                    position: 'relative',
+                  }}
+                >
+                  {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                    const p = filteredProducts[virtualRow.index];
+                    return (
+                      <ProductRow 
+                        key={virtualRow.key}
+                        product={p}
+                        isSelected={selectedIds.has(p.id)}
+                        toggleSelect={toggleSelect}
+                        targetPrice={targetPrice}
+                        amount={amount}
+                        direction={direction}
+                        calculateNewPrice={calculateNewPrice}
+                        style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          width: '100%',
+                          height: `${virtualRow.size}px`,
+                          transform: `translateY(${virtualRow.start}px)`,
+                        }}
+                      />
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -288,14 +347,14 @@ const Revaluation = () => {
           />
 
           <div style={{ padding: '16px', backgroundColor: '#F4F8FF', borderRadius: '12px', border: '1px solid #DCE8F5' }}>
-            <div style={{ fontWeight: 600, color: '#4A90E2', fontSize: 14 }}>Tanlanganlar: {selectedIds.length} ta</div>
+            <div style={{ fontWeight: 600, color: '#4A90E2', fontSize: 14 }}>Tanlanganlar: {selectedIds.size} ta</div>
           </div>
 
           <button 
             className="btn btn-primary" 
             style={{ width: '100%', padding: '12px', marginTop: 'auto', fontWeight: 600 }} 
             onClick={handleApply}
-            disabled={isProcessing || selectedIds.length === 0 || amount === ''}
+            disabled={isProcessing || selectedIds.size === 0 || amount === ''}
           >
             {isProcessing ? 'Bajarilmoqda...' : 'Tasdiqlash va saqlash'}
           </button>

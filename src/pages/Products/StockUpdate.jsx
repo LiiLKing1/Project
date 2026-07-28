@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useDeferredValue, useCallback, useRef, memo } from 'react';
 import { Search, Save, Package } from 'lucide-react';
 import { db } from '../../firebase';
 import { collection, onSnapshot, query, doc, updateDoc, writeBatch } from '../../services/firebaseMock';
@@ -6,22 +6,105 @@ import { useRoles } from '../../context/RolesContext';
 import { useWarehouse } from '../../context/WarehouseContext';
 import { useToast } from '../../context/ToastContext';
 import AnimatedNumber from '../../components/AnimatedNumber';
+import { useVirtualizer } from '@tanstack/react-virtual';
+
+// Memoized Row Component
+const ProductRow = memo(({ 
+  product, 
+  isSelected, 
+  toggleSelect, 
+  currentStock, 
+  inputValue, 
+  handleStockChange, 
+  saveStock, 
+  updatingId,
+  style 
+}) => {
+  const hasChanged = inputValue !== '' && Number(inputValue) !== Number(currentStock);
+  
+  return (
+    <div style={{ ...style, display: 'flex', borderBottom: '1px solid var(--border-color)', alignItems: 'center', padding: '0 1rem' }}>
+      <div style={{ width: '40px', textAlign: 'center', flexShrink: 0 }}>
+        <input 
+          type="checkbox" 
+          checked={isSelected}
+          onChange={() => toggleSelect(product.id)}
+          style={{ cursor: 'pointer', width: '16px', height: '16px' }}
+        />
+      </div>
+      <div style={{ flex: 2, fontWeight: 600, color: 'var(--text-main)', minWidth: 0, paddingRight: '10px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <div style={{ width: 32, height: 32, borderRadius: 8, background: 'var(--bg-surface)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary)', flexShrink: 0 }}>
+            <Package size={16} />
+          </div>
+          <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{product.name}</span>
+        </div>
+      </div>
+      <div style={{ flex: 1.5, color: 'var(--text-secondary)', fontFamily: 'monospace', fontSize: 13, minWidth: 0 }}>
+        {product.barcode || '-'}
+      </div>
+      <div style={{ flex: 1.5, textAlign: 'center', fontWeight: 600, color: 'var(--primary)', fontSize: '1.1rem', minWidth: 0 }}>
+        <AnimatedNumber value={currentStock} /> <span style={{ color: 'var(--text-secondary)', fontSize: 13, fontWeight: 400 }}>{product.unit || 'dona'}</span>
+      </div>
+      <div style={{ width: '150px', flexShrink: 0, padding: '0 10px' }}>
+        <input 
+          type="number"
+          value={inputValue !== undefined ? inputValue : ''}
+          onChange={(e) => handleStockChange(product.id, e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && hasChanged && updatingId !== product.id) saveStock(product);
+          }}
+          placeholder="Miqdor"
+          style={{ 
+            padding: '8px 12px', 
+            width: '100%', 
+            textAlign: 'center', 
+            border: hasChanged ? '2px solid var(--primary)' : '1px solid var(--border-color)',
+            borderRadius: 'var(--radius-md)',
+            outline: 'none',
+            fontWeight: 600,
+            color: 'var(--text-main)',
+            backgroundColor: 'var(--bg-main)'
+          }}
+        />
+      </div>
+      <div style={{ width: '100px', textAlign: 'right', flexShrink: 0 }}>
+        <button 
+          className={`btn ${hasChanged ? 'btn-primary' : 'btn-outline'}`}
+          onClick={() => saveStock(product)}
+          disabled={!hasChanged || updatingId === product.id}
+          style={{ padding: '0.4rem 1rem', width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '4px' }}
+        >
+          {updatingId === product.id ? '...' : <><Save size={16} /> Saqlash</>}
+        </button>
+      </div>
+    </div>
+  );
+}, (prevProps, nextProps) => {
+  return prevProps.isSelected === nextProps.isSelected &&
+         prevProps.currentStock === nextProps.currentStock &&
+         prevProps.inputValue === nextProps.inputValue &&
+         prevProps.updatingId === nextProps.updatingId &&
+         prevProps.style.top === nextProps.style.top;
+});
 
 const StockUpdate = () => {
   const [products, setProducts] = useState([]);
   const [search, setSearch] = useState('');
+  const deferredSearch = useDeferredValue(search); // Smooth typing
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState(null);
   
   // Local state for stock inputs before saving
   const [stockInputs, setStockInputs] = useState({});
-  const [selectedIds, setSelectedIds] = useState([]);
+  const [selectedIds, setSelectedIds] = useState(new Set());
   const [bulkQty, setBulkQty] = useState('');
 
   const { userProfile } = useRoles();
   const { selectedWarehouseId } = useWarehouse();
   const { addToast } = useToast();
   const storeId = userProfile?.storeOwnerId;
+  const parentRef = useRef(null);
 
   useEffect(() => {
     if (!storeId) return;
@@ -47,14 +130,14 @@ const StockUpdate = () => {
     return () => unsub();
   }, [storeId, selectedWarehouseId]);
 
-  const handleStockChange = (id, value) => {
+  const handleStockChange = useCallback((id, value) => {
     setStockInputs(prev => ({
       ...prev,
       [id]: value === '' ? '' : Number(value)
     }));
-  };
+  }, []);
 
-  const saveStock = async (product) => {
+  const saveStock = useCallback(async (product) => {
     const newValue = stockInputs[product.id];
     if (newValue === '' || isNaN(newValue)) {
       addToast("Noto'g'ri qiymat", "error");
@@ -73,19 +156,34 @@ const StockUpdate = () => {
     } finally {
       setUpdatingId(null);
     }
-  };
+  }, [stockInputs, storeId, selectedWarehouseId, addToast]);
 
-  const handleSelectAll = (e) => {
+  const filteredProducts = React.useMemo(() => {
+    return products.filter(p => 
+      p.status === 'active' && 
+      (p.name.toLowerCase().includes(deferredSearch.toLowerCase()) || (p.barcode || '').includes(deferredSearch))
+    );
+  }, [products, deferredSearch]);
+
+  const handleSelectAll = useCallback((e) => {
     if (e.target.checked) {
-      setSelectedIds(filteredProducts.map(p => p.id));
+      setSelectedIds(new Set(filteredProducts.map(p => p.id)));
     } else {
-      setSelectedIds([]);
+      setSelectedIds(new Set());
     }
-  };
+  }, [filteredProducts]);
 
-  const toggleSelect = (id) => {
-    setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
-  };
+  const toggleSelect = useCallback((id) => {
+    setSelectedIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) {
+        newSet.delete(id);
+      } else {
+        newSet.add(id);
+      }
+      return newSet;
+    });
+  }, []);
 
   const handleBulkSave = async () => {
     if (bulkQty === '' || isNaN(bulkQty)) {
@@ -95,23 +193,30 @@ const StockUpdate = () => {
     
     setUpdatingId('bulk');
     try {
-      const batch = writeBatch(db);
-      selectedIds.forEach(id => {
-        const productRef = doc(db, `users/${storeId}/products`, id);
-        batch.update(productRef, {
-          [`stockByWarehouse.${selectedWarehouseId}`]: Number(bulkQty)
+      const idsArray = Array.from(selectedIds);
+      const chunkSize = 400; // Firebase batch limit is 500
+      
+      for (let i = 0; i < idsArray.length; i += chunkSize) {
+        const chunk = idsArray.slice(i, i + chunkSize);
+        const batch = writeBatch(db);
+        chunk.forEach(id => {
+          const productRef = doc(db, `users/${storeId}/products`, id);
+          batch.update(productRef, {
+            [`stockByWarehouse.${selectedWarehouseId}`]: Number(bulkQty)
+          });
         });
-      });
-      await batch.commit();
-      addToast(`${selectedIds.length} ta mahsulot qoldig'i yangilandi`, "success");
+        await batch.commit();
+      }
+      
+      addToast(`${selectedIds.size} ta mahsulot qoldig'i yangilandi`, "success");
       
       setStockInputs(prev => {
         const next = { ...prev };
-        selectedIds.forEach(id => { next[id] = Number(bulkQty); });
+        idsArray.forEach(id => { next[id] = Number(bulkQty); });
         return next;
       });
       
-      setSelectedIds([]);
+      setSelectedIds(new Set());
       setBulkQty('');
     } catch (error) {
       addToast(error.message, "error");
@@ -120,10 +225,12 @@ const StockUpdate = () => {
     }
   };
 
-  const filteredProducts = products.filter(p => 
-    p.status === 'active' && 
-    (p.name.toLowerCase().includes(search.toLowerCase()) || (p.barcode || '').includes(search))
-  );
+  const rowVirtualizer = useVirtualizer({
+    count: filteredProducts.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 64, // estimated row height
+    overscan: 10,
+  });
 
   return (
     <div className="page-wrapper">
@@ -134,8 +241,8 @@ const StockUpdate = () => {
         </div>
       </div>
 
-      <div className="page-card">
-        <div className="page-card-header" style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
+      <div className="page-card" style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 180px)' }}>
+        <div className="page-card-header" style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center', flexShrink: 0 }}>
           <div className="search-wrap" style={{ flex: 1, minWidth: '300px' }}>
             <Search size={16} className="search-icon" />
             <input 
@@ -149,9 +256,9 @@ const StockUpdate = () => {
             Ombor: <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>{selectedWarehouseId === 'main' ? 'Asosiy Ombor' : selectedWarehouseId}</span>
           </div>
           
-          {selectedIds.length > 0 && (
+          {selectedIds.size > 0 && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--primary-light)', padding: '0.5rem 1rem', borderRadius: 'var(--radius-md)' }}>
-              <span style={{ fontWeight: 600, color: 'var(--primary)', marginRight: '1rem' }}>{selectedIds.length} ta tanlandi</span>
+              <span style={{ fontWeight: 600, color: 'var(--primary)', marginRight: '1rem' }}>{selectedIds.size} ta tanlandi</span>
               <input 
                 type="number"
                 placeholder="Yangi qoldiq..."
@@ -174,98 +281,72 @@ const StockUpdate = () => {
           )}
         </div>
 
-        <div style={{ overflowX: 'auto' }}>
-          <table className="page-table">
-            <thead>
-              <tr>
-                <th style={{ width: '40px', textAlign: 'center' }}>
-                  <input 
-                    type="checkbox" 
-                    checked={filteredProducts.length > 0 && selectedIds.length === filteredProducts.length}
-                    onChange={handleSelectAll}
-                    style={{ cursor: 'pointer', width: '16px', height: '16px' }}
-                  />
-                </th>
-                <th>Mahsulot</th>
-                <th>Shtrix kod</th>
-                <th style={{ textAlign: 'center' }}>Joriy Qoldiq</th>
-                <th style={{ width: '200px' }}>Yangi Qoldiq</th>
-                <th style={{ width: '100px', textAlign: 'right' }}>Amal</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredProducts.length === 0 ? (
-                <tr>
-                  <td colSpan="6" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                    {loading ? 'Yuklanmoqda...' : 'Hech narsa topilmadi'}
-                  </td>
-                </tr>
-              ) : filteredProducts.map(p => {
-                const currentStock = p.stockByWarehouse?.[selectedWarehouseId] ?? p.stock ?? 0;
-                const inputValue = stockInputs[p.id];
-                const hasChanged = inputValue !== '' && Number(inputValue) !== Number(currentStock);
-                
-                return (
-                  <tr key={p.id}>
-                    <td style={{ textAlign: 'center' }}>
-                      <input 
-                        type="checkbox" 
-                        checked={selectedIds.includes(p.id)}
-                        onChange={() => toggleSelect(p.id)}
-                        style={{ cursor: 'pointer', width: '16px', height: '16px' }}
-                      />
-                    </td>
-                    <td style={{ fontWeight: 600, color: 'var(--text-main)' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <div style={{ width: 32, height: 32, borderRadius: 8, background: 'var(--bg-surface)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary)' }}>
-                          <Package size={16} />
-                        </div>
-                        {p.name}
-                      </div>
-                    </td>
-                    <td style={{ color: 'var(--text-secondary)', fontFamily: 'monospace', fontSize: 13 }}>{p.barcode || '-'}</td>
-                    <td style={{ textAlign: 'center', fontWeight: 600, color: 'var(--primary)', fontSize: '1.1rem' }}>
-                      <AnimatedNumber value={currentStock} /> <span style={{ color: 'var(--text-secondary)', fontSize: 13, fontWeight: 400 }}>{p.unit || 'dona'}</span>
-                    </td>
-                    <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <input 
-                          type="number"
-                          value={inputValue !== undefined ? inputValue : ''}
-                          onChange={(e) => handleStockChange(p.id, e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' && hasChanged && !updatingId) saveStock(p);
-                          }}
-                          placeholder="Miqdor"
-                          style={{ 
-                            padding: '8px 12px', 
-                            width: '100px', 
-                            textAlign: 'center', 
-                            border: hasChanged ? '2px solid var(--primary)' : '1px solid var(--border-color)',
-                            borderRadius: 'var(--radius-md)',
-                            outline: 'none',
-                            fontWeight: 600,
-                            color: 'var(--text-main)',
-                            backgroundColor: 'var(--bg-main)'
-                          }}
-                        />
-                      </div>
-                    </td>
-                    <td style={{ textAlign: 'right' }}>
-                      <button 
-                        className={`btn ${hasChanged ? 'btn-primary' : 'btn-outline'}`}
-                        onClick={() => saveStock(p)}
-                        disabled={!hasChanged || updatingId === p.id}
-                        style={{ padding: '0.4rem 1rem', minWidth: '90px' }}
-                      >
-                        {updatingId === p.id ? '...' : <><Save size={16} style={{ marginRight: '4px' }}/> Saqlash</>}
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+        {/* Custom Virtualized Table implementation */}
+        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+          {/* Header */}
+          <div style={{ display: 'flex', borderBottom: '2px solid var(--border-color)', padding: '12px 1rem', fontWeight: 600, color: 'var(--text-secondary)', fontSize: 13, textTransform: 'uppercase', flexShrink: 0 }}>
+            <div style={{ width: '40px', textAlign: 'center', flexShrink: 0 }}>
+              <input 
+                type="checkbox" 
+                checked={filteredProducts.length > 0 && selectedIds.size === filteredProducts.length}
+                onChange={handleSelectAll}
+                style={{ cursor: 'pointer', width: '16px', height: '16px' }}
+              />
+            </div>
+            <div style={{ flex: 2, minWidth: 0, paddingRight: '10px' }}>Mahsulot</div>
+            <div style={{ flex: 1.5, minWidth: 0 }}>Shtrix kod</div>
+            <div style={{ flex: 1.5, textAlign: 'center', minWidth: 0 }}>Joriy Qoldiq</div>
+            <div style={{ width: '150px', padding: '0 10px', flexShrink: 0 }}>Yangi Qoldiq</div>
+            <div style={{ width: '100px', textAlign: 'right', flexShrink: 0 }}>Amal</div>
+          </div>
+
+          {/* Virtualized Body */}
+          <div 
+            ref={parentRef} 
+            style={{ flex: 1, overflow: 'auto', position: 'relative' }}
+          >
+            {filteredProducts.length === 0 ? (
+              <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                {loading ? 'Yuklanmoqda...' : 'Hech narsa topilmadi'}
+              </div>
+            ) : (
+              <div
+                style={{
+                  height: `${rowVirtualizer.getTotalSize()}px`,
+                  width: '100%',
+                  position: 'relative',
+                }}
+              >
+                {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                  const p = filteredProducts[virtualRow.index];
+                  const currentStock = p.stockByWarehouse?.[selectedWarehouseId] ?? p.stock ?? 0;
+                  const inputValue = stockInputs[p.id];
+                  
+                  return (
+                    <ProductRow 
+                      key={virtualRow.key}
+                      product={p}
+                      isSelected={selectedIds.has(p.id)}
+                      toggleSelect={toggleSelect}
+                      currentStock={currentStock}
+                      inputValue={inputValue}
+                      handleStockChange={handleStockChange}
+                      saveStock={saveStock}
+                      updatingId={updatingId}
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        height: `${virtualRow.size}px`,
+                        transform: `translateY(${virtualRow.start}px)`,
+                      }}
+                    />
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -273,3 +354,4 @@ const StockUpdate = () => {
 };
 
 export default StockUpdate;
+
