@@ -101,7 +101,7 @@ const Catalog = () => {
   const [newCatName, setNewCatName] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [formData, setFormData] = useState({
-    name: '', barcode: '', categoryId: '', unit: 'dona', costPrice: '', sellPrice: '', stock: '', minStock: ''
+    name: '', barcode: '', categoryId: '', unit: 'dona', costPrice: '', sellPrice: '', stock: '', minStock: '', supplier: '', supplierPrice: ''
   });
   const [formErrors, setFormErrors] = useState({});
 
@@ -237,6 +237,7 @@ const Catalog = () => {
       barcode: finalBarcode,
       costPrice: Number(formData.costPrice),
       sellPrice: Number(formData.sellPrice),
+      supplierPrice: formData.supplierPrice ? Number(formData.supplierPrice) : 0,
       stockByWarehouse: editingId ? undefined : { [selectedWarehouseId]: Number(formData.stock || 0) }, // Use undefined so merge doesn't overwrite if not explicitly handling
       minStock: Number(formData.minStock || 5),
       status: 'active'
@@ -296,12 +297,14 @@ const Catalog = () => {
         costPrice: product.costPrice || '', 
         sellPrice: product.sellPrice || '',
         stock: product.stockByWarehouse?.[selectedWarehouseId] || 0, 
-        minStock: product.minStock || ''
+        minStock: product.minStock || '',
+        supplier: product.supplier || '',
+        supplierPrice: product.supplierPrice || ''
       });
     } else {
       setEditingId(null);
       setFormData({
-        name: '', barcode: '', categoryId: '', unit: 'dona', costPrice: '', sellPrice: '', stock: '', minStock: ''
+        name: '', barcode: '', categoryId: '', unit: 'dona', costPrice: '', sellPrice: '', stock: '', minStock: '', supplier: '', supplierPrice: ''
       });
     }
     setIsModalOpen(true);
@@ -309,8 +312,10 @@ const Catalog = () => {
 
   const handleExport = () => {
     const dataToExport = filteredProducts.map(p => ({
-      'Shtrix-kod': p.barcode,
       'Nomi': p.name,
+      'Yetkazib beruvchi': p.supplier || '',
+      'Y.b narxi': p.supplierPrice || 0,
+      'Shtrix-kod': p.barcode,
       'Kategoriya': categories.find(c => c.id === p.categoryId)?.name || 'Boshqa',
       'O\'lchov birligi': p.unit,
       'Tannarx': p.costPrice,
@@ -329,11 +334,15 @@ const Catalog = () => {
 
   const formatMoney = (v) => new Intl.NumberFormat('uz-UZ').format(v) + ' UZS';
 
-  const filteredProducts = products.filter(p => 
-    p.status !== 'archived' && 
-    ((p.name || '').toLowerCase().includes(search.toLowerCase()) || (p.barcode || '').includes(search)) &&
-    (categoryFilter === '' || p.categoryId === categoryFilter)
-  );
+  const searchTerms = search.toLowerCase().trim().split(/\s+/);
+  const filteredProducts = products.filter(p => {
+    if (p.status === 'archived') return false;
+    if (categoryFilter !== '' && p.categoryId !== categoryFilter) return false;
+    if (!search.trim()) return true;
+    const lowerName = (p.name || '').toLowerCase();
+    const barcode = p.barcode || '';
+    return searchTerms.every(term => lowerName.includes(term) || barcode.includes(term));
+  });
 
   // Reset visible count on filter/search change
   useEffect(() => {
@@ -706,6 +715,11 @@ const Catalog = () => {
             ({(((Number(formData.sellPrice) - Number(formData.costPrice)) / Number(formData.costPrice)) * 100).toFixed(1)}%)
           </div>
         )}
+
+        <div className="form-grid-2">
+          <FormInput label="Yetkazib beruvchi" value={formData.supplier} onChange={e => setFormData({...formData, supplier: e.target.value})} placeholder="Masalan: Ali aka" />
+          <FormInput label="Yetkazib berish narxi" type="number" value={formData.supplierPrice} onChange={e => setFormData({...formData, supplierPrice: e.target.value})} placeholder="10000" />
+        </div>
 
         <div className="form-grid-2">
           {!editingId ? (

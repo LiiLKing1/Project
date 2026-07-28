@@ -3,6 +3,7 @@ import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
 import TitleBar from '../components/TitleBar';
+import BottomNav from './BottomNav';
 import './layout.css';
 
 const MainLayout = () => {
@@ -49,6 +50,7 @@ const MainLayout = () => {
           <main className="page-content" onScroll={handleScroll}>
             <Outlet />
           </main>
+          <BottomNav />
         </div>
       </div>
     </>

@@ -2,7 +2,7 @@ import { dataService } from '../../services/dataService';
 import React, { useState, useEffect, useRef } from 'react';
 import { Search, Plus, Minus, Trash2, CreditCard, Banknote, User, FileText, ChevronDown, Percent, Calendar, X, CheckCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { db } from '../../firebase';
-import { collection, onSnapshot, query, where, writeBatch, increment, doc, orderBy, getDoc, runTransaction } from '../../services/firebaseMock';
+import { collection, onSnapshot, query, where, writeBatch, increment, doc, orderBy, getDoc, runTransaction, getDocs } from '../../services/firebaseMock';
 import { useToast } from '../../context/ToastContext';
 import { useRoles } from '../../context/RolesContext';
 import { useSettings } from '../../context/SettingsContext';
@@ -129,6 +129,32 @@ const POS = () => {
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
   const [lastSale, setLastSale] = useState(null);
 
+  // Daily Receipts (Cheklar)
+  const [isReceiptsDrawerOpen, setIsReceiptsDrawerOpen] = useState(false);
+  const [selectedReceiptDate, setSelectedReceiptDate] = useState(new Date().toISOString().split('T')[0]);
+  const [dailySales, setDailySales] = useState([]);
+  const [isLoadingReceipts, setIsLoadingReceipts] = useState(false);
+  const [selectedOldReceipt, setSelectedOldReceipt] = useState(null);
+
+  useEffect(() => {
+    if (isReceiptsDrawerOpen && storeId) {
+      const fetchSales = async () => {
+        setIsLoadingReceipts(true);
+        try {
+          const snapshot = await getDocs(collection(db, `users/${storeId}/sales`));
+          let sales = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+          sales = sales.filter(s => s.createdAt && s.createdAt.startsWith(selectedReceiptDate));
+          sales.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+          setDailySales(sales);
+        } catch (e) {
+          console.error(e);
+        }
+        setIsLoadingReceipts(false);
+      };
+      fetchSales();
+    }
+  }, [isReceiptsDrawerOpen, selectedReceiptDate, storeId]);
+
   useEffect(() => {
     if (!storeId) return;
 
@@ -239,9 +265,13 @@ const POS = () => {
   const mDebt = Math.max(0, mDiff);
   const mChange = Math.max(0, -mDiff);
 
-  const filteredProducts = products.filter(p => 
-    p.name.toLowerCase().includes(search.toLowerCase()) || p.barcode.includes(search)
-  ).sort((a, b) => {
+  const searchTerms = search.toLowerCase().trim().split(/\s+/);
+  const filteredProducts = products.filter(p => {
+    const lowerName = (p.name || '').toLowerCase();
+    const barcode = p.barcode || '';
+    if (!search.trim()) return true;
+    return searchTerms.every(term => lowerName.includes(term) || barcode.includes(term));
+  }).sort((a, b) => {
     if (sortBy === 'name_asc') {
       return a.name.localeCompare(b.name);
     } else if (sortBy === 'qty_desc') {
@@ -485,7 +515,12 @@ const POS = () => {
       >
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <div className="flex-between">
-              <h1 className="h1" style={{ margin: 0 }}>Sotuv Oynasi</h1>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <h1 className="h1" style={{ margin: 0 }}>Sotuv Oynasi</h1>
+                <button className="btn btn-outline" onClick={() => setIsReceiptsDrawerOpen(true)} style={{ padding: '0.5rem 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <FileText size={18} /> Cheklar
+                </button>
+              </div>
               <select 
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
@@ -512,7 +547,7 @@ const POS = () => {
 
           <div className="pos-products-grid" onScroll={handleGridScroll} style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1rem', overflowY: 'auto', paddingRight: '1rem', paddingBottom: '2rem' }}>
             {filteredProducts.slice(0, visibleCount).map(p => (
-              <div key={p.id} className="glass-panel" onClick={() => addToCart(p)} style={{ padding: '1rem', cursor: p.stock > 0 ? 'pointer' : 'not-allowed', opacity: p.stock > 0 ? 1 : 0.5, transition: 'transform 0.1s' }} onMouseDown={e => p.stock > 0 && (e.currentTarget.style.transform = 'scale(0.98)')} onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'}>
+              <motion.div key={p.id} className="glass-panel" onClick={() => addToCart(p)} whileTap={{ scale: p.stock > 0 ? 0.95 : 1 }} style={{ padding: '1rem', cursor: p.stock > 0 ? 'pointer' : 'not-allowed', opacity: p.stock > 0 ? 1 : 0.5 }}>
                 <div style={{ fontWeight: '600', marginBottom: '0.5rem', fontSize: '1rem' }}>{p.name}</div>
                 <div style={{ color: 'var(--primary)', fontWeight: '700', fontSize: '1.125rem' }}><CurrencyDisplay amount={p.sellPrice} /></div>
                 <div className="flex-between" style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
@@ -521,7 +556,7 @@ const POS = () => {
                     Qoldiq: <AnimatedNumber value={p.stock} />
                   </span>
                 </div>
-              </div>
+              </motion.div>
             ))}
           </div>
       </motion.div>
@@ -595,7 +630,23 @@ const POS = () => {
                   <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '1rem', borderBottom: '1px solid var(--border-color)' }}>
                     <div>
                       <div style={{ fontWeight: '500' }}>{item.name}</div>
-                      <div style={{ color: 'var(--primary)', fontWeight: '600', fontSize: '0.875rem' }}><CurrencyDisplay amount={item.sellPrice * item.qty} /></div>
+                      <div style={{ color: 'var(--primary)', fontWeight: '600', fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem' }}>
+                        <input 
+                          type="number"
+                          value={item.sellPrice}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setCart(prev => prev.map(p => p.id === item.id ? { ...p, sellPrice: val } : p));
+                          }}
+                          onBlur={(e) => {
+                            let num = Number(e.target.value);
+                            if (isNaN(num) || num < 0) num = 0;
+                            setCart(prev => prev.map(p => p.id === item.id ? { ...p, sellPrice: num } : p));
+                          }}
+                          style={{ width: '80px', padding: '2px 4px', border: '1px solid var(--border-color)', borderRadius: '4px', color: 'inherit', fontWeight: 'inherit', background: 'transparent' }}
+                        /> 
+                        <span style={{color: 'var(--text-secondary)'}}>x {item.qty} =</span> <CurrencyDisplay amount={item.sellPrice * item.qty} />
+                      </div>
                     </div>
                     <div className="flex-center" style={{ gap: '0.5rem' }}>
                       <button className="btn btn-outline" style={{ padding: '0.25rem' }} onClick={() => updateQty(item.id, -1, item.stock)}><Minus size={16} /></button>
@@ -637,7 +688,7 @@ const POS = () => {
               <span style={{ fontSize: '1.25rem', color: 'var(--text-secondary)', fontWeight: 500 }}>Jami summa:</span>
               <span className="h1" style={{ color: 'var(--primary)', fontSize: '2rem' }}><CurrencyDisplay amount={subtotal} /></span>
             </div>
-            <button className="btn btn-primary" disabled={cart.length === 0} onClick={openPaymentDrawer} style={{ width: '100%', padding: '1rem', fontSize: '1.125rem' }}>
+            <button className="btn btn-primary" disabled={cart.length === 0} onClick={() => setIsPaymentDrawerOpen(true)} style={{ width: '100%', padding: '1rem', fontSize: '1.125rem' }}>
                To'lash
             </button>
           </div>
@@ -710,7 +761,23 @@ const POS = () => {
                     <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '1rem', borderBottom: '1px solid var(--border-color)' }}>
                       <div>
                         <div style={{ fontWeight: '500' }}>{item.name}</div>
-                        <div style={{ color: 'var(--primary)', fontWeight: '600', fontSize: '0.875rem' }}><CurrencyDisplay amount={item.sellPrice * item.qty} /></div>
+                        <div style={{ color: 'var(--primary)', fontWeight: '600', fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem' }}>
+                          <input 
+                            type="number"
+                            value={item.sellPrice}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setCart(prev => prev.map(p => p.id === item.id ? { ...p, sellPrice: val } : p));
+                            }}
+                            onBlur={(e) => {
+                              let num = Number(e.target.value);
+                              if (isNaN(num) || num < 0) num = 0;
+                              setCart(prev => prev.map(p => p.id === item.id ? { ...p, sellPrice: num } : p));
+                            }}
+                            style={{ width: '80px', padding: '2px 4px', border: '1px solid var(--border-color)', borderRadius: '4px', color: 'inherit', fontWeight: 'inherit', background: 'transparent' }}
+                          /> 
+                          <span style={{color: 'var(--text-secondary)'}}>x {item.qty} =</span> <CurrencyDisplay amount={item.sellPrice * item.qty} />
+                        </div>
                       </div>
                       <div className="flex-center" style={{ gap: '0.5rem' }}>
                         <button className="btn btn-outline" style={{ padding: '0.25rem' }} onClick={() => updateQty(item.id, -1, item.stock)}><Minus size={16} /></button>
@@ -729,7 +796,7 @@ const POS = () => {
                 <span style={{ fontSize: '1.25rem', color: 'var(--text-secondary)', fontWeight: 500 }}>Jami summa:</span>
                 <span className="h1" style={{ color: 'var(--primary)', fontSize: '2rem' }}><CurrencyDisplay amount={subtotal} /></span>
               </div>
-              <button className="btn btn-primary" disabled={cart.length === 0} onClick={openPaymentDrawer} style={{ width: '100%', padding: '1rem', fontSize: '1.125rem' }}>
+              <button className="btn btn-primary" disabled={cart.length === 0} onClick={() => { setIsCartDrawerOpen(false); setIsPaymentDrawerOpen(true); }} style={{ width: '100%', padding: '1rem', fontSize: '1.125rem' }}>
                  To'lash
               </button>
             </div>
@@ -817,54 +884,56 @@ const POS = () => {
               }}>
 
                 {/* ── LEFT: Receipt ── */}
-                <div className="pos-payment-left" style={{
-                  width: '380px',
-                  flexShrink: 0,
-                  background: 'linear-gradient(160deg, #1A2538 0%, #2C4A7C 100%)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  padding: '24px 20px',
-                  gap: '16px',
-                  position: 'relative',
-                  overflow: 'hidden',
-                }}>
-                  {/* Decorative circles */}
-                  <div style={{ position: 'absolute', top: -60, right: -60, width: 200, height: 200, borderRadius: '50%', background: 'rgba(74,144,226,0.12)' }} />
-                  <div style={{ position: 'absolute', bottom: -40, left: -40, width: 150, height: 150, borderRadius: '50%', background: 'rgba(123,206,235,0.1)' }} />
+                {!isMobile && (
+                  <div className="pos-payment-left" style={{
+                    width: '380px',
+                    flexShrink: 0,
+                    background: 'linear-gradient(160deg, #1A2538 0%, #2C4A7C 100%)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '24px 20px',
+                    gap: '16px',
+                    position: 'relative',
+                    overflow: 'hidden',
+                  }}>
+                    {/* Decorative circles */}
+                    <div style={{ position: 'absolute', top: -60, right: -60, width: 200, height: 200, borderRadius: '50%', background: 'rgba(74,144,226,0.12)' }} />
+                    <div style={{ position: 'absolute', bottom: -40, left: -40, width: 150, height: 150, borderRadius: '50%', background: 'rgba(123,206,235,0.1)' }} />
 
-                  <div style={{ position: 'relative', zIndex: 1, color: '#fff', textAlign: 'center', marginBottom: 4 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, opacity: 0.6, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Chek namunasi</div>
-                    <div style={{ fontSize: 12, opacity: 0.4 }}>Tasdiqlashdan avval tekshiring</div>
-                  </div>
-
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.15, duration: 0.4 }}
-                    style={{ position: 'relative', zIndex: 1, width: '100%', overflowY: 'auto', maxHeight: 'calc(100% - 80px)',
-                      scrollbarWidth: 'none',
-                    }}
-                  >
-                    <style>{`.receipt-scroll::-webkit-scrollbar{display:none}`}</style>
-                    <div className="receipt-scroll">
-                      <Receipt sale={{
-                        id: 'PREVIEW',
-                        items: cart,
-                        subtotal,
-                        discountAmount,
-                        usedBonusAmount,
-                        finalTotal,
-                        paymentType,
-                        customerName: selectedCustomer ? selectedCustomer.fullName : 'Xaridor',
-                        createdAt: new Date().toISOString(),
-                        cashierId: userProfile?.name || 'Kassir',
-                        storeId,
-                      }} storeId={storeId} />
+                    <div style={{ position: 'relative', zIndex: 1, color: '#fff', textAlign: 'center', marginBottom: 4 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, opacity: 0.6, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Chek namunasi</div>
+                      <div style={{ fontSize: 12, opacity: 0.4 }}>Tasdiqlashdan avval tekshiring</div>
                     </div>
-                  </motion.div>
-                </div>
+
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.15, duration: 0.4 }}
+                      style={{ position: 'relative', zIndex: 1, width: '100%', overflowY: 'auto', maxHeight: 'calc(100% - 80px)',
+                        scrollbarWidth: 'none',
+                      }}
+                    >
+                      <style>{`.receipt-scroll::-webkit-scrollbar{display:none}`}</style>
+                      <div className="receipt-scroll">
+                        <Receipt sale={{
+                          id: 'PREVIEW',
+                          items: cart,
+                          subtotal,
+                          discountAmount,
+                          usedBonusAmount,
+                          finalTotal,
+                          paymentType,
+                          customerName: selectedCustomer ? selectedCustomer.fullName : 'Xaridor',
+                          createdAt: new Date().toISOString(),
+                          cashierId: userProfile?.name || 'Kassir',
+                          storeId,
+                        }} storeId={storeId} />
+                      </div>
+                    </motion.div>
+                  </div>
+                )}
 
                 {/* ── RIGHT: Payment Form ── */}
                 <div className="pos-payment-right" style={{
@@ -1116,6 +1185,49 @@ const POS = () => {
           </div>
         )}
       </Modal>
+      {/* Daily Receipts Drawer */}
+      <Drawer isOpen={isReceiptsDrawerOpen} onClose={() => setIsReceiptsDrawerOpen(false)} title="Kunlik Cheklar">
+        <div style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem', height: '100%' }}>
+          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+            <label style={{ fontWeight: 600 }}>Sana:</label>
+            <input type="date" value={selectedReceiptDate} onChange={e => setSelectedReceiptDate(e.target.value)} style={{ padding: '0.5rem', borderRadius: '4px', border: '1px solid var(--border-color)' }} />
+          </div>
+          <div style={{ flex: 1, overflowY: 'auto' }}>
+            {isLoadingReceipts ? (
+              <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>Yuklanmoqda...</div>
+            ) : dailySales.length === 0 ? (
+              <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>Bu sanada sotuvlar topilmadi</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                {dailySales.map(sale => (
+                  <div key={sale.id} onClick={() => setSelectedOldReceipt(sale)} style={{ padding: '1rem', background: '#f8fafc', borderRadius: '8px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid #e2e8f0' }}>
+                    <div>
+                      <div style={{ fontWeight: 600 }}>{sale.customerName || 'Xaridor'}</div>
+                      <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>{new Date(sale.createdAt).toLocaleTimeString()}</div>
+                    </div>
+                    <div style={{ fontWeight: 700, color: 'var(--primary)' }}>
+                      <CurrencyDisplay amount={sale.finalTotal} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </Drawer>
+
+      <Modal isOpen={!!selectedOldReceipt} onClose={() => setSelectedOldReceipt(null)} title="Chek">
+        {selectedOldReceipt && (
+          <div className="flex-col" style={{ gap: '1.5rem', alignItems: 'center' }}>
+            <Receipt sale={selectedOldReceipt} storeId={storeId} />
+            <div style={{ display: 'flex', gap: '1rem', width: '100%', maxWidth: '350px' }}>
+              <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => setSelectedOldReceipt(null)}>Yopish</button>
+              <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => dataService.printReceipt()}>Chop etish</button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
     </div>
   );
 };

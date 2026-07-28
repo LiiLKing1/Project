@@ -17,7 +17,7 @@ const Settings = () => {
     storeName: '', address: '', taxRate: ''
   });
   const [generalData, setGeneralData] = useState({
-    theme: 'light', language: 'uz', currency: 'UZS', showUsdConversion: false, usdRate: 12500, rubRate: 140
+    theme: 'light', language: 'uz', currency: 'UZS', sellCurrency: 'UZS', costCurrency: 'USD', showUsdConversion: false, usdRate: 12500, rubRate: 140
   });
   const [loyaltyData, setLoyaltyData] = useState({
     bonusPercent: 0, minPurchaseForBonus: 0, vipMultiplier: 1
@@ -40,6 +40,8 @@ const Settings = () => {
         theme: settings.theme || 'light',
         language: settings.language || 'uz',
         currency: settings.currency || 'UZS',
+        sellCurrency: settings.sellCurrency || 'UZS',
+        costCurrency: settings.costCurrency || 'USD',
         showUsdConversion: settings.showUsdConversion || false,
         usdRate: settings.usdRate || 12500,
         rubRate: settings.rubRate || 140,
@@ -185,6 +187,30 @@ const Settings = () => {
               <CustomSelect 
                 value={generalData.currency} 
                 onChange={v => setGeneralData({...generalData, currency: v})} 
+                options={[
+                  {value: 'UZS', label: "UZS (So'm)"},
+                  {value: 'USD', label: "USD ($)"},
+                  {value: 'RUB', label: "RUB (₽)"}
+                ]}
+              />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <label style={{ fontSize: 14, fontWeight: 500, color: '#1A2538' }}>Sotuv narxi valyutasi</label>
+              <CustomSelect 
+                value={generalData.sellCurrency} 
+                onChange={v => setGeneralData({...generalData, sellCurrency: v})} 
+                options={[
+                  {value: 'UZS', label: "UZS (So'm)"},
+                  {value: 'USD', label: "USD ($)"},
+                  {value: 'RUB', label: "RUB (₽)"}
+                ]}
+              />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <label style={{ fontSize: 14, fontWeight: 500, color: '#1A2538' }}>Tannarx valyutasi</label>
+              <CustomSelect 
+                value={generalData.costCurrency} 
+                onChange={v => setGeneralData({...generalData, costCurrency: v})} 
                 options={[
                   {value: 'UZS', label: "UZS (So'm)"},
                   {value: 'USD', label: "USD ($)"},
