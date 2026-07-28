@@ -297,7 +297,7 @@ const POS = () => {
   const mChange = Math.max(0, -mDiff);
 
   const searchTerms = normalizeSearchText(search).trim().split(/\s+/);
-  const filteredProducts = allProducts.filter(p => {
+  const filteredProducts = products.filter(p => {
     if (p.status === 'archived') return false;
     const lowerName = normalizeSearchText(p.name);
     const barcode = p.barcode || '';
