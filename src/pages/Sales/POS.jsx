@@ -266,6 +266,10 @@ const POS = () => {
   };
 
   const removeFromCart = (id) => setCart(prev => prev.filter(p => p.id !== id));
+
+  const updateItemPrice = (id, newPrice) => {
+    setCart(prev => prev.map(p => p.id === id ? { ...p, sellPrice: newPrice } : p));
+  };
   
   // Totals calculations
   const subtotal = cart.reduce((acc, item) => acc + (item.sellPrice * item.qty), 0);
@@ -998,6 +1002,34 @@ const POS = () => {
                         <Banknote size={26} color="#fff" />
                       </div>
                     </motion.div>
+
+                    {/* Cart Items Price Edit */}
+                    {cart.length > 0 && (
+                      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12 }}
+                        style={{ border: '1.5px solid #DCE8F5', borderRadius: '16px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}
+                      >
+                        <div style={{ fontSize: 14, fontWeight: 700, color: '#1A2538', marginBottom: '4px' }}>Mahsulotlar narxi</div>
+                        {cart.map(item => (
+                          <div key={item.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', background: '#F7FAFF', borderRadius: '12px', border: '1px solid #DCE8F5' }}>
+                            <div style={{ flex: 1, minWidth: 0, paddingRight: '12px' }}>
+                              <div style={{ fontWeight: 600, fontSize: 13, color: '#1A2538', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.name}</div>
+                              <div style={{ fontSize: 11, color: '#8A9BB5' }}>{item.qty} x <CurrencyDisplay amount={item.sellPrice} isSell /></div>
+                            </div>
+                            <div style={{ width: '120px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', background: '#fff', borderRadius: '8px', border: '1.5px solid #DCE8F5', overflow: 'hidden', padding: '4px 8px' }}>
+                                <input 
+                                  type="number"
+                                  value={item.sellPrice}
+                                  onChange={e => updateItemPrice(item.id, Number(e.target.value))}
+                                  style={{ width: '100%', border: 'none', fontSize: 13, fontWeight: 600, outline: 'none', textAlign: 'right', background: 'transparent' }}
+                                  disabled={!canDiscount}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </motion.div>
+                    )}
 
                     {/* Discount Block */}
                     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
