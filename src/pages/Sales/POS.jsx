@@ -792,8 +792,8 @@ const POS = () => {
         style={{ gap: '1.5rem', overflow: 'hidden', height: '100%', flex: 1, display: 'flex', flexDirection: 'column' }}
       >
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <div className="flex-between">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <div className="flex-between" style={{ flexWrap: 'wrap', gap: '1rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                 <h1 className="h1" style={{ margin: 0 }}>Sotuv Oynasi</h1>
                 <button className="btn btn-outline" onClick={() => setIsReceiptsDrawerOpen(true)} style={{ padding: '0.5rem 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <FileText size={18} /> Cheklar
@@ -917,9 +917,15 @@ const POS = () => {
                   <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '1rem', borderBottom: '1px solid var(--border-color)' }}>
                     <div>
                       <div style={{ fontWeight: '500' }}>{item.name}</div>
-                      <div style={{ color: 'var(--primary)', fontWeight: '600', fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem' }}>
-                        <CurrencyDisplay amount={item.sellPrice} isSell />
-                        <span style={{color: 'var(--text-secondary)'}}>x {item.qty} =</span> <CurrencyDisplay amount={item.sellPrice * item.qty} isSell />
+                      <div style={{ color: 'var(--primary)', fontWeight: '600', fontSize: '0.875rem', marginTop: '0.25rem', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                          <CurrencyDisplay amount={item.sellPrice} isSell />
+                          <span style={{color: 'var(--text-secondary)', alignSelf: 'flex-start', marginTop: '2px'}}>x {item.qty}</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#F8FAFC', padding: '4px 8px', borderRadius: '6px', width: 'fit-content' }}>
+                          <span style={{color: 'var(--text-secondary)', fontWeight: 500}}>=</span>
+                          <CurrencyDisplay amount={item.sellPrice * item.qty} isSell />
+                        </div>
                       </div>
                     </div>
                     <div className="flex-center" style={{ gap: '0.5rem' }}>
@@ -1298,7 +1304,7 @@ const POS = () => {
                         <div style={{ display: 'flex', gap: '8px' }}>
                           <input
                             type="text" value={couponCode} onChange={e => setCouponCode(e.target.value.toUpperCase())} placeholder="Kupon kodi"
-                            style={{ flex: 1, padding: '9px 14px', borderRadius: '10px', border: '1.5px solid #DCE8F5', fontSize: 14, fontFamily: 'inherit', outline: 'none' }}
+                            style={{ flex: 1, minWidth: '150px', padding: '9px 14px', borderRadius: '10px', border: '1.5px solid #DCE8F5', fontSize: 14, fontFamily: 'inherit', outline: 'none' }}
                           />
                           <button onClick={handleApplyCoupon} disabled={isApplyingCoupon || !couponCode}
                             style={{ padding: '9px 16px', borderRadius: '10px', border: 'none', background: '#4A90E2', color: '#fff', fontWeight: 600, cursor: 'pointer' }}
