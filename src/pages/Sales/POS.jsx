@@ -832,7 +832,7 @@ const POS = () => {
 
           <div className="pos-products-grid" onScroll={handleGridScroll} style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1rem', overflowY: 'auto', paddingRight: '1rem', paddingBottom: '2rem' }}>
             {filteredProducts.slice(0, visibleCount).map(p => (
-              <motion.div key={p.id} className="glass-panel" onClick={() => addToCart(p)} whileTap={{ scale: p.stock > 0 ? 0.94 : 1, backgroundColor: p.stock > 0 ? '#EAF4FC' : '' }} style={{ padding: '1rem', cursor: p.stock > 0 ? 'pointer' : 'not-allowed', opacity: p.stock > 0 ? 1 : 0.5, transition: 'background-color 0.2s' }}>
+              <motion.div key={p.id} className="glass-panel" onClick={() => addToCart(p)} whileTap={{ scale: p.stock > 0 ? 0.94 : 1, backgroundColor: p.stock > 0 ? '#EAF4FC' : '' }} style={{ padding: '1rem', cursor: p.stock > 0 ? 'pointer' : 'not-allowed', opacity: p.stock > 0 ? 1 : 0.5, transition: 'background-color 0.2s', userSelect: 'none', WebkitUserSelect: 'none' }}>
                 <div style={{ fontWeight: '600', marginBottom: '0.5rem', fontSize: '1rem' }}><HighlightText text={p.name} search={search} /></div>
                 <div style={{ color: 'var(--primary)', fontWeight: '700', fontSize: '1.125rem' }}><CurrencyDisplay amount={p.sellPrice} isSell /></div>
                 <div className="flex-between" style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
