@@ -18,6 +18,7 @@ import { useNavigate } from 'react-router-dom';
 import { useSettings } from '../../context/SettingsContext';
 import { useWarehouse } from '../../context/WarehouseContext';
 import CurrencyDisplay from '../../components/CurrencyDisplay';
+import Modal from '../../components/Modal';
 
 /* ─── helpers ─────────────────────────────────────────── */
 const pct = (a, b) => b > 0 ? Math.round((a / b) * 100) : 0;
@@ -47,6 +48,7 @@ const Dashboard = () => {
   const [orders, setOrders]       = useState([]);
   const [loading, setLoading]     = useState(true);
   const [timeFilter, setTimeFilter] = useState('bugun');
+  const [isTopProductsModalOpen, setIsTopProductsModalOpen] = useState(false);
 
   const { userProfile }         = useRoles();
   const { settings }            = useSettings();
@@ -145,7 +147,7 @@ const Dashboard = () => {
   const overdueDebts = activeDebts.filter(d=>new Date(d.dueDate)<now).length;
   const pendingOrders = orders.filter(o=>o.status==='pending');
 
-  const topProducts = useMemo(() => {
+  const allTopProducts = useMemo(() => {
     const map = {};
     filteredSales.forEach(sale => {
       sale.items?.forEach(item => {
@@ -154,10 +156,12 @@ const Dashboard = () => {
         map[item.productId].revenue += Number(item.qty||0)*Number(item.price||0);
       });
     });
-    return Object.values(map).sort((a,b)=>b.qty-a.qty).slice(0,5);
+    return Object.values(map).sort((a,b)=>b.qty-a.qty);
   }, [filteredSales]);
 
-  const maxTopRev = Math.max(...topProducts.map(p=>p.revenue), 1);
+  const topProducts = allTopProducts.slice(0, 5);
+
+  const maxTopRev = Math.max(...allTopProducts.map(p=>p.revenue), 1);
 
   /* chart data */
   const chartBars = useMemo(() => {
@@ -465,7 +469,14 @@ const Dashboard = () => {
                 </div>
                 Top Mahsulotlar
               </div>
-              <span className="db-panel-badge">{filterLabels[timeFilter]}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {allTopProducts.length > 5 && (
+                  <button className="db-panel-link" onClick={() => setIsTopProductsModalOpen(true)}>
+                    Barchasini ko'rish
+                  </button>
+                )}
+                <span className="db-panel-badge">{filterLabels[timeFilter]}</span>
+              </div>
             </div>
 
             <div className="db-sales-overview">
@@ -600,7 +611,33 @@ const Dashboard = () => {
           </div>
 
         </div>
-      </div>
+  
+      <Modal isOpen={isTopProductsModalOpen} onClose={() => setIsTopProductsModalOpen(false)} title="Barcha Top Mahsulotlar">
+        <div style={{ maxHeight: '60vh', overflowY: 'auto', paddingRight: '10px' }}>
+          <div className="db-progress-row">
+            {allTopProducts.map((p, i) => (
+              <div key={i} className="db-progress-item">
+                <div className="db-progress-top">
+                  <span className="db-progress-label">
+                    <span style={{ fontWeight: 600, marginRight: '8px', color: '#94A3B8' }}>{i + 1}.</span>
+                    {p.name}
+                  </span>
+                  <span className="db-progress-pct">{pct(p.revenue, maxTopRev)}%</span>
+                </div>
+                <div className="db-progress-track">
+                  <div
+                    className="db-progress-fill"
+                    style={{ width: `${pct(p.revenue, maxTopRev)}%` }}
+                  />
+                </div>
+                <div style={{ fontSize: 12, color: '#64748B', marginTop: '4px' }}>
+                  Sotildi: {p.qty} ta | Tushum: <CurrencyDisplay amount={p.revenue} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

@@ -793,15 +793,16 @@ const POS = () => {
       >
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <div className="flex-between" style={{ flexWrap: 'wrap', gap: '1rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                <h1 className="h1" style={{ margin: 0 }}>Sotuv Oynasi</h1>
-                <button className="btn btn-outline" onClick={() => setIsReceiptsDrawerOpen(true)} style={{ padding: '0.5rem 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', overflowX: 'auto', flexWrap: 'nowrap', paddingBottom: '4px', scrollbarWidth: 'none', msOverflowStyle: 'none' }} className="hide-scrollbar">
+                <style>{`.hide-scrollbar::-webkit-scrollbar { display: none; }`}</style>
+                <h1 className="h1" style={{ margin: 0, whiteSpace: 'nowrap', flexShrink: 0 }}>Sotuv Oynasi</h1>
+                <button className="btn btn-outline" onClick={() => setIsReceiptsDrawerOpen(true)} style={{ padding: '0.4rem 0.8rem', display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0, whiteSpace: 'nowrap' }}>
                   <FileText size={18} /> Cheklar
                 </button>
-                <button className="btn btn-outline" onClick={() => setIsParkedDrawerOpen(true)} style={{ padding: '0.5rem 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <button className="btn btn-outline" onClick={() => setIsParkedDrawerOpen(true)} style={{ padding: '0.4rem 0.8rem', display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0, whiteSpace: 'nowrap' }}>
                   <Archive size={18} /> Chetga qo'yilganlar ({parkedSales.filter(p => p.status !== 'deleted').length})
                 </button>
-                <button className="btn" onClick={handleCloseShiftPrepare} style={{ padding: '0.5rem 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#FCE8E8', color: '#EF4B4B', border: '1.5px solid #FFE0E0' }}>
+                <button className="btn" onClick={handleCloseShiftPrepare} style={{ padding: '0.4rem 0.8rem', display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#FCE8E8', color: '#EF4B4B', border: '1.5px solid #FFE0E0', flexShrink: 0, whiteSpace: 'nowrap' }}>
                   <LogOut size={18} /> Smenani yopish
                 </button>
               </div>
