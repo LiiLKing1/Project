@@ -725,6 +725,27 @@ const POS = () => {
     }
     setIsApplyingCoupon(false);
   };
+
+  useEffect(() => {
+    const topbar = document.querySelector('.topbar');
+    if (topbar && isMobile) {
+      if (isCartDrawerOpen) {
+        topbar.style.transform = 'translateX(-30%)';
+        topbar.style.opacity = '0.3';
+        topbar.style.transition = 'transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1), opacity 0.5s ease';
+      } else {
+        topbar.style.transform = 'translateX(0)';
+        topbar.style.opacity = '1';
+      }
+    }
+    return () => {
+      if (topbar) {
+        topbar.style.transform = '';
+        topbar.style.opacity = '';
+        topbar.style.transition = '';
+      }
+    }
+  }, [isCartDrawerOpen, isMobile]);
   
   if (isCheckingShift) {
     return <div className="flex-center" style={{ height: '100%', fontSize: '1.2rem', color: '#666' }}>Yuklanmoqda...</div>;
@@ -754,26 +775,7 @@ const POS = () => {
     );
   }
 
-  useEffect(() => {
-    const topbar = document.querySelector('.topbar');
-    if (topbar && isMobile) {
-      if (isCartDrawerOpen) {
-        topbar.style.transform = 'translateX(-30%)';
-        topbar.style.opacity = '0.3';
-        topbar.style.transition = 'transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1), opacity 0.5s ease';
-      } else {
-        topbar.style.transform = 'translateX(0)';
-        topbar.style.opacity = '1';
-      }
-    }
-    return () => {
-      if (topbar) {
-        topbar.style.transform = '';
-        topbar.style.opacity = '';
-        topbar.style.transition = '';
-      }
-    }
-  }, [isCartDrawerOpen, isMobile]);
+
 
   return (
     <div className="pos-layout" style={{ overflow: 'hidden', height: '100%', display: isMobile ? 'flex' : undefined, flexDirection: isMobile ? 'column' : undefined }}>
