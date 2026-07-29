@@ -12,6 +12,7 @@ import Modal from '../../components/Modal';
 import Drawer from '../../components/Drawer';
 import FormInput from '../../components/FormInput';
 import CurrencyDisplay from '../../components/CurrencyDisplay';
+import CustomerProfileDrawer from './CustomerProfileDrawer';
 
 const Customers = () => {
   const [customers, setCustomers] = useState([]);
@@ -25,6 +26,8 @@ const Customers = () => {
   const curr = settings?.currency || 'UZS';
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [profileDrawerOpen, setProfileDrawerOpen] = useState(false);
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [editingId, setEditingId] = useState(null);
   const [formData, setFormData] = useState({ fullName: '', phone: '+998', birthDate: '', gender: '', note: '', currentDebt: '', isVip: false, bonusBalance: '', bonusPercent: '' });
   const [formErrors, setFormErrors] = useState({});
@@ -240,7 +243,7 @@ const Customers = () => {
               Mijozlar topilmadi
             </div>
           ) : filteredCustomers.map(c => (
-            <div className="customers-table-row" key={c.id}>
+            <div className="customers-table-row" key={c.id} onClick={() => { setSelectedCustomer(c); setProfileDrawerOpen(true); }} style={{ cursor: 'pointer' }}>
               {/* 1. Name */}
               <div className="cust-col-name">
                 {c.fullName}
@@ -272,8 +275,8 @@ const Customers = () => {
 
               {/* 6. Actions */}
               <div className="cust-col-actions">
-                <button className="action-btn edit" onClick={() => openModal(c)} title="Tahrirlash"><Edit size={14}/></button>
-                <button className="action-btn delete" onClick={() => handleDelete(c)} title="O'chirish"><Trash2 size={14}/></button>
+                <button className="action-btn edit" onClick={(e) => { e.stopPropagation(); openModal(c); }} title="Tahrirlash"><Edit size={14}/></button>
+                <button className="action-btn delete" onClick={(e) => { e.stopPropagation(); handleDelete(c); }} title="O'chirish"><Trash2 size={14}/></button>
               </div>
             </div>
           ))}
@@ -319,6 +322,11 @@ const Customers = () => {
           <button className="btn btn-primary" style={{ flex: 2 }} onClick={handleSave}>Saqlash</button>
         </div>
       </Drawer>
+      <CustomerProfileDrawer 
+        isOpen={profileDrawerOpen} 
+        onClose={() => setProfileDrawerOpen(false)} 
+        customer={selectedCustomer} 
+      />
     </div>
   );
 };

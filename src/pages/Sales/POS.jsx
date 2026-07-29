@@ -1,8 +1,8 @@
 import { dataService } from '../../services/dataService';
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, Plus, Minus, Trash2, CreditCard, Banknote, User, FileText, ChevronDown, Percent, Calendar, X, CheckCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, Plus, Minus, Trash2, CreditCard, Banknote, User, FileText, ChevronDown, Percent, Calendar, X, CheckCircle, ChevronLeft, ChevronRight, Archive, LogOut, Download, Play, Save } from 'lucide-react';
 import { db } from '../../firebase';
-import { collection, onSnapshot, query, where, writeBatch, increment, doc, orderBy, getDoc, runTransaction, getDocs } from '../../services/firebaseMock';
+import { collection, onSnapshot, query, where, writeBatch, increment, doc, orderBy, getDoc, runTransaction, getDocs, addDoc, updateDoc } from '../../services/firebaseMock';
 import { useToast } from '../../context/ToastContext';
 import { useRoles } from '../../context/RolesContext';
 import { useSettings } from '../../context/SettingsContext';
@@ -51,6 +51,23 @@ const POS = () => {
   const [allProducts, setAllProducts] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [cart, setCart] = useState([]);
+  
+  // -- NEW STATES --
+  const [openShift, setOpenShift] = useState(null);
+  const [isCheckingShift, setIsCheckingShift] = useState(true);
+  const [openingCashInput, setOpeningCashInput] = useState('');
+  const [isCloseShiftModalOpen, setIsCloseShiftModalOpen] = useState(false);
+  const [actualCashInput, setActualCashInput] = useState('');
+  const [shiftExpectedCash, setShiftExpectedCash] = useState(0);
+  
+  const [parkedSales, setParkedSales] = useState([]);
+  const [isParkedDrawerOpen, setIsParkedDrawerOpen] = useState(false);
+  
+  const [couponCode, setCouponCode] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState(null);
+  const [couponError, setCouponError] = useState('');
+  const [isApplyingCoupon, setIsApplyingCoupon] = useState(false);
+  // ----------------
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState('available_first');
   const [visibleCount, setVisibleCount] = useState(30);
@@ -187,7 +204,7 @@ const POS = () => {
   }, [isReceiptsDrawerOpen, selectedReceiptDate, storeId]);
 
   useEffect(() => {
-    if (!storeId) return;
+    if (!storeId || !userProfile?.uid) return;
 
     const unsubProducts = onSnapshot(query(collection(db, `users/${storeId}/products`), where('status', '==', 'active')), (snapshot) => {
       setAllProducts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
@@ -196,12 +213,29 @@ const POS = () => {
     const unsubCustomers = onSnapshot(query(collection(db, `users/${storeId}/customers`), orderBy('createdAt', 'desc')), (snapshot) => {
       setCustomers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
+    
+    // Listen for open shift
+    const unsubShift = onSnapshot(query(collection(db, `users/${storeId}/cashShifts`), where('cashierId', '==', userProfile.uid), where('status', '==', 'ochiq')), (snapshot) => {
+      if (!snapshot.empty) {
+        setOpenShift({ id: snapshot.docs[0].id, ...snapshot.docs[0].data() });
+      } else {
+        setOpenShift(null);
+      }
+      setIsCheckingShift(false);
+    });
+    
+    // Listen for parked sales
+    const unsubParked = onSnapshot(query(collection(db, `users/${storeId}/parkedSales`), where('cashierId', '==', userProfile.uid)), (snapshot) => {
+      setParkedSales(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
 
     return () => {
       unsubProducts();
       unsubCustomers();
+      unsubShift();
+      unsubParked();
     };
-  }, [storeId]);
+  }, [storeId, userProfile?.uid]);
 
   // Handle Edit Sale Data
   useEffect(() => {
@@ -275,7 +309,13 @@ const POS = () => {
   const subtotal = cart.reduce((acc, item) => acc + (item.sellPrice * item.qty), 0);
   
   let discountAmount = 0;
-  if (discountValue) {
+  if (appliedCoupon) {
+     if (appliedCoupon.discountType === 'percent') {
+       discountAmount = subtotal * (Number(appliedCoupon.discountValue) / 100);
+     } else {
+       discountAmount = Number(appliedCoupon.discountValue);
+     }
+  } else if (discountValue) {
     if (discountType === 'percent') {
       discountAmount = subtotal * (Number(discountValue) / 100);
     } else {
@@ -425,6 +465,8 @@ const POS = () => {
       // 2. Create Sale Document
       const saleRef = doc(collection(db, `users/${storeId}/sales`));
       const saleData = {
+        shiftId: openShift ? openShift.id : null,
+        couponId: appliedCoupon ? appliedCoupon.id : null,
         saleNumber: 'CH-' + Date.now().toString().slice(-6),
         items: cart.map(i => ({ productId: i.id, name: i.name, qty: i.qty, price: i.sellPrice, costPrice: i.costPrice })),
         subtotal: subtotal,
@@ -456,6 +498,14 @@ const POS = () => {
           status: 'active',
           createdAt: new Date().toISOString(),
           createdBy: userProfile?.name || 'Kassir'
+        });
+      }
+      
+      // Update coupon usage
+      if (appliedCoupon) {
+        const couponRef = doc(db, `users/${storeId}/coupons`, appliedCoupon.id);
+        transaction.update(couponRef, {
+          usedCount: increment(1)
         });
       }
 
@@ -494,6 +544,9 @@ const POS = () => {
       setMixedCard('');
       setMixedDebt('');
       setCashAmount('');
+      setAppliedCoupon(null);
+      setCouponCode('');
+      setCouponError('');
       
       setIsReceiptModalOpen(true);
     } catch (error) {
@@ -513,6 +566,192 @@ const POS = () => {
   };
   
   const canDiscount = userProfile?.role === 'admin' || userProfile?.role === 'manager';
+
+
+  const handleOpenShift = async () => {
+    if (!openingCashInput) {
+      addToast('Iltimos, boshlang\'ich summani kiriting', 'error');
+      return;
+    }
+    try {
+      await addDoc(collection(db, `users/${storeId}/cashShifts`), {
+        cashierId: userProfile.uid,
+        cashierName: userProfile.name || userProfile.fullName || 'Kassir',
+        openingCash: Number(openingCashInput),
+        openedAt: new Date().toISOString(),
+        closedAt: null,
+        expectedCash: 0,
+        actualCash: 0,
+        difference: 0,
+        status: 'ochiq',
+        totalCash: 0,
+        totalCard: 0,
+        totalDebt: 0,
+        salesCount: 0,
+        warehouseId: selectedWarehouseId
+      });
+      addToast('Smena muvaffaqiyatli ochildi', 'success');
+    } catch (e) {
+      addToast('Xatolik: ' + e.message, 'error');
+    }
+  };
+
+  const handleCloseShiftPrepare = async () => {
+    if (!openShift) return;
+    try {
+      // Calculate expected cash
+      const salesSnap = await getDocs(query(collection(db, `users/${storeId}/sales`), where('shiftId', '==', openShift.id)));
+      let cashTotal = 0;
+      salesSnap.forEach(d => {
+        const s = d.data();
+        if (s.status !== 'fully_returned' && s.status !== 'archived') {
+           cashTotal += (s.cashReceived || 0);
+        }
+      });
+      setShiftExpectedCash(openShift.openingCash + cashTotal);
+      setIsCloseShiftModalOpen(true);
+    } catch (e) {
+      addToast('Xatolik: ' + e.message, 'error');
+    }
+  };
+
+  const handleCloseShift = async () => {
+    if (!actualCashInput) {
+      addToast('Iltimos, haqiqiy summani kiriting', 'error');
+      return;
+    }
+    const actual = Number(actualCashInput);
+    const diff = actual - shiftExpectedCash;
+    
+    try {
+      // Get all sales for stats
+      const salesSnap = await getDocs(query(collection(db, `users/${storeId}/sales`), where('shiftId', '==', openShift.id)));
+      let tCash = 0, tCard = 0, tDebt = 0;
+      salesSnap.forEach(d => {
+        const s = d.data();
+        if (s.status !== 'fully_returned' && s.status !== 'archived') {
+          tCash += (s.cashReceived || 0);
+          tCard += (s.cardAmount || 0);
+          tDebt += (s.paymentBreakdown?.find(p => p.method === 'debt')?.amount || 0);
+        }
+      });
+
+      await updateDoc(doc(db, `users/${storeId}/cashShifts`, openShift.id), {
+        status: 'yopiq',
+        closedAt: new Date().toISOString(),
+        expectedCash: shiftExpectedCash,
+        actualCash: actual,
+        difference: diff,
+        totalCash: tCash,
+        totalCard: tCard,
+        totalDebt: tDebt,
+        salesCount: salesSnap.size
+      });
+      addToast('Smena yopildi', 'success');
+      setIsCloseShiftModalOpen(false);
+      setOpenShift(null);
+      setActualCashInput('');
+    } catch (e) {
+      addToast('Xatolik: ' + e.message, 'error');
+    }
+  };
+
+  const handleParkSale = async () => {
+    if (cart.length === 0) return;
+    try {
+      await addDoc(collection(db, `users/${storeId}/parkedSales`), {
+        cashierId: userProfile.uid,
+        items: cart,
+        customerId: selectedCustomer ? selectedCustomer.id : null,
+        createdAt: new Date().toISOString(),
+      });
+      setCart([]);
+      setSelectedCustomer(null);
+      addToast('Savat chetga qo\'yildi', 'success');
+    } catch (e) {
+      addToast(e.message, 'error');
+    }
+  };
+
+  const handleRestoreParked = async (parked) => {
+    if (cart.length > 0) {
+       addToast('Joriy savatni tozalab oling yoki avval to\'lang', 'error');
+       return;
+    }
+    try {
+      setCart(parked.items);
+      if (parked.customerId) {
+        const c = customers.find(c => c.id === parked.customerId);
+        if (c) setSelectedCustomer(c);
+      }
+      await updateDoc(doc(db, `users/${storeId}/parkedSales`, parked.id), { status: 'restored' }); 
+      // or delete it
+      // Let's just delete it for simplicity
+      const { deleteDoc } = require('firebase/firestore'); // wait, we don't have deleteDoc. Let's just soft delete or use runTransaction.
+      // Actually we have runTransaction. Let's just use updateDoc status = deleted
+      await updateDoc(doc(db, `users/${storeId}/parkedSales`, parked.id), { status: 'deleted' });
+      addToast('Savat qayta yuklandi', 'success');
+      setIsParkedDrawerOpen(false);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+  
+  const handleApplyCoupon = async () => {
+    if (!couponCode.trim()) return;
+    setIsApplyingCoupon(true);
+    setCouponError('');
+    try {
+      const snap = await getDocs(query(collection(db, `users/${storeId}/coupons`), where('code', '==', couponCode.trim().toUpperCase())));
+      if (snap.empty) {
+        setCouponError('Kupon topilmadi');
+        setIsApplyingCoupon(false);
+        return;
+      }
+      const c = { id: snap.docs[0].id, ...snap.docs[0].data() };
+      if (!c.isActive) {
+        setCouponError('Kupon faol emas');
+      } else if (c.expiresAt && new Date(c.expiresAt) < new Date()) {
+        setCouponError('Kupon muddati o\'tgan');
+      } else if (c.usageLimit && c.usedCount >= c.usageLimit) {
+        setCouponError('Kupon ishlatish limiti tugagan');
+      } else {
+        setAppliedCoupon(c);
+        addToast('Kupon qo\'llanildi', 'success');
+      }
+    } catch (e) {
+      setCouponError(e.message);
+    }
+    setIsApplyingCoupon(false);
+  };
+  
+  if (isCheckingShift) {
+    return <div className="flex-center" style={{ height: '100%', fontSize: '1.2rem', color: '#666' }}>Yuklanmoqda...</div>;
+  }
+  
+  if (!openShift) {
+    return (
+      <div className="flex-center" style={{ height: '100%', background: '#F8FAFC' }}>
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="glass-panel flex-col" style={{ width: '400px', padding: '2rem', gap: '1.5rem', textAlign: 'center' }}>
+          <div style={{ width: 64, height: 64, background: '#EFF6FF', borderRadius: '50%', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+             <Play size={32} color="var(--primary)" />
+          </div>
+          <h2 className="h2" style={{ margin: 0 }}>Smenani Boshlash</h2>
+          <p style={{ color: 'var(--text-secondary)' }}>Iltimos kassa oynasini ochish uchun boshlang'ich naqd summani kiriting.</p>
+          <FormInput 
+             label="Kassadagi naqd pul" 
+             type="number" 
+             value={openingCashInput}
+             onChange={(e) => setOpeningCashInput(e.target.value)}
+             placeholder="0"
+          />
+          <button className="btn btn-primary" onClick={handleOpenShift} style={{ padding: '1rem', fontSize: '1.1rem' }}>
+             Smenani Ochish
+          </button>
+        </motion.div>
+      </div>
+    );
+  }
 
   useEffect(() => {
     const topbar = document.querySelector('.topbar');
@@ -555,6 +794,12 @@ const POS = () => {
                 <h1 className="h1" style={{ margin: 0 }}>Sotuv Oynasi</h1>
                 <button className="btn btn-outline" onClick={() => setIsReceiptsDrawerOpen(true)} style={{ padding: '0.5rem 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <FileText size={18} /> Cheklar
+                </button>
+                <button className="btn btn-outline" onClick={() => setIsParkedDrawerOpen(true)} style={{ padding: '0.5rem 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Archive size={18} /> Chetga qo'yilganlar ({parkedSales.filter(p => p.status !== 'deleted').length})
+                </button>
+                <button className="btn" onClick={handleCloseShiftPrepare} style={{ padding: '0.5rem 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#FCE8E8', color: '#EF4B4B', border: '1.5px solid #FFE0E0' }}>
+                  <LogOut size={18} /> Smenani yopish
                 </button>
               </div>
               <select 
@@ -603,6 +848,9 @@ const POS = () => {
           <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '1rem', flexShrink: 0 }}>
             <div className="flex-between">
               <h2 className="h2">Savat</h2>
+              <button onClick={handleParkSale} disabled={cart.length === 0} className="btn btn-outline" style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}>
+                <Save size={16} style={{marginRight: 4}}/> Chetga qo'yish
+              </button>
             </div>
           
             <div style={{ position: 'relative' }}>
@@ -1031,6 +1279,32 @@ const POS = () => {
                       </motion.div>
                     )}
 
+                    {/* Coupon Block */}
+                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.13 }}
+                      style={{ border: '1.5px solid #DCE8F5', borderRadius: '16px', padding: '16px' }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
+                        <span style={{ fontWeight: 700, fontSize: 14, color: '#1A2538' }}>Kupon kodi</span>
+                      </div>
+                      {appliedCoupon ? (
+                        <div style={{ padding: '10px 14px', background: '#F0FDF4', borderRadius: '10px', color: '#059669', display: 'flex', justifyContent: 'space-between' }}>
+                          <span style={{ fontWeight: 600 }}>{appliedCoupon.code} qo'llanildi!</span>
+                          <button onClick={() => setAppliedCoupon(null)} style={{ background: 'none', border: 'none', color: '#059669', cursor: 'pointer' }}><X size={16}/></button>
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <input
+                            type="text" value={couponCode} onChange={e => setCouponCode(e.target.value.toUpperCase())} placeholder="Kupon kodi"
+                            style={{ flex: 1, padding: '9px 14px', borderRadius: '10px', border: '1.5px solid #DCE8F5', fontSize: 14, fontFamily: 'inherit', outline: 'none' }}
+                          />
+                          <button onClick={handleApplyCoupon} disabled={isApplyingCoupon || !couponCode}
+                            style={{ padding: '9px 16px', borderRadius: '10px', border: 'none', background: '#4A90E2', color: '#fff', fontWeight: 600, cursor: 'pointer' }}
+                          >{isApplyingCoupon ? '...' : "Qo'llash"}</button>
+                        </div>
+                      )}
+                      {couponError && <div style={{ color: '#EF4B4B', fontSize: '12px', marginTop: '6px' }}>{couponError}</div>}
+                    </motion.div>
+
                     {/* Discount Block */}
                     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
                       style={{ border: '1.5px solid #DCE8F5', borderRadius: '16px', padding: '16px' }}
@@ -1223,6 +1497,53 @@ const POS = () => {
           </div>
         )}
       </Modal>
+      {/* Shift Close Modal */}
+      <Modal isOpen={isCloseShiftModalOpen} onClose={() => setIsCloseShiftModalOpen(false)} title="Smenani Yopish">
+        <div className="flex-col" style={{ gap: '1.5rem' }}>
+           <div style={{ padding: '1rem', background: '#F8FAFC', borderRadius: '12px' }}>
+              <div style={{ color: '#64748B', fontSize: '14px', marginBottom: '8px' }}>Kutilayotgan naqd pul:</div>
+              <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#0F172A' }}><CurrencyDisplay amount={shiftExpectedCash} /></div>
+           </div>
+           
+           <FormInput 
+             label="Kassadagi haqiqiy naqd pul (Sanab kiriting)" 
+             type="number"
+             value={actualCashInput}
+             onChange={e => setActualCashInput(e.target.value)}
+           />
+           
+           {actualCashInput && Number(actualCashInput) !== shiftExpectedCash && (
+              <div style={{ padding: '1rem', background: '#FFF1F2', color: '#E11D48', borderRadius: '12px', fontWeight: 500 }}>
+                 Farq: <CurrencyDisplay amount={Number(actualCashInput) - shiftExpectedCash} /> 
+              </div>
+           )}
+           
+           <div style={{ display: 'flex', gap: '1rem' }}>
+              <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => setIsCloseShiftModalOpen(false)}>Bekor qilish</button>
+              <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleCloseShift}>Smenani Yopish</button>
+           </div>
+        </div>
+      </Modal>
+
+      {/* Parked Sales Drawer */}
+      <Drawer isOpen={isParkedDrawerOpen} onClose={() => setIsParkedDrawerOpen(false)} title="Chetga qo'yilgan savatlar">
+         <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            {parkedSales.filter(p => p.status !== 'deleted').length === 0 ? (
+               <div style={{ textAlign: 'center', padding: '3rem', color: '#8A9BB5' }}>Bo'sh</div>
+            ) : (
+               parkedSales.filter(p => p.status !== 'deleted').map(p => (
+                  <div key={p.id} style={{ padding: '1.5rem', border: '1px solid #E2E8F0', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                     <div>
+                        <div style={{ fontWeight: 600 }}>{p.items.length} ta mahsulot</div>
+                        <div style={{ fontSize: '13px', color: '#64748B' }}>{new Date(p.createdAt).toLocaleTimeString()}</div>
+                     </div>
+                     <button className="btn btn-outline" onClick={() => handleRestoreParked(p)}>Davom ettirish</button>
+                  </div>
+               ))
+            )}
+         </div>
+      </Drawer>
+
       {/* Daily Receipts Drawer */}
       <Drawer isOpen={isReceiptsDrawerOpen} onClose={() => setIsReceiptsDrawerOpen(false)} title="Kunlik Cheklar">
         <div style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem', height: '100%' }}>

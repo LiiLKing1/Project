@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Megaphone, Plus, Percent, Check, Send } from 'lucide-react';
+import { Megaphone, Plus, Percent, Check, Send, Ticket, Trash2 } from 'lucide-react';
 import CustomSelect from '../../components/CustomSelect';
 import { db } from '../../firebase';
 import { collection, onSnapshot, query, orderBy, doc } from '../../services/firebaseMock';
@@ -12,6 +12,8 @@ import FormInput from '../../components/FormInput';
 
 const Marketing = () => {
   const [promotions, setPromotions] = useState([]);
+  const [coupons, setCoupons] = useState([]);
+  const [activeTab, setActiveTab] = useState('promos');
   const [loading, setLoading] = useState(false);
   const { addToast } = useToast();
   const { userProfile } = useRoles();
@@ -21,10 +23,16 @@ const Marketing = () => {
 
   const [isPromoModalOpen, setIsPromoModalOpen] = useState(false);
   const [formData, setFormData] = useState({ name: '', type: 'discount', targetProductIds: '', discountValue: '', discountType: 'percent', isActive: true });
+  const [isCouponModalOpen, setIsCouponModalOpen] = useState(false);
+  const [couponData, setCouponData] = useState({ code: '', discountType: 'percent', discountValue: '', usageLimit: '', expiresAt: '', isActive: true, usedCount: 0 });
 
   useEffect(() => {
     if (!storeId) return;
 
+    const unsubCoupons = onSnapshot(query(collection(db, `users/${storeId}/coupons`), orderBy('createdAt', 'desc')), (snapshot) => {
+      setCoupons(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+    
     const unsub = onSnapshot(query(collection(db, `users/${storeId}/promotions`), orderBy('createdAt', 'desc')), (snapshot) => {
       setPromotions(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
       setLoading(false);
@@ -32,7 +40,7 @@ const Marketing = () => {
       addToast(error.message, 'error');
       setLoading(false);
     });
-    return () => unsub();
+    return () => { unsub(); unsubCoupons(); };
   }, [addToast, storeId]);
 
   const handleSave = async () => {
@@ -54,6 +62,36 @@ const Marketing = () => {
     }
   };
 
+
+  const handleSaveCoupon = async () => {
+    if (!couponData.code.trim() || !couponData.discountValue) {
+      addToast('Kupon kodi va chegirma qiymatini kiriting', 'error');
+      return;
+    }
+    if (!storeId) return;
+
+    try {
+      await saveDoc(collection(db, `users/${storeId}/coupons`), {
+        ...couponData,
+        code: couponData.code.trim().toUpperCase(),
+        discountValue: Number(couponData.discountValue),
+        usageLimit: couponData.usageLimit ? Number(couponData.usageLimit) : null,
+        usedCount: 0,
+        createdAt: new Date().toISOString()
+      });
+      addToast('Kupon muvaffaqiyatli yaratildi', 'success');
+      setIsCouponModalOpen(false);
+      setCouponData({ code: '', discountType: 'percent', discountValue: '', usageLimit: '', expiresAt: '', isActive: true, usedCount: 0 });
+    } catch (error) {
+      addToast(error.message, 'error');
+    }
+  };
+  
+  const toggleCouponActive = async (c) => {
+    if (!storeId) return;
+    await editDoc(doc(db, `users/${storeId}/coupons`, c.id), { isActive: !c.isActive });
+  };
+
   const toggleActive = async (promo) => {
     if (!storeId) return;
     try {
@@ -70,12 +108,26 @@ const Marketing = () => {
           <h1 className="page-title">Marketing va Aksiyalar</h1>
           <p className="page-subtitle">Aksiyalar va mijozlarga SMS xabarnomalar</p>
         </div>
+        {activeTab === 'promos' ? (
         <button className="btn btn-primary" onClick={() => setIsPromoModalOpen(true)}>
           <Plus size={18} /> Yangi aksiya
         </button>
+        ) : (
+        <button className="btn btn-primary" onClick={() => setIsCouponModalOpen(true)}>
+          <Plus size={18} /> Yangi kupon
+        </button>
+        )}
       </div>
 
+      
+      <div style={{ display: 'flex', gap: '1rem', borderBottom: '1px solid var(--border-color)', marginBottom: '1rem' }}>
+         <button className={`btn ${activeTab === 'promos' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setActiveTab('promos')} style={{ borderRadius: '8px 8px 0 0' }}>Aksiyalar va SMS</button>
+         <button className={`btn ${activeTab === 'coupons' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setActiveTab('coupons')} style={{ borderRadius: '8px 8px 0 0' }}>Kuponlar</button>
+      </div>
+      
+      {activeTab === 'promos' ? (
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', flex: 1, overflow: 'hidden' }}>
+
         
         {/* Promos */}
         <div className="page-card" style={{ display: 'flex', flexDirection: 'column' }}>
@@ -140,7 +192,49 @@ const Marketing = () => {
           </div>
         </div>
 
+
       </div>
+      ) : (
+        <div className="page-card" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+          <div className="page-card-header" style={{ padding: '20px 24px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Ticket size={20} color="#4A90E2" />
+              <h2 style={{ fontSize: 16, fontWeight: 600, color: '#1A2538', margin: 0 }}>Barcha Kuponlar</h2>
+            </div>
+          </div>
+          <div className="table-responsive" style={{ flex: 1, padding: '0 24px 24px' }}>
+            <table className="page-table">
+              <thead>
+                <tr>
+                  <th>Kupon Kodi</th>
+                  <th>Chegirma</th>
+                  <th>Ishlatilgan</th>
+                  <th>Muddat</th>
+                  <th>Holat</th>
+                </tr>
+              </thead>
+              <tbody>
+                {coupons.length === 0 ? <tr><td colSpan="5" style={{textAlign:'center', padding:'2rem'}}>Kuponlar yo'q</td></tr> : null}
+                {coupons.map(c => (
+                  <tr key={c.id}>
+                    <td style={{ fontWeight: 'bold', color: '#1A2538' }}>{c.code}</td>
+                    <td>{c.discountType === 'percent' ? c.discountValue + '%' : new Intl.NumberFormat('uz-UZ').format(c.discountValue) + ' ' + curr}</td>
+                    <td>{c.usedCount} {c.usageLimit ? `/ ${c.usageLimit}` : ''}</td>
+                    <td>{c.expiresAt ? new Date(c.expiresAt).toLocaleDateString() : 'Cheksiz'}</td>
+                    <td>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                        <input type="checkbox" checked={c.isActive} onChange={() => toggleCouponActive(c)} style={{ accentColor: '#4A90E2', width: 16, height: 16 }} />
+                        <span style={{ fontSize: 14, color: c.isActive ? '#10B981' : '#8A9BB5', fontWeight: 500 }}>{c.isActive ? 'Aktiv' : 'Nofaol'}</span>
+                      </label>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
 
       <Modal isOpen={isPromoModalOpen} onClose={() => setIsPromoModalOpen(false)} title="Yangi aksiya yaratish">
         <FormInput label="Aksiya nomi" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} required />
@@ -174,6 +268,33 @@ const Marketing = () => {
           <button className="btn btn-primary" onClick={handleSave}><Check size={18} /> Saqlash</button>
         </div>
       </Modal>
+
+      <Modal isOpen={isCouponModalOpen} onClose={() => setIsCouponModalOpen(false)} title="Yangi kupon yaratish">
+        <FormInput label="Kupon kodi (Masalan: SUMMER20)" value={couponData.code} onChange={e => setCouponData({...couponData, code: e.target.value.toUpperCase()})} required />
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+          <FormInput label="Chegirma qiymati" type="number" value={couponData.discountValue} onChange={e => setCouponData({...couponData, discountValue: e.target.value})} required />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <label style={{ fontSize: '0.875rem', fontWeight: 500 }}>Qiymat turi</label>
+            <CustomSelect 
+              value={couponData.discountType} 
+              onChange={v => setCouponData({...couponData, discountType: v})}
+              options={[
+                {value: 'percent', label: 'Foiz (%)'},
+                {value: 'amount', label: `Summa (${curr})`}
+              ]}
+            />
+          </div>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '1rem' }}>
+          <FormInput label="Ishlatish limiti (Ixtiyoriy)" type="number" placeholder="Masalan: 100" value={couponData.usageLimit} onChange={e => setCouponData({...couponData, usageLimit: e.target.value})} />
+          <FormInput label="Amal qilish muddati (Ixtiyoriy)" type="date" value={couponData.expiresAt} onChange={e => setCouponData({...couponData, expiresAt: e.target.value})} />
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1.5rem' }}>
+          <button className="btn btn-outline" onClick={() => setIsCouponModalOpen(false)}>Bekor qilish</button>
+          <button className="btn btn-primary" onClick={handleSaveCoupon}><Check size={18} /> Yaratish</button>
+        </div>
+      </Modal>
+
     </div>
   );
 };

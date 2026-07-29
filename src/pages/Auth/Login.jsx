@@ -8,7 +8,7 @@ import TitleBar from '../../components/TitleBar';
 import { APP_NAME } from '../../config/appConfig';
 import { db } from '../../firebase';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
-import { getAuth, sendEmailVerification } from 'firebase/auth';
+import { getAuth, sendEmailVerification, sendPasswordResetEmail } from 'firebase/auth';
 import './Login.css';
 
 const Login = () => {
@@ -20,6 +20,8 @@ const Login = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [isResetModalOpen, setIsResetModalOpen] = useState(false);
   
   const { loginWithGoogle, login, signup, currentUser } = useAuth();
   const { addToast } = useToast();
@@ -52,6 +54,26 @@ const Login = () => {
     };
     checkVerification();
   }, [currentUser, navigate, redirectPath]);
+
+
+  const handleForgotPassword = async () => {
+    if (!resetEmail) {
+      addToast("Email manzilingizni kiriting", "error");
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const auth = getAuth();
+      await sendPasswordResetEmail(auth, resetEmail);
+      addToast("Parolni tiklash havolasi emailingizga yuborildi", "success");
+      setIsResetModalOpen(false);
+      setResetEmail('');
+    } catch (error) {
+      addToast(error.message, "error");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleGoogleLogin = async () => {
     if (isElectron) {
@@ -249,13 +271,16 @@ const Login = () => {
           </div>
 
           <div className="login-forgot-link">
+            {activeTab === 'owner' && !isSignup && (
+              <a href="#" onClick={(e) => { e.preventDefault(); setIsResetModalOpen(true); }}>Parolni unutdingizmi?</a>
+            )}
             {activeTab === 'owner' && (
-              <span onClick={() => setIsSignup(!isSignup)} style={{cursor: 'pointer', color: '#2563eb'}}>
-                {isSignup ? "Hisobingiz bormi? Kirish" : "Hisobingiz yo'qmi? Ro'yxatdan o'tish"}
+              <span onClick={() => setIsSignup(!isSignup)} style={{cursor: 'pointer', color: '#2563eb', marginLeft: !isSignup ? 'auto' : '0'}}>
+                {isSignup ? "Hisobingiz bormi? Kirish" : "Ro'yxatdan o'tish"}
               </span>
             )}
             {activeTab === 'employee' && (
-              <a href="#">Parolni unutdingizmi?</a>
+              <a href="#" onClick={(e) => { e.preventDefault(); addToast("Parolni yangilash uchun do'kon administratoriga (Biznes egasiga) murojaat qiling.", "info"); }}>Parolni unutdingizmi?</a>
             )}
           </div>
 
@@ -298,6 +323,47 @@ const Login = () => {
           </>
         )}
 
+
+      {/* Reset Password Modal */}
+      {isResetModalOpen && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
+          background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
+        }}>
+          <div style={{
+            background: '#fff', padding: '2rem', borderRadius: '12px', width: '90%', maxWidth: '400px', boxShadow: '0 10px 25px rgba(0,0,0,0.2)'
+          }}>
+            <h3 style={{ marginTop: 0, marginBottom: '1rem', color: '#111' }}>Parolni tiklash</h3>
+            <p style={{ color: '#666', fontSize: '14px', marginBottom: '1.5rem' }}>
+              Hisobingizga ulangan email manzilni kiriting. Biz parolni tiklash havolasini yuboramiz.
+            </p>
+            <div className="login-input-group" style={{ background: '#f3f4f6' }}>
+              <div className="login-input-icon"><Mail size={18} color="#666"/></div>
+              <input 
+                type="email" 
+                value={resetEmail}
+                onChange={e => setResetEmail(e.target.value)}
+                placeholder="Email manzilingiz"
+                className="login-input"
+                style={{ background: 'transparent' }}
+              />
+            </div>
+            <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
+              <button 
+                type="button" 
+                onClick={() => setIsResetModalOpen(false)}
+                style={{ flex: 1, padding: '0.75rem', border: '1px solid #d1d5db', background: 'transparent', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, color: '#4b5563' }}
+              >Bekor qilish</button>
+              <button 
+                type="button" 
+                onClick={handleForgotPassword}
+                disabled={isLoading}
+                style={{ flex: 1, padding: '0.75rem', border: 'none', background: '#2563eb', color: '#fff', borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}
+              >{isLoading ? '...' : 'Yuborish'}</button>
+            </div>
+          </div>
+        </div>
+      )}
       </motion.div>
     </div>
   );

@@ -153,6 +153,37 @@ const Employees = () => {
     }
   };
 
+
+  const handleResetPassword = async () => {
+    if (!editingId) return;
+    const newPassword = prompt("Yangi parolni kiriting (Kamida 6 ta belgi):");
+    if (!newPassword || newPassword.length < 6) {
+      if (newPassword !== null) addToast("Parol kamida 6 ta belgidan iborat bo'lishi kerak", "error");
+      return;
+    }
+    
+    try {
+      addToast("Parol yangilanmoqda...", "info");
+      const emp = staff.find(s => s.id === editingId);
+      const res = await fetch('/api/resetStaffPassword', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ uid: emp.uid || editingId, newPassword })
+      });
+      
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Parolni yangilashda xatolik");
+      
+      await logAudit(storeId, userProfile, 'UPDATE', 'staff', `${emp.fullName} paroli o'zgartirildi`);
+      addToast("Parol muvaffaqiyatli o'zgartirildi", "success");
+    } catch (e) {
+      console.error(e);
+      addToast("Parolni o'zgartirish u-n Vercel API sozlanmagan bo'lishi mumkin. Xatolik: " + e.message, "error");
+    }
+  };
+
   const openModal = (emp = null) => {
     if (emp) {
       setEditingId(emp.id);
@@ -318,6 +349,16 @@ const Employees = () => {
                   placeholder="••••••••" 
                   required 
                 />
+              )}
+              {editingId && (
+                <div style={{ marginTop: '1rem' }}>
+                  <button className="btn btn-outline" onClick={handleResetPassword} style={{ width: '100%', color: '#E11D48', borderColor: '#FECDD3', backgroundColor: '#FFF1F2' }}>
+                    Parolni yangilash (Reset Password)
+                  </button>
+                  <p style={{ fontSize: '0.75rem', color: '#64748B', marginTop: '0.5rem', textAlign: 'center' }}>
+                    Ushbu funksiya Vercel orqali Firebase Admin API orqali ishlaydi.
+                  </p>
+                </div>
               )}
             </div>
           </div>

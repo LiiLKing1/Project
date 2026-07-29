@@ -1,7 +1,7 @@
 import { dataService } from '../../services/dataService';
 import React, { useState, useEffect } from 'react';
 import './Reports.css';
-import { BarChart3, Download, Calendar, DollarSign, ShoppingBag, Trash2 } from 'lucide-react';
+import { BarChart3, Download, Calendar, DollarSign, ShoppingBag, Trash2, RotateCcw, AlertCircle } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { db } from '../../firebase';
 import { collection, onSnapshot, query, orderBy, runTransaction, doc, getDocs, where } from '../../services/firebaseMock';
@@ -15,6 +15,8 @@ import DateRangePicker from '../../components/DateRangePicker';
 
 const Reports = () => {
   const [salesData, setSalesData] = useState([]);
+  const [shiftsData, setShiftsData] = useState([]);
+  const [activeTab, setActiveTab] = useState('sales');
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedSale, setSelectedSale] = useState(null);
@@ -36,6 +38,10 @@ const Reports = () => {
   useEffect(() => {
     if (!storeId) return;
 
+    const unsubShifts = onSnapshot(query(collection(db, `users/${storeId}/cashShifts`), orderBy('openedAt', 'desc')), (snapshot) => {
+      setShiftsData(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+
     const unsub = onSnapshot(query(collection(db, `users/${storeId}/sales`), orderBy('createdAt', 'desc')), (snapshot) => {
       const sales = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setSalesData(sales);
@@ -46,7 +52,7 @@ const Reports = () => {
       setCustomers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
 
-    return () => { unsub(); unsubCustomers(); };
+    return () => { unsub(); unsubCustomers(); unsubShifts(); };
   }, [storeId]);
 
   const formatMoney = (v) => new Intl.NumberFormat('uz-UZ').format(v || 0) + ' UZS';
@@ -160,17 +166,16 @@ const Reports = () => {
     return acc + ((curr.finalTotal || 0) - cost);
   }, 0);
 
-  const handleDeleteSale = async (saleToProcess = selectedSale) => {
+  const handleReturnSale = async (saleToProcess = selectedSale) => {
     if (!saleToProcess || !storeId) return false;
     setIsDeleting(true);
     try {
-      // 1. Fetch debts related to this sale BEFORE transaction
       const debtAmount = saleToProcess.paymentBreakdown?.find(p => p.method === 'debt')?.amount || 0;
-      let debtDocsToDelete = [];
+      let debtDocsToUpdate = [];
       if (debtAmount > 0 && saleToProcess.customerId) {
         const debtsQuery = query(collection(db, `users/${storeId}/customerDebts`), where('relatedSaleId', '==', saleToProcess.id));
         const debtsSnap = await getDocs(debtsQuery);
-        debtDocsToDelete = debtsSnap.docs.map(d => d.ref);
+        debtDocsToUpdate = debtsSnap.docs.map(d => d.ref);
       }
 
       await runTransaction(db, async (transaction) => {
@@ -211,23 +216,33 @@ const Reports = () => {
           if (debtAmount > 0 && currentCust.currentDebt !== undefined) {
             updates.currentDebt = Math.max(0, currentCust.currentDebt - debtAmount);
           }
-          
-          const bonusUsed = saleToProcess.paymentBreakdown?.find(p => p.method === 'bonus')?.amount || 0;
-          const bonusEarned = saleToProcess.bonusEarned || 0;
-          if (bonusUsed > 0 || bonusEarned > 0) {
-            updates.bonusBalance = (currentCust.bonusBalance || 0) + bonusUsed - bonusEarned;
-          }
 
           if (Object.keys(updates).length > 0) {
             transaction.update(custRef, updates);
           }
         }
 
-        debtDocsToDelete.forEach(ref => {
-          transaction.delete(ref);
+        debtDocsToUpdate.forEach(ref => {
+           // We shouldn't necessarily delete the debt if they partially paid, but for a full return we'll mark as returned.
+           // To be safe, just update status or amount
+          transaction.update(ref, { status: 'returned', remainingAmount: 0 });
         });
-
-        transaction.delete(doc(db, `users/${storeId}/sales`, saleToProcess.id));
+        
+        // Mark sale as fully_returned instead of deleting
+        const saleRef = doc(db, `users/${storeId}/sales`, saleToProcess.id);
+        transaction.update(saleRef, { status: 'fully_returned' });
+        
+        // Add to returns collection
+        const returnRef = doc(collection(db, `users/${storeId}/returns`));
+        transaction.set(returnRef, {
+           originalSaleId: saleToProcess.id,
+           items: saleToProcess.items,
+           refundAmount: saleToProcess.finalTotal,
+           refundMethod: saleToProcess.paymentType,
+           reason: 'Qaytarish (To\'liq)',
+           cashierId: userProfile?.name || 'Admin',
+           createdAt: new Date().toISOString()
+        });
       });
 
       return true;
@@ -240,9 +255,9 @@ const Reports = () => {
   };
 
   const confirmDelete = async () => {
-    const success = await handleDeleteSale(selectedSale);
+    const success = await handleReturnSale(selectedSale);
     if (success) {
-      addToast('Sotuv muvaffaqiyatli bekor qilindi', 'success');
+      addToast('Sotuv muvaffaqiyatli qaytarildi', 'success');
       setIsDeleteModalOpen(false);
       setSelectedSale(null);
     }
@@ -250,7 +265,7 @@ const Reports = () => {
 
   const handleEditSale = async () => {
     if (!selectedSale) return;
-    const success = await handleDeleteSale(selectedSale);
+    const success = await handleReturnSale(selectedSale);
     if (success) {
       // Save sale to localStorage and redirect to POS
       localStorage.setItem('editSaleData', JSON.stringify(selectedSale));
@@ -280,9 +295,17 @@ const Reports = () => {
               setEndDate(formatYMD(end));
             }} 
           />
-          <button className="btn btn-primary" onClick={() => addToast("Tez orada qo'shiladi", 'info')}><Download size={18} /> Excel ga yuklash</button>
+          <button className="btn btn-primary" onClick={() => addToast("Tez orada qo'shiladi", 'info')}><Download size={18} /> Excel</button>
         </div>
       </div>
+      
+      <div style={{ display: 'flex', gap: '1rem', borderBottom: '1px solid var(--border-color)' }}>
+         <button className={`btn ${activeTab === 'sales' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setActiveTab('sales')} style={{ borderRadius: '8px 8px 0 0' }}>Sotuvlar tarixi</button>
+         <button className={`btn ${activeTab === 'shifts' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setActiveTab('shifts')} style={{ borderRadius: '8px 8px 0 0' }}>Smenalar tarixi</button>
+      </div>
+      
+      {activeTab === 'sales' ? (
+      <>
 
       <div className="stat-row">
         <div className="stat-card">
@@ -354,7 +377,10 @@ const Reports = () => {
               ) : filteredSales.map(sale => (
                 <tr key={sale.id}>
                   <td>{new Date(sale.createdAt).toLocaleString('uz-UZ', { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
-                  <td style={{ fontWeight: 500 }}>{sale.saleNumber}</td>
+                  <td style={{ fontWeight: 500 }}>
+                    {sale.saleNumber}
+                    {sale.status === 'fully_returned' && <span style={{display: 'inline-block', marginLeft: '8px', padding: '2px 6px', fontSize: '10px', background: '#FCE8E8', color: '#EF4B4B', borderRadius: '4px'}}>Qaytarilgan</span>}
+                  </td>
                   <td>
                     {sale.customerId 
                       ? (customers.find(c => c.id === sale.customerId)?.fullName || 'Noma\'lum mijoz') 
@@ -405,9 +431,9 @@ const Reports = () => {
                               setSelectedSale(sale);
                               setIsDeleteModalOpen(true);
                             }}
-                            title="Bekor qilish"
+                            title="Qaytarish"
                           >
-                            <Trash2 size={14} />
+                            <RotateCcw size={14} />
                           </button>
                         </>
                       )}
@@ -419,6 +445,51 @@ const Reports = () => {
           </table>
         </div>
       </div>
+
+      </>
+      ) : (
+         <div className="glass-panel flex-col" style={{ flex: 1, padding: '1.5rem' }}>
+            <h2 className="h2" style={{ marginBottom: '1.5rem' }}>Smenalar tarixi</h2>
+            <div className="table-responsive">
+              <table className="page-table">
+                <thead>
+                  <tr>
+                    <th>Sana</th>
+                    <th>Kassir</th>
+                    <th>Holat</th>
+                    <th>Kutilgan summa</th>
+                    <th>Haqiqiy summa</th>
+                    <th>Farq</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {shiftsData.length === 0 ? (
+                    <tr><td colSpan="6" style={{ textAlign: 'center', padding: '2rem' }}>Smenalar yo'q</td></tr>
+                  ) : shiftsData.map(shift => (
+                    <tr key={shift.id}>
+                      <td>{new Date(shift.openedAt).toLocaleString('uz-UZ')}</td>
+                      <td style={{ fontWeight: 600 }}>{shift.cashierName}</td>
+                      <td>
+                        <span style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '12px', background: shift.status === 'ochiq' ? '#EFF6FF' : '#F0FDF4', color: shift.status === 'ochiq' ? '#2563EB' : '#16A34A', fontWeight: 600 }}>
+                          {shift.status === 'ochiq' ? 'Ochiq' : 'Yopiq'}
+                        </span>
+                      </td>
+                      <td>{shift.expectedCash ? <CurrencyDisplay amount={shift.expectedCash} /> : '-'}</td>
+                      <td>{shift.actualCash ? <CurrencyDisplay amount={shift.actualCash} /> : '-'}</td>
+                      <td>
+                        {shift.difference ? (
+                           <span style={{ color: shift.difference < 0 ? '#E11D48' : '#16A34A', fontWeight: 600 }}>
+                              {shift.difference > 0 ? '+' : ''}<CurrencyDisplay amount={shift.difference} />
+                           </span>
+                        ) : '-'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+         </div>
+      )}
 
       <Modal isOpen={isReceiptModalOpen} onClose={() => setIsReceiptModalOpen(false)} title="Xarid cheki">
         {selectedSale && (
@@ -432,11 +503,11 @@ const Reports = () => {
         )}
       </Modal>
 
-      <Modal isOpen={isDeleteModalOpen} onClose={() => !isDeleting && setIsDeleteModalOpen(false)} title="Sotuvni bekor qilish">
+      <Modal isOpen={isDeleteModalOpen} onClose={() => !isDeleting && setIsDeleteModalOpen(false)} title="Sotuvni qaytarish">
         {selectedSale && (
           <div className="flex-col" style={{ gap: '1.5rem' }}>
             <div style={{ padding: '1rem', backgroundColor: 'var(--danger-light)', color: 'var(--danger)', borderRadius: 'var(--radius-md)' }}>
-              <strong>Diqqat!</strong> Siz ushbu sotuvni (Chek: {selectedSale.saleNumber}) bekor qilmoqchisiz. 
+              <strong>Diqqat!</strong> Siz ushbu sotuvni (Chek: {selectedSale.saleNumber}) qaytarmoqchisiz (Return). 
               Buning natijasida:
               <ul style={{ marginLeft: '1.5rem', marginTop: '0.5rem' }}>
                 <li>Ushbu chekdagi barcha tovarlar ombor qoldig'iga qaytariladi.</li>
@@ -449,7 +520,7 @@ const Reports = () => {
             <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
               <button className="btn btn-ghost" disabled={isDeleting} onClick={() => setIsDeleteModalOpen(false)}>Yopish</button>
               <button className="btn btn-primary" style={{ backgroundColor: 'var(--danger)' }} disabled={isDeleting} onClick={confirmDelete}>
-                {isDeleting ? 'Bajarilmoqda...' : 'Tasdiqlash, bekor qilish'}
+                {isDeleting ? 'Bajarilmoqda...' : 'Qaytarish (Tasdiqlash)'}
               </button>
             </div>
           </div>

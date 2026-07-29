@@ -17,6 +17,8 @@ import FormInput from '../../components/FormInput';
 import CurrencyDisplay from '../../components/CurrencyDisplay';
 import { motion, AnimatePresence } from 'framer-motion';
 import TransferDrawer from './TransferDrawer';
+import PrintLabels from './PrintLabels';
+import { Printer } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 
 /* ─────── Design tokens & Components (Dashboard matching) ─────── */
@@ -113,6 +115,25 @@ const Catalog = () => {
   
   // Transfer state
   const [isTransferOpen, setIsTransferOpen] = useState(false);
+  const [selectedForPrint, setSelectedForPrint] = useState([]);
+  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
+  
+  const toggleSelectForPrint = (p) => {
+    setSelectedForPrint(prev => 
+      prev.find(item => item.id === p.id) 
+        ? prev.filter(item => item.id !== p.id) 
+        : [...prev, p]
+    );
+  };
+  
+  const handleSelectAll = (e) => {
+    if (e.target.checked) {
+      setSelectedForPrint(filteredProducts.slice(0, visibleCount));
+    } else {
+      setSelectedForPrint([]);
+    }
+  };
+  
 
   const handleAddCategory = async () => {
     if (!newCatName.trim()) {
@@ -443,6 +464,9 @@ const Catalog = () => {
           <button className="btn btn-outline" style={{ display:'flex', alignItems:'center', gap:'0.4rem' }} onClick={() => setIsTransferOpen(true)}>
             <FileSpreadsheet size={18}/> Stok ko'chirish
           </button>
+          <button className="btn btn-outline" style={{ display:'flex', alignItems:'center', gap:'0.4rem', color: selectedForPrint.length > 0 ? '#4A90E2' : '#8A9BB5', borderColor: selectedForPrint.length > 0 ? '#4A90E2' : '#DCE8F5' }} onClick={() => { if(selectedForPrint.length > 0) setIsPrintModalOpen(true); else addToast("Shtrix-kod chop etish uchun mahsulotlarni tanlang", "warning"); }}>
+            <Printer size={18}/> Chop etish ({selectedForPrint.length})
+          </button>
           <button onClick={() => openModal()} style={{ display:'flex', alignItems:'center', gap:'0.4rem', padding:'0.6rem 1.3rem', borderRadius:'12px', border:'none', cursor:'pointer', background:'linear-gradient(135deg,#4A90E2,#7BCEEB)', color:'#fff', fontWeight:700, fontSize:'0.875rem', boxShadow:'0 4px 14px -4px #4A90E255' }}>
             <Plus size={18}/> Yangi mahsulot
           </button>
@@ -502,7 +526,10 @@ const Catalog = () => {
               {viewMode === 'list' && (
                 <div className="catalog-table-wrapper">
                   <div className="catalog-table-header" style={{ padding:'12px 20px', borderBottom:'2px solid #DCE8F5', background:'#F7FAFF', color:'#8A9BB5', fontSize:'12px', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.05em' }}>
-                    <div style={{ paddingLeft:'54px' }}>Mahsulot</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingLeft: '12px' }}>
+     <input type="checkbox" onChange={handleSelectAll} checked={selectedForPrint.length === Math.min(filteredProducts.length, visibleCount) && visibleCount > 0} style={{ accentColor: '#4A90E2', width: 16, height: 16 }} />
+     <span>Mahsulot</span>
+   </div>
                     <div>Kategoriya</div>
                     <div>Qoldiq</div>
                     <div>Narxlar</div>
@@ -515,7 +542,10 @@ const Catalog = () => {
                       <div key={p.id} className="catalog-table-row"
                         onMouseEnter={e => e.currentTarget.style.backgroundColor='#F4F8FF'}
                         onMouseLeave={e => e.currentTarget.style.backgroundColor='transparent'}>
-                        <div className="catalog-row-info">
+                        <div style={{ padding: '0 12px', display: 'flex', alignItems: 'center' }}>
+     <input type="checkbox" checked={selectedForPrint.some(s => s.id === p.id)} onChange={() => toggleSelectForPrint(p)} style={{ accentColor: '#4A90E2', width: 16, height: 16 }} />
+   </div>
+   <div className="catalog-row-info">
                           <div style={{ width:40, height:40, borderRadius:'12px', background:'#F0F5FC', color:'#8A9BB5', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}><Package size={18}/></div>
                           <div style={{ minWidth:0 }}>
                             <div style={{ fontWeight:700, fontSize:'14px', color:'#1A2538', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}><HighlightText text={p.name} search={search} /></div>
@@ -658,6 +688,11 @@ const Catalog = () => {
           )}
         </div>
       </div>
+
+      
+      <Modal isOpen={isPrintModalOpen} onClose={() => setIsPrintModalOpen(false)} title="Shtrix-kod yorliqlari">
+         <PrintLabels products={selectedForPrint} onClose={() => setIsPrintModalOpen(false)} />
+      </Modal>
 
       <Drawer isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingId ? 'Mahsulotni tahrirlash' : 'Yangi mahsulot'}>
         <FormInput label="Shtrix-kod" value={formData.barcode} onChange={e => setFormData({...formData, barcode: e.target.value})} error={formErrors.barcode} placeholder="Avtomatik yaratish uchun bo'sh qoldiring" />
