@@ -18,7 +18,7 @@ import { useNavigate } from 'react-router-dom';
 import { useSettings } from '../../context/SettingsContext';
 import { useWarehouse } from '../../context/WarehouseContext';
 import CurrencyDisplay from '../../components/CurrencyDisplay';
-import Modal from '../../components/Modal';
+
 
 /* ─── helpers ─────────────────────────────────────────── */
 const pct = (a, b) => b > 0 ? Math.round((a / b) * 100) : 0;
@@ -48,7 +48,7 @@ const Dashboard = () => {
   const [orders, setOrders]       = useState([]);
   const [loading, setLoading]     = useState(true);
   const [timeFilter, setTimeFilter] = useState('bugun');
-  const [isTopProductsModalOpen, setIsTopProductsModalOpen] = useState(false);
+  
 
   const { userProfile }         = useRoles();
   const { settings }            = useSettings();
@@ -147,21 +147,20 @@ const Dashboard = () => {
   const overdueDebts = activeDebts.filter(d=>new Date(d.dueDate)<now).length;
   const pendingOrders = orders.filter(o=>o.status==='pending');
 
-  const allTopProducts = useMemo(() => {
+  const topProducts = useMemo(() => {
     const map = {};
     filteredSales.forEach(sale => {
       sale.items?.forEach(item => {
-        if (!map[item.productId]) map[item.productId] = { name: item.name, qty: 0, revenue: 0 };
-        map[item.productId].qty     += Number(item.qty||0);
-        map[item.productId].revenue += Number(item.qty||0)*Number(item.price||0);
+        const key = item.productId || item.name || 'Noma\'lum';
+        if (!map[key]) map[key] = { name: item.name || 'Noma\'lum', qty: 0, revenue: 0 };
+        map[key].qty     += Number(item.qty||0);
+        map[key].revenue += Number(item.qty||0)*Number(item.price||0);
       });
     });
     return Object.values(map).sort((a,b)=>b.qty-a.qty);
   }, [filteredSales]);
 
-  const topProducts = allTopProducts.slice(0, 5);
-
-  const maxTopRev = Math.max(...allTopProducts.map(p=>p.revenue), 1);
+  const maxTopRev = Math.max(...topProducts.map(p=>p.revenue), 1);
 
   /* chart data */
   const chartBars = useMemo(() => {
@@ -469,14 +468,7 @@ const Dashboard = () => {
                 </div>
                 Top Mahsulotlar
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                {allTopProducts.length > 5 && (
-                  <button className="db-panel-link" onClick={() => setIsTopProductsModalOpen(true)}>
-                    Barchasini ko'rish
-                  </button>
-                )}
-                <span className="db-panel-badge">{filterLabels[timeFilter]}</span>
-              </div>
+              <span className="db-panel-badge">{filterLabels[timeFilter]}</span>
             </div>
 
             <div className="db-sales-overview">
@@ -489,7 +481,8 @@ const Dashboard = () => {
               </div>
 
               {/* Progress bars — top products */}
-              <div className="db-progress-row">
+              <div className="db-progress-row hide-scrollbar" style={{ maxHeight: 350, overflowY: 'auto', paddingRight: 4 }}>
+                <style>{`.hide-scrollbar::-webkit-scrollbar { display: none; }`}</style>
                 {topProducts.length > 0 ? topProducts.map((p, i) => (
                   <div key={i} className="db-progress-item">
                     <div className="db-progress-top">
@@ -597,7 +590,7 @@ const Dashboard = () => {
                 Mijozlar
               </button>
               <button className="quick-action-btn" onClick={() => navigate('/customers/debts')}>
-                <div className="quick-action-icon"><Wallet size={14} /></div>
+                              <div className="quick-action-icon"><Wallet size={14} /></div>
                 Qarzlar
                 {overdueDebts > 0 && (
                   <span style={{
@@ -611,33 +604,7 @@ const Dashboard = () => {
           </div>
 
         </div>
-  
-      <Modal isOpen={isTopProductsModalOpen} onClose={() => setIsTopProductsModalOpen(false)} title="Barcha Top Mahsulotlar">
-        <div style={{ maxHeight: '60vh', overflowY: 'auto', paddingRight: '10px' }}>
-          <div className="db-progress-row">
-            {allTopProducts.map((p, i) => (
-              <div key={i} className="db-progress-item">
-                <div className="db-progress-top">
-                  <span className="db-progress-label">
-                    <span style={{ fontWeight: 600, marginRight: '8px', color: '#94A3B8' }}>{i + 1}.</span>
-                    {p.name}
-                  </span>
-                  <span className="db-progress-pct">{pct(p.revenue, maxTopRev)}%</span>
-                </div>
-                <div className="db-progress-track">
-                  <div
-                    className="db-progress-fill"
-                    style={{ width: `${pct(p.revenue, maxTopRev)}%` }}
-                  />
-                </div>
-                <div style={{ fontSize: 12, color: '#64748B', marginTop: '4px' }}>
-                  Sotildi: {p.qty} ta | Tushum: <CurrencyDisplay amount={p.revenue} />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </Modal>
+      </div>
     </div>
   );
 };
