@@ -47,6 +47,97 @@ const HighlightText = ({ text, search }) => {
   );
 };
 
+
+const ProductCard = ({ p, search, addToCart }) => {
+  const [addedCount, setAddedCount] = React.useState(0);
+  const timerRef = React.useRef(null);
+  const resetTimerRef = React.useRef(null);
+
+  const triggerAdd = () => {
+    if (p.stock <= 0) return;
+    addToCart(p);
+    setAddedCount(c => c + 1);
+    
+    if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
+    resetTimerRef.current = setTimeout(() => {
+      setAddedCount(0);
+    }, 1500);
+  };
+
+  const handlePointerDown = (e) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    triggerAdd();
+    timerRef.current = setInterval(() => {
+      triggerAdd();
+    }, 700);
+  };
+
+  const stopHold = () => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+  };
+
+  // Cleanup timers on unmount
+  React.useEffect(() => {
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+      if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
+    };
+  }, []);
+
+  return (
+    <motion.div 
+      className="glass-panel" 
+      onPointerDown={handlePointerDown}
+      onPointerUp={stopHold}
+      onPointerLeave={stopHold}
+      onPointerCancel={stopHold}
+      onContextMenu={(e) => {
+        // Prevent context menu (long press on mobile triggers this usually)
+        if (e.pointerType === 'touch') e.preventDefault();
+      }}
+      whileTap={{ scale: p.stock > 0 ? 0.94 : 1, backgroundColor: p.stock > 0 ? '#EAF4FC' : '' }} 
+      style={{ padding: '1rem', cursor: p.stock > 0 ? 'pointer' : 'not-allowed', opacity: p.stock > 0 ? 1 : 0.5, transition: 'background-color 0.2s', userSelect: 'none', WebkitUserSelect: 'none', position: 'relative' }}
+    >
+      <div style={{ fontWeight: '600', marginBottom: '0.5rem', fontSize: '1rem' }}><HighlightText text={p.name} search={search} /></div>
+      <div style={{ color: 'var(--primary)', fontWeight: '700', fontSize: '1.125rem' }}><CurrencyDisplay amount={p.sellPrice} isSell /></div>
+      <div className="flex-between" style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.5rem', position: 'relative' }}>
+        <span><HighlightText text={p.barcode} search={search} /></span>
+        <div style={{ position: 'relative' }}>
+          <span style={{ fontWeight: 600, color: p.stock <= p.minStock ? 'var(--danger)' : 'var(--success)', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+            Qoldiq: <AnimatedNumber value={p.stock} />
+          </span>
+          <AnimatePresence>
+            {addedCount > 0 && (
+              <motion.div
+                key={addedCount}
+                initial={{ opacity: 0, y: 10, scale: 0.5 }}
+                animate={{ opacity: 1, y: -25, scale: 1.2 }}
+                exit={{ opacity: 0, y: -40, scale: 0.8 }}
+                transition={{ duration: 0.4 }}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  right: 0,
+                  color: '#10B981',
+                  fontWeight: '900',
+                  fontSize: '1.2rem',
+                  pointerEvents: 'none',
+                  textShadow: '0 2px 5px rgba(16, 185, 129, 0.2)'
+                }}
+              >
+                +{addedCount}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </div>
+    </motion.div>
+  );
+};
+
 const POS = () => {
   const [allProducts, setAllProducts] = useState([]);
   const [customers, setCustomers] = useState([]);
@@ -832,16 +923,7 @@ const POS = () => {
 
           <div className="pos-products-grid" onScroll={handleGridScroll} style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1rem', overflowY: 'auto', paddingRight: '1rem', paddingBottom: '2rem' }}>
             {filteredProducts.slice(0, visibleCount).map(p => (
-              <motion.div key={p.id} className="glass-panel" onClick={() => addToCart(p)} whileTap={{ scale: p.stock > 0 ? 0.94 : 1, backgroundColor: p.stock > 0 ? '#EAF4FC' : '' }} style={{ padding: '1rem', cursor: p.stock > 0 ? 'pointer' : 'not-allowed', opacity: p.stock > 0 ? 1 : 0.5, transition: 'background-color 0.2s', userSelect: 'none', WebkitUserSelect: 'none' }}>
-                <div style={{ fontWeight: '600', marginBottom: '0.5rem', fontSize: '1rem' }}><HighlightText text={p.name} search={search} /></div>
-                <div style={{ color: 'var(--primary)', fontWeight: '700', fontSize: '1.125rem' }}><CurrencyDisplay amount={p.sellPrice} isSell /></div>
-                <div className="flex-between" style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
-                  <span><HighlightText text={p.barcode} search={search} /></span>
-                  <span style={{ fontWeight: 600, color: p.stock <= p.minStock ? 'var(--danger)' : 'var(--success)', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
-                    Qoldiq: <AnimatedNumber value={p.stock} />
-                  </span>
-                </div>
-              </motion.div>
+              <ProductCard key={p.id} p={p} search={search} addToCart={addToCart} />
             ))}
           </div>
       </motion.div>
