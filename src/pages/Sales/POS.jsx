@@ -1,6 +1,6 @@
 import { dataService } from '../../services/dataService';
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, Plus, Minus, Trash2, CreditCard, Banknote, User, FileText, ChevronDown, Percent, Calendar, X, CheckCircle, ChevronLeft, ChevronRight, Archive, LogOut, Download, Play, Save } from 'lucide-react';
+import { Search, Printer, Plus, Minus, Trash2, CreditCard, Banknote, User, UserPlus, FileText, ChevronDown, Percent, Calendar, X, CheckCircle, ChevronLeft, ChevronRight, Archive, LogOut, Download, Play, Save } from 'lucide-react';
 import { db } from '../../firebase';
 import { collection, onSnapshot, query, where, writeBatch, increment, doc, orderBy, getDoc, runTransaction, getDocs, addDoc, updateDoc } from '../../services/firebaseMock';
 import { useToast } from '../../context/ToastContext';
@@ -114,18 +114,18 @@ const ProductCard = ({ p, search, addToCart }) => {
               <motion.div
                 key={addedCount}
                 initial={{ opacity: 0, y: 10, scale: 0.5 }}
-                animate={{ opacity: 1, y: -25, scale: 1.2 }}
-                exit={{ opacity: 0, y: -40, scale: 0.8 }}
+                animate={{ opacity: 1, y: -35, scale: 1.5 }}
+                exit={{ opacity: 0, y: -50, scale: 0.8 }}
                 transition={{ duration: 0.4 }}
                 style={{
                   position: 'absolute',
-                  top: 0,
+                  top: '-15px',
                   right: 0,
-                  color: '#10B981',
+                  color: '#34D399',
                   fontWeight: '900',
-                  fontSize: '1.2rem',
+                  fontSize: '1.5rem',
                   pointerEvents: 'none',
-                  textShadow: '0 2px 5px rgba(16, 185, 129, 0.2)'
+                  textShadow: '0 2px 5px rgba(52, 211, 153, 0.3)'
                 }}
               >
                 +{addedCount}
@@ -215,6 +215,8 @@ const POS = () => {
   // Customer selection
   const [customerSearch, setCustomerSearch] = useState('');
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
+  const [isNewCustomerModalOpen, setIsNewCustomerModalOpen] = useState(false);
+  const [newCustomerForm, setNewCustomerForm] = useState({ name: '', phone: '', debt: 0 });
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   
   const { addToast } = useToast();
@@ -883,10 +885,12 @@ const POS = () => {
         style={{ gap: '1.5rem', overflow: 'hidden', height: '100%', flex: 1, display: 'flex', flexDirection: 'column' }}
       >
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <div className="flex-between" style={{ flexWrap: 'wrap', gap: '1rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h1 className="h1" style={{ margin: 0 }}>Sotuv Oynasi</h1>
+              </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', overflowX: 'auto', flexWrap: 'nowrap', paddingBottom: '4px', scrollbarWidth: 'none', msOverflowStyle: 'none' }} className="hide-scrollbar">
                 <style>{`.hide-scrollbar::-webkit-scrollbar { display: none; }`}</style>
-                <h1 className="h1" style={{ margin: 0, whiteSpace: 'nowrap', flexShrink: 0 }}>Sotuv Oynasi</h1>
                 <button className="btn btn-outline" onClick={() => setIsReceiptsDrawerOpen(true)} style={{ padding: '0.4rem 0.8rem', display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0, whiteSpace: 'nowrap' }}>
                   <FileText size={18} /> Cheklar
                 </button>
@@ -954,6 +958,12 @@ const POS = () => {
                 </div>
               ) : (
                 <>
+                  <div className="flex-between" style={{ marginBottom: '0.5rem' }}>
+                    <span style={{ fontWeight: 600, fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Mijoz tanlash</span>
+                    <button className="btn btn-outline" onClick={() => setIsNewCustomerModalOpen(true)} style={{ padding: '0.2rem 0.6rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                      <UserPlus size={14} /> Yangi
+                    </button>
+                  </div>
                   <div style={{ display: 'flex', gap: '0.5rem' }}>
                     <div style={{ position: 'relative', flex: 1 }}>
                       <User size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
@@ -1000,13 +1010,13 @@ const POS = () => {
                   <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '1rem', borderBottom: '1px solid var(--border-color)' }}>
                     <div>
                       <div style={{ fontWeight: '500' }}>{item.name}</div>
-                      <div style={{ color: 'var(--primary)', fontWeight: '600', fontSize: '0.875rem', marginTop: '0.25rem', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px', background: '#F8FAFC', padding: '8px 12px', borderRadius: '8px', marginTop: '8px' }}>
+                        <div style={{ fontSize: '0.85rem' }}>
                           <CurrencyDisplay amount={item.sellPrice} isSell />
-                          <span style={{color: 'var(--text-secondary)', alignSelf: 'flex-start', marginTop: '2px'}}>x {item.qty}</span>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#F8FAFC', padding: '4px 8px', borderRadius: '6px', width: 'fit-content' }}>
-                          <span style={{color: 'var(--text-secondary)', fontWeight: 500}}>=</span>
+                        <div style={{ fontWeight: '600', color: '#94A3B8', fontSize: '0.9rem' }}>× {item.qty}</div>
+                        <div style={{ fontWeight: '600', color: '#94A3B8', fontSize: '0.9rem' }}>=</div>
+                        <div style={{ fontSize: '1rem', color: 'var(--primary)', fontWeight: 'bold' }}>
                           <CurrencyDisplay amount={item.sellPrice * item.qty} isSell />
                         </div>
                       </div>
