@@ -439,6 +439,9 @@ const Catalog = () => {
 
   const ProductActions = ({ p }) => (
     <div style={{ display: 'flex', gap: '6px' }}>
+      <button title="Chop etish" onClick={(e) => { e.stopPropagation(); toggleSelectForPrint(p); }}
+        style={{ width: 32, height: 32, borderRadius: '8px', border: '1.5px solid #DCE8F5', background: selectedForPrint.some(s => s.id === p.id) ? '#4A90E2' : '#F7FAFF', color: selectedForPrint.some(s => s.id === p.id) ? '#fff' : '#8A9BB5', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 0.2s' }}
+      ><Printer size={14}/></button>
       <button title="Tahrirlash" onClick={() => openModal(p)}
         style={{ width: 32, height: 32, borderRadius: '8px', border: '1.5px solid #DCE8F5', background: '#F7FAFF', color: '#4A90E2', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 0.2s' }}
         onMouseEnter={e => e.currentTarget.style.background = '#E8F2FC'}
@@ -526,10 +529,7 @@ const Catalog = () => {
               {viewMode === 'list' && (
                 <div className="catalog-table-wrapper">
                   <div className="catalog-table-header" style={{ padding:'12px 20px', borderBottom:'2px solid #DCE8F5', background:'#F7FAFF', color:'#8A9BB5', fontSize:'12px', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.05em' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingLeft: '12px' }}>
-     <input type="checkbox" onChange={handleSelectAll} checked={selectedForPrint.length === Math.min(filteredProducts.length, visibleCount) && visibleCount > 0} style={{ accentColor: '#4A90E2', width: 16, height: 16 }} />
-     <span>Mahsulot</span>
-   </div>
+                    <div style={{ paddingLeft:'54px' }}>Mahsulot</div>
                     <div>Kategoriya</div>
                     <div>Qoldiq</div>
                     <div>Narxlar</div>
@@ -542,10 +542,7 @@ const Catalog = () => {
                       <div key={p.id} className="catalog-table-row"
                         onMouseEnter={e => e.currentTarget.style.backgroundColor='#F4F8FF'}
                         onMouseLeave={e => e.currentTarget.style.backgroundColor='transparent'}>
-                        <div style={{ padding: '0 12px', display: 'flex', alignItems: 'center' }}>
-     <input type="checkbox" checked={selectedForPrint.some(s => s.id === p.id)} onChange={() => toggleSelectForPrint(p)} style={{ accentColor: '#4A90E2', width: 16, height: 16 }} />
-   </div>
-   <div className="catalog-row-info">
+                        <div className="catalog-row-info">
                           <div style={{ width:40, height:40, borderRadius:'12px', background:'#F0F5FC', color:'#8A9BB5', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}><Package size={18}/></div>
                           <div style={{ minWidth:0 }}>
                             <div style={{ fontWeight:700, fontSize:'14px', color:'#1A2538', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}><HighlightText text={p.name} search={search} /></div>

@@ -135,6 +135,7 @@ const POS = () => {
   const { settings } = useSettings();
   const { selectedWarehouseId } = useWarehouse();
   const storeId = userProfile?.storeOwnerId;
+  const cashierId = userProfile?.uid || userProfile?.storeOwnerId || 'unknown';
   const curr = settings?.currency || 'UZS';
   
   const products = React.useMemo(() => {
@@ -204,7 +205,7 @@ const POS = () => {
   }, [isReceiptsDrawerOpen, selectedReceiptDate, storeId]);
 
   useEffect(() => {
-    if (!storeId || !userProfile?.uid) return;
+    if (!storeId || !cashierId) return;
 
     const unsubProducts = onSnapshot(query(collection(db, `users/${storeId}/products`), where('status', '==', 'active')), (snapshot) => {
       setAllProducts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
@@ -215,7 +216,7 @@ const POS = () => {
     });
     
     // Listen for open shift
-    const unsubShift = onSnapshot(query(collection(db, `users/${storeId}/cashShifts`), where('cashierId', '==', userProfile.uid), where('status', '==', 'ochiq')), (snapshot) => {
+    const unsubShift = onSnapshot(query(collection(db, `users/${storeId}/cashShifts`), where('cashierId', '==', cashierId), where('status', '==', 'ochiq')), (snapshot) => {
       if (!snapshot.empty) {
         setOpenShift({ id: snapshot.docs[0].id, ...snapshot.docs[0].data() });
       } else {
@@ -225,7 +226,7 @@ const POS = () => {
     });
     
     // Listen for parked sales
-    const unsubParked = onSnapshot(query(collection(db, `users/${storeId}/parkedSales`), where('cashierId', '==', userProfile.uid)), (snapshot) => {
+    const unsubParked = onSnapshot(query(collection(db, `users/${storeId}/parkedSales`), where('cashierId', '==', cashierId)), (snapshot) => {
       setParkedSales(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
 
@@ -575,7 +576,7 @@ const POS = () => {
     }
     try {
       await addDoc(collection(db, `users/${storeId}/cashShifts`), {
-        cashierId: userProfile.uid,
+        cashierId: cashierId,
         cashierName: userProfile.name || userProfile.fullName || 'Kassir',
         openingCash: Number(openingCashInput),
         openedAt: new Date().toISOString(),
@@ -660,7 +661,7 @@ const POS = () => {
     if (cart.length === 0) return;
     try {
       await addDoc(collection(db, `users/${storeId}/parkedSales`), {
-        cashierId: userProfile.uid,
+        cashierId: cashierId,
         items: cart,
         customerId: selectedCustomer ? selectedCustomer.id : null,
         createdAt: new Date().toISOString(),
