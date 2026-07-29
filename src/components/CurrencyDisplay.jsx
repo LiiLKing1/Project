@@ -2,7 +2,7 @@ import React from 'react';
 import { useSettings } from '../context/SettingsContext';
 import AnimatedNumber from './AnimatedNumber';
 
-const CurrencyDisplay = ({ amount, overrideCurrency, isCost, isSell }) => {
+const CurrencyDisplay = ({ amount, overrideCurrency, isCost, isSell, inline }) => {
   const { settings } = useSettings();
   
   let currency = overrideCurrency || settings.currency || 'UZS';
@@ -24,17 +24,17 @@ const CurrencyDisplay = ({ amount, overrideCurrency, isCost, isSell }) => {
   };
 
   return (
-    <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start', lineHeight: '1.2' }}>
+    <div style={{ display: 'inline-flex', flexDirection: inline ? 'row' : 'column', alignItems: inline ? 'center' : 'flex-start', gap: inline ? '6px' : '0', lineHeight: '1.2' }}>
       <div style={{ display: 'inline-flex', alignItems: 'center' }}>
         {renderMain()}
       </div>
       {currency === 'USD' && showUsdConversion && (
-        <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 500, marginTop: '2px', display: 'inline-flex', alignItems: 'center' }}>
+        <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 500, marginTop: inline ? '0' : '2px', display: 'inline-flex', alignItems: 'center' }}>
           ~<AnimatedNumber value={(amount || 0) * usdRate} locales="uz-UZ" suffix="UZS" />
         </span>
       )}
       {currency === 'RUB' && showUsdConversion && (
-        <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 500, marginTop: '2px', display: 'inline-flex', alignItems: 'center' }}>
+        <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 500, marginTop: inline ? '0' : '2px', display: 'inline-flex', alignItems: 'center' }}>
           ~<AnimatedNumber value={(amount || 0) * rubRate} locales="uz-UZ" suffix="UZS" />
         </span>
       )}

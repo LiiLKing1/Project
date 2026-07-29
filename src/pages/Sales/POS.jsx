@@ -114,16 +114,16 @@ const ProductCard = ({ p, search, addToCart }) => {
               <motion.div
                 key={addedCount}
                 initial={{ opacity: 0, y: 10, scale: 0.5 }}
-                animate={{ opacity: 1, y: -35, scale: 1.5 }}
-                exit={{ opacity: 0, y: -50, scale: 0.8 }}
+                animate={{ opacity: 1, y: -45, scale: 2 }}
+                exit={{ opacity: 0, y: -60, scale: 0.8 }}
                 transition={{ duration: 0.4 }}
                 style={{
                   position: 'absolute',
-                  top: '-15px',
-                  right: 0,
-                  color: '#34D399',
+                  top: '-25px',
+                  right: '10px',
+                  color: '#6EE7B7',
                   fontWeight: '900',
-                  fontSize: '1.5rem',
+                  fontSize: '2rem',
                   pointerEvents: 'none',
                   textShadow: '0 2px 5px rgba(52, 211, 153, 0.3)'
                 }}
@@ -889,7 +889,7 @@ const POS = () => {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <h1 className="h1" style={{ margin: 0 }}>Sotuv Oynasi</h1>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', overflowX: 'auto', flexWrap: 'nowrap', paddingBottom: '4px', scrollbarWidth: 'none', msOverflowStyle: 'none' }} className="hide-scrollbar">
+              <div onTouchStart={e => e.stopPropagation()} onTouchEnd={e => e.stopPropagation()} onTouchMove={e => e.stopPropagation()} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', overflowX: 'auto', flexWrap: 'nowrap', paddingBottom: '4px', scrollbarWidth: 'none', msOverflowStyle: 'none' }} className="hide-scrollbar">
                 <style>{`.hide-scrollbar::-webkit-scrollbar { display: none; }`}</style>
                 <button className="btn btn-outline" onClick={() => setIsReceiptsDrawerOpen(true)} style={{ padding: '0.4rem 0.8rem', display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0, whiteSpace: 'nowrap' }}>
                   <FileText size={18} /> Cheklar
@@ -1012,12 +1012,12 @@ const POS = () => {
                       <div style={{ fontWeight: '500' }}>{item.name}</div>
                       <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px', background: '#F8FAFC', padding: '8px 12px', borderRadius: '8px', marginTop: '8px' }}>
                         <div style={{ fontSize: '0.85rem' }}>
-                          <CurrencyDisplay amount={item.sellPrice} isSell />
+                          <CurrencyDisplay amount={item.sellPrice} isSell inline />
                         </div>
                         <div style={{ fontWeight: '600', color: '#94A3B8', fontSize: '0.9rem' }}>× {item.qty}</div>
                         <div style={{ fontWeight: '600', color: '#94A3B8', fontSize: '0.9rem' }}>=</div>
                         <div style={{ fontSize: '1rem', color: 'var(--primary)', fontWeight: 'bold' }}>
-                          <CurrencyDisplay amount={item.sellPrice * item.qty} isSell />
+                          <CurrencyDisplay amount={item.sellPrice * item.qty} isSell inline />
                         </div>
                       </div>
                     </div>
