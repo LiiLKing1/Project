@@ -4,7 +4,15 @@ import { collection, onSnapshot, query, orderBy, runTransaction, doc, getDocs, w
 import { useRoles } from '../../context/RolesContext';
 import { useToast } from '../../context/ToastContext';
 import CurrencyDisplay from '../../components/CurrencyDisplay';
-import { Search, RefreshCcw, ShoppingBag, ArrowRightLeft, User, CreditCard, Banknote, Calculator, X, ArrowLeft, CheckSquare, Square, CornerDownLeft } from 'lucide-react';
+import { Search, RefreshCcw, ShoppingBag, ArrowRightLeft, User, CreditCard, Banknote, Calculator, X, ArrowLeft, CheckSquare, Square, CornerDownLeft, Minus, Plus } from 'lucide-react';
+
+const EmptyState = ({ icon: Icon, title, message, compact = false }) => (
+  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: compact ? '1.5rem' : '3rem 1.5rem', textAlign: 'center', color: 'var(--text-secondary)', backgroundColor: 'var(--bg-main)', border: '1px dashed var(--border-color)', borderRadius: 'var(--radius-md)' }}>
+    <Icon size={compact ? 32 : 48} color="var(--border-color)" style={{ marginBottom: '1rem' }} />
+    <div style={{ fontWeight: 600, color: 'var(--text-main)', fontSize: compact ? '1rem' : '1.125rem', marginBottom: '0.25rem' }}>{title}</div>
+    <div style={{ fontSize: '0.875rem' }}>{message}</div>
+  </div>
+);
 
 const HighlightTextLocal = ({ text, search }) => {
   if (!search || !text) return <span>{text}</span>;
@@ -51,6 +59,7 @@ const Exchange = () => {
   const [cart, setCart] = useState([]); // new items for exchange
   
   const [isProcessing, setIsProcessing] = useState(false);
+  const [selectedPayment, setSelectedPayment] = useState(null);
 
   useEffect(() => {
     if (!storeId) return;
@@ -88,8 +97,8 @@ const Exchange = () => {
     setReturningItems([]);
     setCart([]);
     setProductSearch('');
+    setSelectedPayment(null);
     
-    // For return mode
     const initialSelections = {};
     sale.items?.forEach(item => {
       initialSelections[item.productId] = { selected: false, returnQty: item.qty };
@@ -98,58 +107,62 @@ const Exchange = () => {
   };
 
   // ===================== EXCHANGE MODE LOGIC =====================
+  const updateReturningItemQty = (item, newQty) => {
+    const previouslyReturned = selectedSale.returnedItems?.find(r => r.productId === item.productId)?.qty || 0;
+    const maxQty = item.qty - previouslyReturned;
+    
+    if (newQty <= 0) {
+      setReturningItems(prev => prev.filter(p => p.productId !== item.productId));
+      return;
+    }
+    if (newQty > maxQty) {
+      addToast(`Ushbu mahsulotdan ko'pi bilan ${maxQty} ta qaytarish mumkin`, 'warning');
+      newQty = maxQty;
+    }
+
+    setReturningItems(prev => {
+      const existing = prev.find(p => p.productId === item.productId);
+      if (existing) return prev.map(p => p.productId === item.productId ? { ...p, qty: newQty } : p);
+      return [...prev, { ...item, qty: newQty }];
+    });
+  };
+
   const handleReturnAllOfItemExchange = (item) => {
-    const returningQty = returningItems.find(r => r.productId === item.productId)?.qty || 0;
-    const availableQty = item.qty - returningQty;
-    if (availableQty <= 0) return;
-    setReturningItems(prev => {
-      const existing = prev.find(p => p.productId === item.productId);
-      if (existing) return prev.map(p => p.productId === item.productId ? { ...p, qty: p.qty + availableQty } : p);
-      return [...prev, { ...item, qty: availableQty }];
-    });
+    const previouslyReturned = selectedSale.returnedItems?.find(r => r.productId === item.productId)?.qty || 0;
+    const maxQty = item.qty - previouslyReturned;
+    updateReturningItemQty(item, maxQty);
   };
 
-  const handleReturnItemExchange = (item) => {
-    setReturningItems(prev => {
-      const existing = prev.find(p => p.productId === item.productId);
-      if (existing) {
-        if (existing.qty >= item.qty) { addToast('Ushbu mahsulotdan boshqa qaytarib bo\'lmaydi', 'warning'); return prev; }
-        return prev.map(p => p.productId === item.productId ? { ...p, qty: p.qty + 1 } : p);
-      }
-      return [...prev, { ...item, qty: 1 }];
-    });
-  };
+  const updateCartItemQty = (product, newQty) => {
+    if (newQty <= 0) {
+      setCart(prev => prev.filter(p => p.id !== product.id));
+      return;
+    }
+    if (newQty > product.stock) {
+      addToast(`Omborda faqat ${product.stock} ta mavjud`, 'warning');
+      newQty = product.stock;
+    }
 
-  const handleRemoveReturnExchange = (item) => {
-    setReturningItems(prev => {
-      const existing = prev.find(p => p.productId === item.productId);
-      if (existing.qty > 1) return prev.map(p => p.productId === item.productId ? { ...p, qty: p.qty - 1 } : p);
-      return prev.filter(p => p.productId !== item.productId);
+    setCart(prev => {
+      const existing = prev.find(p => p.id === product.id);
+      if (existing) return prev.map(p => p.id === product.id ? { ...p, qty: newQty } : p);
+      return [...prev, { ...product, qty: newQty }];
     });
-  };
-
-  const handleReturnAllExchange = () => {
-    if (!selectedSale || !selectedSale.items) return;
-    setReturningItems(selectedSale.items.map(item => ({...item})));
   };
 
   const handleAddToCart = (product) => {
+    if (product.stock <= 0) {
+      addToast('Mahsulot qoldig\'i yo\'q', 'error');
+      return;
+    }
     setCart(prev => {
       const existing = prev.find(p => p.id === product.id);
-      if (existing) {
-        if (existing.qty >= product.stock) { addToast('Qoldiqdan ortiq qo\'shib bo\'lmaydi', 'warning'); return prev; }
-        return prev.map(p => p.id === product.id ? { ...p, qty: p.qty + 1 } : p);
+      if (existing && existing.qty >= product.stock) {
+        addToast('Qoldiqdan ortiq qo\'shib bo\'lmaydi', 'warning');
+        return prev;
       }
-      if (product.stock <= 0) { addToast('Mahsulot qoldig\'i yo\'q', 'error'); return prev; }
+      if (existing) return prev.map(p => p.id === product.id ? { ...p, qty: p.qty + 1 } : p);
       return [...prev, { ...product, qty: 1 }];
-    });
-  };
-
-  const handleRemoveCart = (product) => {
-    setCart(prev => {
-      const existing = prev.find(p => p.id === product.id);
-      if (existing.qty > 1) return prev.map(p => p.id === product.id ? { ...p, qty: p.qty - 1 } : p);
-      return prev.filter(p => p.id !== product.id);
     });
   };
 
@@ -158,7 +171,13 @@ const Exchange = () => {
   const exDifference = exNewAmount - exReturnAmount; // positive = customer pays us, negative = we pay customer
 
   // ===================== PROCESS EXCHANGE =====================
-  const processExchange = async (settlementMethod) => {
+  const processExchange = async () => {
+    if (!selectedPayment) {
+      addToast("Iltimos, to'lov turini tanlang", 'warning');
+      return;
+    }
+    const settlementMethod = selectedPayment;
+
     if (returningItems.length === 0 && cart.length === 0) return;
     if (!selectedSale) return;
     
@@ -169,121 +188,109 @@ const Exchange = () => {
       let openShiftRef = !shiftsSnap.empty ? doc(db, `users/${storeId}/shifts`, shiftsSnap.docs[0].id) : null;
 
       await runTransaction(db, async (transaction) => {
-         const exchangeRef = doc(collection(db, `users/${storeId}/exchanges`));
-         
-         const exchangeData = {
-           storeId,
-           originalSaleId: selectedSale.id,
-           customerId: selectedSale.customerId || null,
-           customerName: selectedSale.customerName || null,
-           returnedItems: returningItems,
-           newItems: cart,
-           totalReturnAmount: exReturnAmount,
-           totalNewAmount: exNewAmount,
-           priceDifference: exDifference,
-           settlementMethod,
-           createdAt: serverTimestamp(),
-           cashier: userProfile?.name || 'Kassir',
-         };
-         
-         transaction.set(exchangeRef, exchangeData);
-
-         // Stocks
-         for (const item of returningItems) {
-           const pRef = doc(db, `users/${storeId}/products`, item.productId);
-           const pSnap = await transaction.get(pRef);
-           if (pSnap.exists()) transaction.update(pRef, { stock: pSnap.data().stock + item.qty });
-         }
-         for (const item of cart) {
-           const pRef = doc(db, `users/${storeId}/products`, item.id);
-           const pSnap = await transaction.get(pRef);
-           if (pSnap.exists()) transaction.update(pRef, { stock: pSnap.data().stock - item.qty });
-         }
-
-         // Customer Balances
-         let custRef = selectedSale.customerId ? doc(db, `users/${storeId}/customers`, selectedSale.customerId) : null;
-         if (custRef) {
-           const custSnap = await transaction.get(custRef);
-           if (custSnap.exists()) {
-             const currentCust = custSnap.data();
-             const updates = {};
-             
-             if (exDifference > 0 && settlementMethod === 'nasiya') {
-               updates.currentDebt = (currentCust.currentDebt || 0) + exDifference;
-               const newDebtRef = doc(collection(db, `users/${storeId}/customerDebts`));
-               transaction.set(newDebtRef, {
-                 customerId: selectedSale.customerId,
-                 amount: exDifference,
-                 type: 'given',
-                 date: new Date().toISOString(),
-                 createdAt: serverTimestamp(),
-                 note: 'Almashtirish ustiga qarz',
-                 cashier: userProfile?.name || 'Kassir',
-               });
-             } else if (exDifference < 0 && settlementMethod === 'balansga_qoshildi') {
-               updates.storeCredit = (currentCust.storeCredit || 0) + Math.abs(exDifference);
-               const creditRef = doc(collection(db, `users/${storeId}/customerCredits`));
-               transaction.set(creditRef, {
-                 customerId: selectedSale.customerId,
-                 amount: Math.abs(exDifference),
-                 type: 'exchange_credit',
-                 note: 'Almashtirishdan ortib qolgan summa',
-                 createdAt: serverTimestamp()
-               });
-             }
-             if (Object.keys(updates).length > 0) transaction.update(custRef, updates);
-           }
-         }
-
-         // Shift cash
-         if (openShiftRef) {
-           const shiftSnap = await transaction.get(openShiftRef);
-           if (shiftSnap.exists()) {
-             const shift = shiftSnap.data();
-             if (exDifference > 0 && settlementMethod === 'naqd') {
-               transaction.update(openShiftRef, { currentCash: (shift.currentCash || 0) + exDifference });
-             } else if (exDifference < 0 && settlementMethod === 'naqd_qaytarildi') {
-               transaction.update(openShiftRef, { currentCash: (shift.currentCash || 0) + exDifference }); // difference is negative
-             }
-           }
-         }
-
-         // Update Original Sale Status
+         // --- 1. ALL READS FIRST ---
          const saleRef = doc(db, `users/${storeId}/sales`, selectedSale.id);
          const saleSnap = await transaction.get(saleRef);
-         if (saleSnap.exists()) {
-           const sData = saleSnap.data();
-           let fullyReturned = true;
-           sData.items.forEach(si => {
-             const retItem = returningItems.find(r => r.productId === si.productId);
-             const previouslyReturned = sData.returnedItems?.find(r => r.productId === si.productId)?.qty || 0;
-             const totalNowReturned = previouslyReturned + (retItem ? retItem.qty : 0);
-             if (totalNowReturned < si.qty) fullyReturned = false;
-           });
-           
-           const existingReturned = sData.returnedItems || [];
-           const updatedReturnedItems = [...existingReturned];
-           returningItems.forEach(ri => {
-              const exIdx = updatedReturnedItems.findIndex(x => x.productId === ri.productId);
-              if (exIdx >= 0) updatedReturnedItems[exIdx].qty += ri.qty;
-              else updatedReturnedItems.push({...ri});
-           });
+         if (!saleSnap.exists()) throw new Error("Asl sotuv hujjati topilmadi");
+         const sData = saleSnap.data();
 
-           transaction.update(saleRef, {
-             status: fullyReturned ? 'fully_returned' : 'partially_returned',
-             returnedItems: updatedReturnedItems
-           });
+         let custRef = selectedSale.customerId ? doc(db, `users/${storeId}/customers`, selectedSale.customerId) : null;
+         let custSnap = custRef ? await transaction.get(custRef) : null;
+
+         let shiftSnap = openShiftRef ? await transaction.get(openShiftRef) : null;
+
+         const returningProductRefs = returningItems.map(item => doc(db, `users/${storeId}/products`, item.productId));
+         const returningProductSnaps = await Promise.all(returningProductRefs.map(ref => transaction.get(ref)));
+
+         const newProductRefs = cart.map(item => doc(db, `users/${storeId}/products`, item.id));
+         const newProductSnaps = await Promise.all(newProductRefs.map(ref => transaction.get(ref)));
+
+         // --- 2. CALCULATIONS (NO FIRESTORE CALLS) ---
+         const updatedReturningStocks = returningProductSnaps.map((snap, i) => {
+            return (snap.exists() ? snap.data().stock : 0) + returningItems[i].qty;
+         });
+         const updatedNewStocks = newProductSnaps.map((snap, i) => {
+            return (snap.exists() ? snap.data().stock : 0) - cart[i].qty;
+         });
+
+         let fullyReturned = true;
+         let updatedReturnedItems = [...(sData.returnedItems || [])];
+         sData.items.forEach(si => {
+           const retItem = returningItems.find(r => r.productId === si.productId);
+           const previouslyReturned = sData.returnedItems?.find(r => r.productId === si.productId)?.qty || 0;
+           const totalNowReturned = previouslyReturned + (retItem ? retItem.qty : 0);
+           if (totalNowReturned < si.qty) fullyReturned = false;
+         });
+         
+         returningItems.forEach(ri => {
+            const exIdx = updatedReturnedItems.findIndex(x => x.productId === ri.productId);
+            if (exIdx >= 0) updatedReturnedItems[exIdx].qty += ri.qty;
+            else updatedReturnedItems.push({...ri});
+         });
+
+         const currentCustData = custSnap?.exists() ? custSnap.data() : null;
+         let newDebt = currentCustData?.currentDebt || 0;
+         let newStoreCredit = currentCustData?.storeCredit || 0;
+         let shouldUpdateCust = false;
+         let debtDocData = null;
+         let creditDocData = null;
+
+         if (currentCustData) {
+           if (exDifference > 0 && settlementMethod === 'nasiya') {
+             newDebt += exDifference;
+             shouldUpdateCust = true;
+             debtDocData = {
+               customerId: selectedSale.customerId, amount: exDifference, type: 'given', date: new Date().toISOString(),
+               createdAt: serverTimestamp(), note: 'Almashtirish ustiga qarz', cashier: userProfile?.name || 'Kassir',
+             };
+           } else if (exDifference < 0 && settlementMethod === 'balansga_qoshildi') {
+             newStoreCredit += Math.abs(exDifference);
+             shouldUpdateCust = true;
+             creditDocData = {
+               customerId: selectedSale.customerId, amount: Math.abs(exDifference), type: 'exchange_credit',
+               note: 'Almashtirishdan ortib qolgan summa', createdAt: serverTimestamp()
+             };
+           }
          }
 
-         // Audit log
-         const auditRef = doc(collection(db, `users/${storeId}/auditLogs`));
-         transaction.set(auditRef, {
-           action: 'exchange_processed',
-           details: `Sotuv ${selectedSale.saleNumber} almashtirildi. Farq: ${exDifference}`,
-           userId: userProfile?.uid || 'unknown',
-           userName: userProfile?.name || 'Kassir',
-           createdAt: serverTimestamp()
+         let newShiftCash = shiftSnap?.exists() ? (shiftSnap.data().currentCash || 0) : 0;
+         let shouldUpdateShift = false;
+         if (shiftSnap?.exists()) {
+           if (exDifference > 0 && settlementMethod === 'naqd') {
+             newShiftCash += exDifference;
+             shouldUpdateShift = true;
+           } else if (exDifference < 0 && settlementMethod === 'naqd_qaytarildi') {
+             newShiftCash += exDifference; // exDiff is negative
+             shouldUpdateShift = true;
+           }
+         }
+
+         // --- 3. ALL WRITES ---
+         const exchangeRef = doc(collection(db, `users/${storeId}/exchanges`));
+         transaction.set(exchangeRef, {
+           storeId, originalSaleId: selectedSale.id, customerId: selectedSale.customerId || null,
+           customerName: selectedSale.customerName || null, returnedItems: returningItems, newItems: cart,
+           totalReturnAmount: exReturnAmount, totalNewAmount: exNewAmount, priceDifference: exDifference,
+           settlementMethod, createdAt: serverTimestamp(), cashier: userProfile?.name || 'Kassir',
          });
+
+         returningProductRefs.forEach((ref, i) => { transaction.update(ref, { stock: updatedReturningStocks[i] }); });
+         newProductRefs.forEach((ref, i) => { transaction.update(ref, { stock: updatedNewStocks[i] }); });
+
+         if (shouldUpdateCust && custRef) {
+           transaction.update(custRef, { currentDebt: newDebt, storeCredit: newStoreCredit });
+           if (debtDocData) transaction.set(doc(collection(db, `users/${storeId}/customerDebts`)), debtDocData);
+           if (creditDocData) transaction.set(doc(collection(db, `users/${storeId}/customerCredits`)), creditDocData);
+         }
+
+         if (shouldUpdateShift && openShiftRef) {
+           transaction.update(openShiftRef, { currentCash: newShiftCash });
+         }
+
+         transaction.update(saleRef, { status: fullyReturned ? 'fully_returned' : 'partially_returned', returnedItems: updatedReturnedItems });
+
+         const auditRef = doc(collection(db, `users/${storeId}/auditLogs`));
+         transaction.set(auditRef, { action: 'exchange_processed', details: `Sotuv ${selectedSale.saleNumber} almashtirildi. Farq: ${exDifference}`, userId: userProfile?.uid || 'unknown', userName: userProfile?.name || 'Kassir', createdAt: serverTimestamp() });
       });
       
       addToast('Almashtirish muvaffaqiyatli amalga oshirildi', 'success');
@@ -297,7 +304,13 @@ const Exchange = () => {
   };
 
   // ===================== RETURN MODE LOGIC =====================
-  const processReturn = async (refundMethod) => {
+  const processReturn = async () => {
+    if (!selectedPayment) {
+      addToast("Iltimos, to'lov turini tanlang", 'warning');
+      return;
+    }
+    const refundMethod = selectedPayment;
+
     const itemsToReturn = Object.keys(returnSelections)
       .filter(id => returnSelections[id].selected && returnSelections[id].returnQty > 0)
       .map(id => {
@@ -319,89 +332,84 @@ const Exchange = () => {
       let openShiftRef = !shiftsSnap.empty ? doc(db, `users/${storeId}/shifts`, shiftsSnap.docs[0].id) : null;
 
       await runTransaction(db, async (transaction) => {
-         // Create returns record
-         const returnRef = doc(collection(db, `users/${storeId}/returns`));
-         transaction.set(returnRef, {
-           originalSaleId: selectedSale.id,
-           items: itemsToReturn,
-           refundAmount,
-           refundMethod,
-           reason: 'Foydalanuvchi orqali qaytarildi',
-           cashierId: userProfile?.uid || null,
-           cashierName: userProfile?.name || 'Kassir',
-           createdAt: serverTimestamp(),
-           storeId
-         });
-
-         // Stocks
-         for (const item of itemsToReturn) {
-           const pRef = doc(db, `users/${storeId}/products`, item.productId);
-           const pSnap = await transaction.get(pRef);
-           if (pSnap.exists()) transaction.update(pRef, { stock: pSnap.data().stock + item.qty });
-         }
-
-         // Finance/Debt logic
-         if (refundMethod === 'naqd' && openShiftRef) {
-           const shiftSnap = await transaction.get(openShiftRef);
-           if (shiftSnap.exists()) {
-             transaction.update(openShiftRef, { currentCash: (shiftSnap.data().currentCash || 0) - refundAmount });
-           }
-         } else if (refundMethod === 'nasiya' && selectedSale.customerId) {
-           const custRef = doc(db, `users/${storeId}/customers`, selectedSale.customerId);
-           const custSnap = await transaction.get(custRef);
-           if (custSnap.exists()) {
-             const currentDebt = custSnap.data().currentDebt || 0;
-             transaction.update(custRef, { currentDebt: Math.max(0, currentDebt - refundAmount) });
-             
-             const newDebtRef = doc(collection(db, `users/${storeId}/customerDebts`));
-             transaction.set(newDebtRef, {
-               customerId: selectedSale.customerId,
-               amount: refundAmount,
-               type: 'paid', // reducing debt
-               date: new Date().toISOString(),
-               createdAt: serverTimestamp(),
-               note: 'Qaytarish orqali qarzdan chegirildi',
-               cashier: userProfile?.name || 'Kassir',
-             });
-           }
-         }
-
-         // Update Original Sale Status
+         // --- 1. ALL READS ---
          const saleRef = doc(db, `users/${storeId}/sales`, selectedSale.id);
          const saleSnap = await transaction.get(saleRef);
-         if (saleSnap.exists()) {
-           const sData = saleSnap.data();
-           let fullyReturned = true;
-           sData.items.forEach(si => {
-             const retItem = itemsToReturn.find(r => r.productId === si.productId);
-             const previouslyReturned = sData.returnedItems?.find(r => r.productId === si.productId)?.qty || 0;
-             const totalNowReturned = previouslyReturned + (retItem ? retItem.qty : 0);
-             if (totalNowReturned < si.qty) fullyReturned = false;
-           });
-           
-           const existingReturned = sData.returnedItems || [];
-           const updatedReturnedItems = [...existingReturned];
-           itemsToReturn.forEach(ri => {
-              const exIdx = updatedReturnedItems.findIndex(x => x.productId === ri.productId);
-              if (exIdx >= 0) updatedReturnedItems[exIdx].qty += ri.qty;
-              else updatedReturnedItems.push({...ri});
-           });
+         if (!saleSnap.exists()) throw new Error("Asl sotuv hujjati topilmadi");
+         const sData = saleSnap.data();
 
-           transaction.update(saleRef, {
-             status: fullyReturned ? 'fully_returned' : 'partially_returned',
-             returnedItems: updatedReturnedItems
-           });
+         let custRef = selectedSale.customerId ? doc(db, `users/${storeId}/customers`, selectedSale.customerId) : null;
+         let custSnap = custRef ? await transaction.get(custRef) : null;
+
+         let shiftSnap = openShiftRef ? await transaction.get(openShiftRef) : null;
+
+         const returningProductRefs = itemsToReturn.map(item => doc(db, `users/${storeId}/products`, item.productId));
+         const returningProductSnaps = await Promise.all(returningProductRefs.map(ref => transaction.get(ref)));
+
+         // --- 2. CALCULATIONS ---
+         const updatedReturningStocks = returningProductSnaps.map((snap, i) => {
+            return (snap.exists() ? snap.data().stock : 0) + itemsToReturn[i].qty;
+         });
+
+         let fullyReturned = true;
+         let updatedReturnedItems = [...(sData.returnedItems || [])];
+         sData.items.forEach(si => {
+           const retItem = itemsToReturn.find(r => r.productId === si.productId);
+           const previouslyReturned = sData.returnedItems?.find(r => r.productId === si.productId)?.qty || 0;
+           const totalNowReturned = previouslyReturned + (retItem ? retItem.qty : 0);
+           if (totalNowReturned < si.qty) fullyReturned = false;
+         });
+         
+         itemsToReturn.forEach(ri => {
+            const exIdx = updatedReturnedItems.findIndex(x => x.productId === ri.productId);
+            if (exIdx >= 0) updatedReturnedItems[exIdx].qty += ri.qty;
+            else updatedReturnedItems.push({...ri});
+         });
+
+         const currentCustData = custSnap?.exists() ? custSnap.data() : null;
+         let newDebt = currentCustData?.currentDebt || 0;
+         let shouldUpdateCust = false;
+         let debtDocData = null;
+
+         if (currentCustData && refundMethod === 'nasiya') {
+             newDebt = Math.max(0, newDebt - refundAmount);
+             shouldUpdateCust = true;
+             debtDocData = {
+               customerId: selectedSale.customerId, amount: refundAmount, type: 'paid', date: new Date().toISOString(),
+               createdAt: serverTimestamp(), note: 'Qaytarish orqali qarzdan chegirildi', cashier: userProfile?.name || 'Kassir',
+             };
          }
 
-         // Audit log
-         const auditRef = doc(collection(db, `users/${storeId}/auditLogs`));
-         transaction.set(auditRef, {
-           action: 'return_processed',
-           details: `Sotuv ${selectedSale.saleNumber} dan qaytarildi. Summa: ${refundAmount}`,
-           userId: userProfile?.uid || 'unknown',
-           userName: userProfile?.name || 'Kassir',
-           createdAt: serverTimestamp()
+         let newShiftCash = shiftSnap?.exists() ? (shiftSnap.data().currentCash || 0) : 0;
+         let shouldUpdateShift = false;
+         if (shiftSnap?.exists() && refundMethod === 'naqd') {
+             newShiftCash -= refundAmount;
+             shouldUpdateShift = true;
+         }
+
+         // --- 3. ALL WRITES ---
+         const returnRef = doc(collection(db, `users/${storeId}/returns`));
+         transaction.set(returnRef, {
+           originalSaleId: selectedSale.id, items: itemsToReturn, refundAmount, refundMethod,
+           reason: 'Foydalanuvchi orqali qaytarildi', cashierId: userProfile?.uid || null,
+           cashierName: userProfile?.name || 'Kassir', createdAt: serverTimestamp(), storeId
          });
+
+         returningProductRefs.forEach((ref, i) => { transaction.update(ref, { stock: updatedReturningStocks[i] }); });
+
+         if (shouldUpdateCust && custRef) {
+           transaction.update(custRef, { currentDebt: newDebt });
+           if (debtDocData) transaction.set(doc(collection(db, `users/${storeId}/customerDebts`)), debtDocData);
+         }
+
+         if (shouldUpdateShift && openShiftRef) {
+           transaction.update(openShiftRef, { currentCash: newShiftCash });
+         }
+
+         transaction.update(saleRef, { status: fullyReturned ? 'fully_returned' : 'partially_returned', returnedItems: updatedReturnedItems });
+
+         const auditRef = doc(collection(db, `users/${storeId}/auditLogs`));
+         transaction.set(auditRef, { action: 'return_processed', details: `Sotuv ${selectedSale.saleNumber} dan qaytarildi. Summa: ${refundAmount}`, userId: userProfile?.uid || 'unknown', userName: userProfile?.name || 'Kassir', createdAt: serverTimestamp() });
       });
 
       addToast('Mahsulotlar muvaffaqiyatli qaytarildi', 'success');
@@ -426,370 +434,393 @@ const Exchange = () => {
     return total;
   };
 
-
   if (loading) return <div className="flex-center" style={{ height: '100%' }}>Yuklanmoqda...</div>;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', backgroundColor: '#F8FAFC' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', backgroundColor: 'var(--bg-main)', overflow: 'hidden' }}>
       
       {/* Top Tabs */}
-      <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', backgroundColor: '#fff', padding: '0 1rem' }}>
+      <div style={{ display: 'flex', backgroundColor: 'var(--bg-surface)', padding: '0 1.5rem', borderBottom: '1px solid var(--border-color)', flexShrink: 0 }}>
         <button 
-          onClick={() => { setMode('return'); setSelectedSale(null); }}
-          style={{ padding: '1rem', borderBottom: mode === 'return' ? '2px solid var(--primary)' : '2px solid transparent', color: mode === 'return' ? 'var(--primary)' : 'var(--text-secondary)', fontWeight: 600, background: 'none', borderTop: 'none', borderLeft: 'none', borderRight: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+          onClick={() => { setMode('return'); setSelectedSale(null); setSelectedPayment(null); }}
+          style={{ padding: '1.25rem 1rem', borderBottom: mode === 'return' ? '2px solid var(--primary)' : '2px solid transparent', color: mode === 'return' ? 'var(--primary)' : 'var(--text-secondary)', fontWeight: 600, background: 'none', borderTop: 'none', borderLeft: 'none', borderRight: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', transition: 'all 0.2s' }}
         >
-          <CornerDownLeft size={18} /> Qaytarish
+          <CornerDownLeft size={18} /> Qaytarish (Vozvrat)
         </button>
         <button 
-          onClick={() => { setMode('exchange'); setSelectedSale(null); }}
-          style={{ padding: '1rem', borderBottom: mode === 'exchange' ? '2px solid var(--primary)' : '2px solid transparent', color: mode === 'exchange' ? 'var(--primary)' : 'var(--text-secondary)', fontWeight: 600, background: 'none', borderTop: 'none', borderLeft: 'none', borderRight: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+          onClick={() => { setMode('exchange'); setSelectedSale(null); setSelectedPayment(null); }}
+          style={{ padding: '1.25rem 1rem', borderBottom: mode === 'exchange' ? '2px solid var(--primary)' : '2px solid transparent', color: mode === 'exchange' ? 'var(--primary)' : 'var(--text-secondary)', fontWeight: 600, background: 'none', borderTop: 'none', borderLeft: 'none', borderRight: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', transition: 'all 0.2s' }}
         >
           <ArrowRightLeft size={18} /> Almashtirish
         </button>
       </div>
 
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden', padding: '1rem', gap: '1rem' }}>
-        {/* LEFT / MAIN SECTION */}
-        <div style={{ flex: '1', display: 'flex', flexDirection: 'column', gap: '1rem', overflow: 'hidden' }}>
+      <div style={{ padding: '1.5rem', flex: 1, minHeight: 0, display: 'flex', gap: '1.5rem' }}>
+        {/* LEFT COLUMN: Scrollable */}
+        <div style={{ flex: '1 1 auto', display: 'flex', flexDirection: 'column', gap: '1.5rem', overflowY: 'auto', paddingRight: '0.5rem' }}>
           
           {!selectedSale ? (
-            <div className="glass-panel flex-col" style={{ flex: 1, padding: '1rem', overflowY: 'auto' }}>
-               <h2 className="h2" style={{ margin: 0, marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                 <RefreshCcw size={20} color="var(--primary)" /> Sotuvni Tanlang
+            <div className="glass-panel flex-col" style={{ flex: '1 1 auto', padding: '1.5rem' }}>
+               <h2 className="h2" style={{ margin: 0, marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                 <RefreshCcw size={20} color="var(--primary)" /> Qaytariladigan sotuvni (chekni) tanlang
                </h2>
-               <input 
-                  type="text" 
-                  placeholder="Chek raqami, mijoz yoki summa qidirish..." 
-                  className="input-field" 
-                  value={saleSearch} 
-                  onChange={e => setSaleSearch(e.target.value)}
-                  style={{ marginBottom: '1rem' }}
-                />
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  {filteredSales.map(sale => (
-                    <div 
-                      key={sale.id} 
-                      onClick={() => handleSelectSale(sale)}
-                      style={{ padding: '1rem', backgroundColor: '#fff', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-                    >
-                      <div>
-                        <div style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          {sale.saleNumber || 'Raqamsiz'}
-                          {sale.status === 'fully_returned' && <span style={{fontSize:'0.7rem', padding:'2px 4px', background:'#FEE2E2', color:'#EF4444', borderRadius:'4px'}}>Qaytarilgan</span>}
-                          {sale.status === 'partially_returned' && <span style={{fontSize:'0.7rem', padding:'2px 4px', background:'#FEF3C7', color:'#F59E0B', borderRadius:'4px'}}>Qisman qaytgan</span>}
-                        </div>
-                        <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-                          {sale.customerName ? <><User size={12}/> {sale.customerName}</> : 'Umumiy xaridor'}
-                        </div>
-                      </div>
-                      <div style={{ textAlign: 'right' }}>
-                        <div style={{ fontWeight: 700, color: 'var(--primary)' }}><CurrencyDisplay amount={sale.finalTotal} /></div>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                          {new Date(sale.createdAt).toLocaleDateString()}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem 1rem', backgroundColor: 'var(--bg-main)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', marginBottom: '1.5rem' }}>
+                 <Search size={18} color="var(--text-secondary)" />
+                 <input 
+                    type="text" 
+                    placeholder="Chek raqami, mijoz yoki summa bo'yicha qidirish..." 
+                    value={saleSearch} 
+                    onChange={e => setSaleSearch(e.target.value)}
+                    style={{ border: 'none', background: 'transparent', outline: 'none', flex: 1, fontSize: '0.875rem' }}
+                  />
+               </div>
+               
+               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                 {filteredSales.map(sale => (
+                   <div 
+                     key={sale.id} 
+                     onClick={() => handleSelectSale(sale)}
+                     style={{ padding: '1rem', backgroundColor: 'var(--bg-main)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', transition: 'all 0.2s' }}
+                     className="hover-card"
+                   >
+                     <div>
+                       <div style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.75rem', color: 'var(--text-main)' }}>
+                         {sale.saleNumber || 'Raqamsiz'}
+                         {sale.status === 'fully_returned' && <span style={{fontSize:'0.65rem', padding:'2px 6px', background:'#FEE2E2', color:'#EF4444', borderRadius:'4px', fontWeight: 700}}>Qaytarilgan</span>}
+                         {sale.status === 'partially_returned' && <span style={{fontSize:'0.65rem', padding:'2px 6px', background:'#FEF3C7', color:'#F59E0B', borderRadius:'4px', fontWeight: 700}}>Qisman qaytgan</span>}
+                       </div>
+                       <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.25rem', marginTop: '0.25rem' }}>
+                         <User size={14}/> {sale.customerName || 'Umumiy xaridor'}
+                       </div>
+                     </div>
+                     <div style={{ textAlign: 'right' }}>
+                       <div style={{ fontWeight: 700, color: 'var(--primary)', fontSize: '1rem' }}><CurrencyDisplay amount={sale.finalTotal} /></div>
+                       <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
+                         {new Date(sale.createdAt).toLocaleString()}
+                       </div>
+                     </div>
+                   </div>
+                 ))}
+                 {filteredSales.length === 0 && (
+                   <EmptyState icon={RefreshCcw} title="Sotuvlar topilmadi" message="Qidiruvingiz bo'yicha hech qanday chek topilmadi." />
+                 )}
+               </div>
             </div>
           ) : (
             <>
               {/* Selected Sale Header */}
-              <div className="glass-panel" style={{ padding: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div className="glass-panel" style={{ padding: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
                 <div>
-                  <div style={{ fontWeight: 600, fontSize: '1.125rem' }}>Chek: {selectedSale.saleNumber}</div>
-                  <div style={{ color: 'var(--text-secondary)' }}>{selectedSale.customerName || 'Umumiy xaridor'}</div>
+                  <div style={{ fontWeight: 700, fontSize: '1.125rem', color: 'var(--text-main)' }}>Chek: {selectedSale.saleNumber}</div>
+                  <div style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginTop: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}><User size={14}/> {selectedSale.customerName || 'Umumiy xaridor'}</div>
                 </div>
                 <button className="btn btn-outline" onClick={() => setSelectedSale(null)}>
-                  <ArrowLeft size={16}/> Boshqasini tanlash
+                  <ArrowLeft size={16}/> Boshqa chekni tanlash
                 </button>
               </div>
 
-              {/* Mode Specific Content */}
-              {mode === 'return' && (
-                <div className="glass-panel flex-col" style={{ flex: 1, padding: '1rem', overflowY: 'auto' }}>
-                  <h3 style={{ marginTop: 0, marginBottom: '1rem' }}>Qaytariladigan mahsulotlarni belgilang</h3>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    {selectedSale.items?.map((item, idx) => {
-                       const previouslyReturned = selectedSale.returnedItems?.find(r => r.productId === item.productId)?.qty || 0;
-                       const maxAvailable = item.qty - previouslyReturned;
+              {/* Returning Items Section (Used in both modes, but slightly different interactions) */}
+              <div className="glass-panel flex-col" style={{ flexShrink: 0, padding: '1.5rem' }}>
+                <h3 style={{ marginTop: 0, marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#E11D48', fontSize: '1.125rem' }}>
+                  <CornerDownLeft size={20} /> Mijoz qaytarayotgan mahsulotlar
+                </h3>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem' }}>
+                  {selectedSale.items?.map((item, idx) => {
+                     const previouslyReturned = selectedSale.returnedItems?.find(r => r.productId === item.productId)?.qty || 0;
+                     const maxAvailable = item.qty - previouslyReturned;
+                     
+                     if (maxAvailable <= 0) return null; // Already fully returned
+
+                     if (mode === 'return') {
+                       // Return Mode Interaction
                        const sel = returnSelections[item.productId];
                        const isSelected = sel?.selected || false;
                        const returnQty = sel?.returnQty || 0;
-
-                       if (maxAvailable <= 0) return null; // Already fully returned
-
+                       
                        return (
-                         <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '1rem', backgroundColor: '#fff', border: isSelected ? '1px solid var(--primary)' : '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', cursor: 'pointer' }} onClick={() => {
+                         <div key={idx} onClick={() => {
                             setReturnSelections(prev => ({
-                              ...prev,
-                              [item.productId]: { ...prev[item.productId], selected: !prev[item.productId].selected }
+                              ...prev, [item.productId]: { ...prev[item.productId], selected: !prev[item.productId].selected }
                             }));
-                         }}>
-                            <div>
-                               {isSelected ? <CheckSquare color="var(--primary)"/> : <Square color="#cbd5e1"/>}
+                         }} style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem', padding: '1rem', backgroundColor: isSelected ? '#FFF1F2' : 'var(--bg-main)', border: isSelected ? '1px solid #FDA4AF' : '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', cursor: 'pointer', transition: 'all 0.2s' }}>
+                            <div style={{ marginTop: '0.125rem' }}>
+                               {isSelected ? <CheckSquare color="#E11D48" size={20}/> : <Square color="#94A3B8" size={20}/>}
                             </div>
                             <div style={{ flex: 1 }}>
-                              <div style={{ fontWeight: 600 }}>{item.name}</div>
-                              <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-                                Sotilgan: {item.qty} (Qaytarilishi mumkin: {maxAvailable}) | Narxi: <CurrencyDisplay amount={item.sellPrice}/>
+                              <div style={{ fontWeight: 600, color: 'var(--text-main)', marginBottom: '0.25rem' }}>{item.name}</div>
+                              <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
+                                Sotilgan: <span style={{fontWeight: 600}}>{item.qty}</span> ta (Qaytarish mumkin: {maxAvailable})
                               </div>
+                              <div style={{ fontWeight: 700, color: 'var(--primary)' }}><CurrencyDisplay amount={item.sellPrice}/></div>
+                              
+                              {isSelected && (
+                                <div onClick={e => e.stopPropagation()} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '1rem' }}>
+                                   <div style={{ display: 'flex', alignItems: 'center', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', backgroundColor: '#fff', overflow: 'hidden' }}>
+                                      <button onClick={() => setReturnSelections(prev => ({ ...prev, [item.productId]: { ...prev[item.productId], returnQty: Math.max(1, returnQty - 1) } }))} style={{ padding: '0.5rem', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-main)', display: 'flex' }}><Minus size={14}/></button>
+                                      <input type="number" min="1" max={maxAvailable} value={returnQty} onChange={e => {
+                                          let val = parseInt(e.target.value) || 1;
+                                          if (val > maxAvailable) val = maxAvailable;
+                                          setReturnSelections(prev => ({ ...prev, [item.productId]: { ...prev[item.productId], returnQty: val } }));
+                                        }} style={{ width: '40px', textAlign: 'center', border: 'none', borderLeft: '1px solid var(--border-color)', borderRight: '1px solid var(--border-color)', padding: '0.5rem 0', outline: 'none', fontWeight: 600 }} 
+                                      />
+                                      <button onClick={() => setReturnSelections(prev => ({ ...prev, [item.productId]: { ...prev[item.productId], returnQty: Math.min(maxAvailable, returnQty + 1) } }))} style={{ padding: '0.5rem', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-main)', display: 'flex' }}><Plus size={14}/></button>
+                                   </div>
+                                   <button onClick={() => setReturnSelections(prev => ({ ...prev, [item.productId]: { ...prev[item.productId], returnQty: maxAvailable } }))} style={{ fontSize: '0.75rem', color: 'var(--primary)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600, padding: '0.5rem' }}>Barchasi</button>
+                                </div>
+                              )}
                             </div>
-                            {isSelected && (
-                              <div onClick={e => e.stopPropagation()} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                 <label style={{ fontSize: '0.875rem' }}>Soni:</label>
-                                 <input 
-                                    type="number" 
-                                    min="1" 
-                                    max={maxAvailable} 
-                                    value={returnQty} 
-                                    onChange={e => {
-                                      let val = parseInt(e.target.value) || 1;
-                                      if (val > maxAvailable) val = maxAvailable;
-                                      setReturnSelections(prev => ({
-                                        ...prev, [item.productId]: { ...prev[item.productId], returnQty: val }
-                                      }));
-                                    }}
-                                    className="input-field" 
-                                    style={{ width: '80px', padding: '0.25rem 0.5rem' }} 
-                                 />
-                              </div>
-                            )}
                          </div>
                        )
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {mode === 'exchange' && (
-                <>
-                  <div className="glass-panel flex-col" style={{ flex: '0 0 auto', padding: '1rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                      <div style={{ fontWeight: 600 }}>Sotilgan mahsulotlar (Qaytarish uchun bosing):</div>
-                      <button className="btn btn-outline" onClick={handleReturnAllExchange} style={{ padding: '0.25rem 0.75rem', fontSize: '0.75rem', height: 'auto' }}>
-                        Barchasini qaytarish
-                      </button>
-                    </div>
-                    
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                      {selectedSale.items?.map((item, idx) => {
-                        const previouslyReturned = selectedSale.returnedItems?.find(r => r.productId === item.productId)?.qty || 0;
-                        const returningNow = returningItems.find(r => r.productId === item.productId)?.qty || 0;
-                        const availableQty = item.qty - previouslyReturned - returningNow;
-                        
-                        if (item.qty - previouslyReturned <= 0) return null;
-
-                        return (
-                          <div 
-                            key={idx} 
-                            onClick={() => availableQty > 0 && handleReturnItemExchange(item)}
-                            style={{ padding: '0.75rem', backgroundColor: availableQty > 0 ? '#fff' : '#F8FAFC', border: '1px solid', borderColor: availableQty > 0 ? 'var(--border-color)' : '#E2E8F0', borderRadius: 'var(--radius-sm)', cursor: availableQty > 0 ? 'pointer' : 'not-allowed', opacity: availableQty > 0 ? 1 : 0.5, flex: '1 1 calc(33% - 0.5rem)', minWidth: '150px' }}
-                          >
-                            <div style={{ fontWeight: 600, fontSize: '0.875rem', marginBottom: '0.25rem' }}>{item.name}</div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem' }}>
-                              <span>Mavjud: <b style={{color: 'var(--primary)'}}>{item.qty - previouslyReturned}</b></span>
-                              <CurrencyDisplay amount={item.sellPrice} />
-                            </div>
+                     } else {
+                       // Exchange Mode Interaction
+                       const returningNow = returningItems.find(r => r.productId === item.productId)?.qty || 0;
+                       return (
+                         <div key={idx} style={{ padding: '1rem', backgroundColor: 'var(--bg-main)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', display: 'flex', flexDirection: 'column' }}>
+                            <div style={{ fontWeight: 600, color: 'var(--text-main)', marginBottom: '0.25rem' }}>{item.name}</div>
+                            <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Mavjud: {maxAvailable} ta</div>
+                            <div style={{ fontWeight: 700, color: 'var(--primary)', marginBottom: '1rem' }}><CurrencyDisplay amount={item.sellPrice}/></div>
                             
-                            {availableQty > 1 && (
-                              <button 
-                                className="btn btn-outline" 
-                                onClick={(e) => { e.stopPropagation(); handleReturnAllOfItemExchange(item); }}
-                                style={{ width: '100%', marginTop: '0.5rem', padding: '0.25rem', fontSize: '0.75rem', height: 'auto', display: 'flex', justifyContent: 'center' }}
-                              >
-                                Barchasini qaytarish
-                              </button>
-                            )}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: 'auto' }}>
+                               <div style={{ display: 'flex', alignItems: 'center', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', backgroundColor: '#fff', overflow: 'hidden', flexShrink: 0 }}>
+                                  <button onClick={() => updateReturningItemQty(item, returningNow - 1)} style={{ padding: '0.5rem', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-main)', display: 'flex' }}><Minus size={14}/></button>
+                                  <input type="number" min="0" max={maxAvailable} value={returningNow} onChange={e => updateReturningItemQty(item, parseInt(e.target.value) || 0)} style={{ width: '40px', textAlign: 'center', border: 'none', borderLeft: '1px solid var(--border-color)', borderRight: '1px solid var(--border-color)', padding: '0.5rem 0', outline: 'none', fontWeight: 600 }} />
+                                  <button onClick={() => updateReturningItemQty(item, returningNow + 1)} style={{ padding: '0.5rem', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-main)', display: 'flex' }}><Plus size={14}/></button>
+                               </div>
+                               <button onClick={() => handleReturnAllOfItemExchange(item)} style={{ fontSize: '0.75rem', color: 'var(--primary)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600, padding: '0.5rem' }}>Barchasi</button>
+                            </div>
+                         </div>
+                       )
+                     }
+                  })}
+                  {selectedSale.items?.filter(i => (i.qty - (selectedSale.returnedItems?.find(r => r.productId === i.productId)?.qty || 0)) > 0).length === 0 && (
+                    <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>Bu chekdagi barcha tovarlar qaytarib bo'lingan.</div>
+                  )}
+                </div>
+              </div>
 
-                            {returningNow > 0 && (
-                              <div style={{ marginTop: '0.5rem', padding: '0.25rem', backgroundColor: '#FEE2E2', color: '#E11D48', borderRadius: '4px', fontSize: '0.75rem', textAlign: 'center', fontWeight: 600 }}>
-                                {returningNow} ta qaytarilmoqda
-                              </div>
-                            )}
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </div>
-
-                  <div className="glass-panel flex-col" style={{ flex: '1', overflow: 'hidden', padding: '1rem' }}>
-                    <h2 className="h2" style={{ margin: 0, marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <ShoppingBag size={20} color="var(--primary)" /> Yangi Tovar Tanlash
-                    </h2>
+              {/* Exchange Catalog Section */}
+              {mode === 'exchange' && (
+                <div className="glass-panel flex-col" style={{ flexShrink: 0, padding: '1.5rem' }}>
+                  <h3 style={{ marginTop: 0, marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--success)', fontSize: '1.125rem' }}>
+                    <ShoppingBag size={20} /> Yangi Tovar Tanlash (Katalog)
+                  </h3>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem 1rem', backgroundColor: 'var(--bg-main)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', marginBottom: '1.5rem' }}>
+                    <Search size={18} color="var(--text-secondary)" />
                     <input 
                       type="text" 
-                      placeholder="Katalogdan tovar narxi, nomi yoki shtrix-kodi..." 
-                      className="input-field" 
+                      placeholder="Katalogdan tovar qidirish..." 
                       value={productSearch} 
                       onChange={e => setProductSearch(e.target.value)}
-                      style={{ marginBottom: '1rem' }}
+                      style={{ border: 'none', background: 'transparent', outline: 'none', flex: 1, fontSize: '0.875rem' }}
                     />
-                    
-                    <div style={{ overflowY: 'auto', flex: 1, paddingRight: '0.5rem', display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignContent: 'flex-start' }}>
-                      {filteredProducts.map(p => (
-                        <div 
-                          key={p.id}
-                          onClick={() => handleAddToCart(p)}
-                          style={{ padding: '0.75rem', backgroundColor: '#fff', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', cursor: 'pointer', flex: '1 1 calc(33% - 0.5rem)', minWidth: '140px', position: 'relative' }}
-                        >
-                          <div style={{ fontWeight: 600, fontSize: '0.875rem', marginBottom: '0.25rem' }}>
-                            <HighlightTextLocal text={p.name} search={productSearch} />
-                          </div>
-                          <div style={{ color: 'var(--primary)', fontWeight: 700, fontSize: '1rem' }}>
-                            <CurrencyDisplay amount={p.sellPrice} isSell />
-                          </div>
-                          <div style={{ fontSize: '0.75rem', color: p.stock > 0 ? 'var(--success)' : 'var(--danger)', marginTop: '0.25rem' }}>
-                            Qoldiq: {p.stock}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
                   </div>
-                </>
+                  
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1rem' }}>
+                    {filteredProducts.map(p => (
+                      <div key={p.id} onClick={() => handleAddToCart(p)} className="hover-card" style={{ padding: '1rem', backgroundColor: 'var(--bg-main)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', cursor: 'pointer', display: 'flex', flexDirection: 'column', transition: 'all 0.2s' }}>
+                        <div style={{ fontWeight: 600, fontSize: '0.875rem', marginBottom: '0.25rem', color: 'var(--text-main)' }}>
+                          <HighlightTextLocal text={p.name} search={productSearch} />
+                        </div>
+                        <div style={{ color: 'var(--success)', fontWeight: 700, fontSize: '1.125rem', margin: '0.5rem 0' }}>
+                          <CurrencyDisplay amount={p.sellPrice} />
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: p.stock > 0 ? 'var(--text-secondary)' : '#EF4444', marginTop: 'auto', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                          <div style={{width: 6, height: 6, borderRadius: '50%', backgroundColor: p.stock > 0 ? '#10B981' : '#EF4444'}}></div>
+                          Qoldiq: {p.stock}
+                        </div>
+                      </div>
+                    ))}
+                    {filteredProducts.length === 0 && (
+                      <div style={{ gridColumn: '1 / -1' }}><EmptyState icon={ShoppingBag} title="Tovarlar topilmadi" message="Qidiruvingiz bo'yicha tovar topilmadi." /></div>
+                    )}
+                  </div>
+                </div>
               )}
             </>
           )}
         </div>
 
-        {/* RIGHT SECTION: CALCULATION PANEL */}
-        {selectedSale && mode === 'return' && (
-          <div className="glass-panel flex-col" style={{ width: '350px', padding: '1.5rem', borderLeft: '4px solid var(--primary)' }}>
-            <h2 className="h2" style={{ margin: 0, marginBottom: '1.5rem' }}>Qaytarish Hisob-kitobi</h2>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: '1.125rem', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between' }}>
-                <span>Jami qaytariladigan summa:</span>
-                <span style={{ fontWeight: 700, color: '#E11D48' }}><CurrencyDisplay amount={calculateReturnTotal()}/></span>
-              </div>
-              <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
-                Mijozga pulni qaysi usulda qaytarasiz?
-              </p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <button className="btn btn-outline" disabled={isProcessing || calculateReturnTotal() === 0} onClick={() => processReturn('naqd')} style={{ width: '100%', justifyContent: 'center' }}>Naqd qaytarish (Kassadan)</button>
-                <button className="btn btn-outline" disabled={isProcessing || calculateReturnTotal() === 0} onClick={() => processReturn('karta')} style={{ width: '100%', justifyContent: 'center' }}>Karta orqali qaytarildi</button>
-                {selectedSale.customerId && (
-                  <button className="btn btn-outline" disabled={isProcessing || calculateReturnTotal() === 0} onClick={() => processReturn('nasiya')} style={{ width: '100%', justifyContent: 'center', borderColor: '#F59E0B', color: '#B45309' }}>Qarzidan chegirib qolish</button>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {selectedSale && mode === 'exchange' && (
-          <div className="glass-panel flex-col" style={{ width: '400px', overflow: 'hidden', borderLeft: '4px solid var(--primary)', display: 'flex', flexDirection: 'column' }}>
-            {/* Header */}
-            <div style={{ padding: '1.5rem 1.5rem 0 1.5rem', flexShrink: 0 }}>
-              <h2 className="h2" style={{ margin: 0, marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Calculator size={22} color="var(--primary)" /> Hisob-kitob
+        {/* RIGHT COLUMN: Sticky Calculation Panel */}
+        {selectedSale && (
+          <div className="glass-panel" style={{ position: 'sticky', top: '0', width: '400px', flexShrink: 0, display: 'flex', flexDirection: 'column', maxHeight: '100%', overflow: 'hidden' }}>
+            {/* Calc Header */}
+            <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border-color)', flexShrink: 0 }}>
+              <h2 className="h2" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <Calculator size={24} color="var(--primary)" /> Hisob-kitob
               </h2>
             </div>
             
-            {/* Scrollable Body */}
-            <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1.5rem', padding: '0 1.5rem' }}>
-              <div>
-                <div style={{ fontWeight: 600, color: '#E11D48', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <CornerDownLeft size={16} /> Qaytarilayotgan tovarlar
-                </div>
-                {returningItems.length === 0 ? (
-                  <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Tanlanmagan</div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    {returningItems.map(item => (
-                      <div key={item.productId} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.875rem', padding: '0.5rem', backgroundColor: '#FFF1F2', borderRadius: '4px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <button onClick={() => handleRemoveReturnExchange(item)} style={{ background: 'none', border: 'none', color: '#E11D48', cursor: 'pointer', padding: 0 }}><X size={14}/></button>
-                          <span>{item.name} <b style={{color: '#E11D48'}}>x{item.qty}</b></span>
-                        </div>
-                        <span style={{ fontWeight: 600, color: '#E11D48' }}>-<CurrencyDisplay amount={item.sellPrice * item.qty} /></span>
-                      </div>
-                    ))}
-                    <div style={{ textAlign: 'right', fontWeight: 700, color: '#E11D48', marginTop: '0.5rem', borderTop: '1px solid #FFE4E6', paddingTop: '0.5rem' }}>
-                      Jami qaytarilmoqda: -<CurrencyDisplay amount={exReturnAmount} />
-                    </div>
+            {/* Calc Body (Scrollable) */}
+            <div style={{ flex: '1 1 auto', overflowY: 'auto', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+              
+              {/* Returning List */}
+              {mode === 'return' ? (
+                <div>
+                  <div style={{ fontWeight: 600, color: '#E11D48', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <CornerDownLeft size={18} /> Qaytarilayotgan tovarlar
                   </div>
-                )}
-              </div>
-
-              <div>
-                <div style={{ fontWeight: 600, color: 'var(--success)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <ShoppingBag size={16} /> Yangi tovarlar
-                </div>
-                {cart.length === 0 ? (
-                  <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Tanlanmagan</div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    {cart.map(item => (
-                      <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.875rem', padding: '0.5rem', backgroundColor: '#F0FDF4', borderRadius: '4px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <button onClick={() => handleRemoveCart(item)} style={{ background: 'none', border: 'none', color: 'var(--success)', cursor: 'pointer', padding: 0 }}><X size={14}/></button>
-                          <span>{item.name} <b style={{color: 'var(--success)'}}>x{item.qty}</b></span>
-                        </div>
-                        <span style={{ fontWeight: 600, color: 'var(--success)' }}>+<CurrencyDisplay amount={item.sellPrice * item.qty} /></span>
-                      </div>
-                    ))}
-                    <div style={{ textAlign: 'right', fontWeight: 700, color: 'var(--success)', marginTop: '0.5rem', borderTop: '1px solid #DCFCE7', paddingTop: '0.5rem' }}>
-                      Jami olinmoqda: +<CurrencyDisplay amount={exNewAmount} />
+                  {calculateReturnTotal() === 0 ? (
+                    <EmptyState icon={RefreshCcw} title="Tanlanmagan" message="Chap tomondan tovarlarni belgilang" compact />
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                      {Object.keys(returnSelections).filter(id => returnSelections[id].selected && returnSelections[id].returnQty > 0).map(id => {
+                        const item = selectedSale.items.find(i => i.productId === id);
+                        const qty = returnSelections[id].returnQty;
+                        return (
+                          <div key={id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.875rem' }}>
+                            <span style={{ color: 'var(--text-main)', flex: 1 }}>{item.name} <b style={{color: '#E11D48', marginLeft: '4px'}}>x{qty}</b></span>
+                            <span style={{ fontWeight: 600, color: '#E11D48' }}>-<CurrencyDisplay amount={item.sellPrice * qty} /></span>
+                          </div>
+                        )
+                      })}
                     </div>
+                  )}
+                </div>
+              ) : (
+                <>
+                  <div>
+                    <div style={{ fontWeight: 600, color: '#E11D48', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <CornerDownLeft size={18} /> Qaytarilayotgan tovarlar
+                    </div>
+                    {returningItems.length === 0 ? (
+                      <EmptyState icon={RefreshCcw} title="Tanlanmagan" message="Chap tomondan tovarlarni belgilang" compact />
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                        {returningItems.map(item => (
+                          <div key={item.productId} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.875rem' }}>
+                            <span style={{ color: 'var(--text-main)', flex: 1 }}>{item.name} <b style={{color: '#E11D48', marginLeft: '4px'}}>x{item.qty}</b></span>
+                            <span style={{ fontWeight: 600, color: '#E11D48' }}>-<CurrencyDisplay amount={item.sellPrice * item.qty} /></span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
+                  <div>
+                    <div style={{ fontWeight: 600, color: 'var(--success)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <ShoppingBag size={18} /> Yangi olinayotgan tovarlar
+                    </div>
+                    {cart.length === 0 ? (
+                      <EmptyState icon={ShoppingBag} title="Tanlanmagan" message="Katalogdan yangi tovarlarni qo'shing" compact />
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                        {cart.map(item => (
+                          <div key={item.id} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.875rem' }}>
+                              <span style={{ color: 'var(--text-main)', flex: 1 }}>{item.name}</span>
+                              <span style={{ fontWeight: 600, color: 'var(--success)' }}>+<CurrencyDisplay amount={item.sellPrice * item.qty} /></span>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', backgroundColor: '#fff', overflow: 'hidden', width: 'max-content' }}>
+                              <button onClick={() => updateCartItemQty(item, item.qty - 1)} style={{ padding: '0.25rem 0.5rem', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-main)', display: 'flex' }}><Minus size={14}/></button>
+                              <input type="number" min="0" max={item.stock} value={item.qty} onChange={e => updateCartItemQty(item, parseInt(e.target.value) || 0)} style={{ width: '40px', textAlign: 'center', border: 'none', borderLeft: '1px solid var(--border-color)', borderRight: '1px solid var(--border-color)', padding: '0.25rem 0', outline: 'none', fontWeight: 600, fontSize: '0.875rem' }} />
+                              <button onClick={() => updateCartItemQty(item, item.qty + 1)} style={{ padding: '0.25rem 0.5rem', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-main)', display: 'flex' }}><Plus size={14}/></button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
 
-            {/* Fixed Footer */}
-            <div style={{ flexShrink: 0, backgroundColor: '#F8FAFC', padding: '1.5rem', borderTop: '1px solid var(--border-color)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem', fontSize: '1.125rem' }}>
-                <span style={{ fontWeight: 600 }}>Yakuniy farq:</span>
-                <span style={{ fontWeight: 700, color: exDifference > 0 ? 'var(--primary)' : (exDifference < 0 ? '#E11D48' : 'var(--text-main)') }}>
-                  {exDifference > 0 ? '+' : ''}<CurrencyDisplay amount={exDifference} />
-                </span>
-              </div>
-
-              <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '1rem', textAlign: 'center' }}>
-                {exDifference > 0 && "Mijoz qo'shimcha to'lashi kerak:"}
-                {exDifference < 0 && "Do'kon mijozga qaytarishi kerak (- balans):"}
-                {exDifference === 0 && "Farq yo'q. To'g'ridan-to'g'ri almashtirish."}
-              </div>
-
-              {exDifference > 0 && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  <button className="btn btn-primary" disabled={isProcessing} onClick={() => processExchange('naqd')} style={{ width: '100%', justifyContent: 'center' }}>
-                    <Banknote size={16} /> Naqd pul to'ladi
-                  </button>
-                  <button className="btn btn-outline" disabled={isProcessing} onClick={() => processExchange('karta')} style={{ width: '100%', justifyContent: 'center' }}>
-                    <CreditCard size={16} /> Karta orqali
-                  </button>
-                  {selectedSale?.customerId && (
-                    <button className="btn btn-outline" disabled={isProcessing} onClick={() => processExchange('nasiya')} style={{ width: '100%', justifyContent: 'center', borderColor: '#F59E0B', color: '#B45309' }}>
-                      Qarzga yozish
+            {/* Calc Footer (Fixed) */}
+            <div style={{ flexShrink: 0, backgroundColor: 'var(--bg-surface)', padding: '1.5rem', borderTop: '1px solid var(--border-color)' }}>
+              
+              {mode === 'return' ? (
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.5rem', fontSize: '1.25rem' }}>
+                    <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>Qaytarilmoqda:</span>
+                    <span style={{ fontWeight: 700, color: '#E11D48' }}><CurrencyDisplay amount={calculateReturnTotal()}/></span>
+                  </div>
+                  
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1.5rem' }}>
+                    <button className={`btn ${selectedPayment === 'naqd' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setSelectedPayment('naqd')} style={{ width: '100%', justifyContent: 'center' }}>
+                      <Banknote size={16} /> Naqd (Kassadan) qaytarish
                     </button>
-                  )}
-                </div>
-              )}
-
-              {exDifference < 0 && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  <button className="btn btn-primary" disabled={isProcessing} onClick={() => processExchange('naqd_qaytarildi')} style={{ width: '100%', justifyContent: 'center', backgroundColor: '#E11D48', borderColor: '#E11D48' }}>
-                    <Banknote size={16} /> Mijozga naqd qaytarish
-                  </button>
-                  {selectedSale?.customerId ? (
-                    <button className="btn btn-outline" disabled={isProcessing} onClick={() => processExchange('balansga_qoshildi')} style={{ width: '100%', justifyContent: 'center' }}>
-                      Mijoz balansiga (Store Credit) qo'shish
+                    <button className={`btn ${selectedPayment === 'karta' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setSelectedPayment('karta')} style={{ width: '100%', justifyContent: 'center' }}>
+                      <CreditCard size={16} /> Karta orqali qaytarildi
                     </button>
-                  ) : (
-                    <div style={{ fontSize: '0.75rem', color: '#E11D48', textAlign: 'center' }}>Mijoz balansiga qo'shish uchun xaridor biriktirilgan bo'lishi shart</div>
-                  )}
-                </div>
-              )}
+                    <button 
+                      className={`btn ${selectedPayment === 'nasiya' ? 'btn-primary' : 'btn-outline'}`} 
+                      disabled={!selectedSale.customerId}
+                      onClick={() => setSelectedPayment('nasiya')} 
+                      style={{ width: '100%', justifyContent: 'center', ...(selectedPayment === 'nasiya' ? {backgroundColor: '#F59E0B', borderColor: '#F59E0B'} : {}) }}
+                    >
+                      <User size={16} /> Mijoz qarzidan chegirish
+                    </button>
+                  </div>
+                  
+                  <button 
+                    className="btn btn-primary" 
+                    disabled={isProcessing || calculateReturnTotal() === 0 || !selectedPayment} 
+                    onClick={processReturn} 
+                    style={{ width: '100%', justifyContent: 'center', padding: '1rem', fontSize: '1rem', backgroundColor: '#E11D48', borderColor: '#E11D48' }}
+                  >
+                    Tasdiqlash va Qaytarish
+                  </button>
+                </>
+              ) : (
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem', fontSize: '1.25rem' }}>
+                    <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>Yakuniy farq:</span>
+                    <span style={{ fontWeight: 700, color: exDifference > 0 ? 'var(--primary)' : (exDifference < 0 ? '#E11D48' : 'var(--text-secondary)') }}>
+                      {exDifference > 0 ? '+' : ''}<CurrencyDisplay amount={exDifference} />
+                    </span>
+                  </div>
 
-              {exDifference === 0 && (
-                <button 
-                  className="btn btn-primary" 
-                  disabled={isProcessing || (returningItems.length===0 && cart.length===0)} 
-                  onClick={() => processExchange('naqd')} // doesn't matter since diff is 0
-                  style={{ width: '100%', justifyContent: 'center' }}
-                >
-                  {returningItems.length > 0 && cart.length === 0 ? "Qaytarib olishni tasdiqlash" : "Almashtirishni tasdiqlash"}
-                </button>
+                  <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '1rem', textAlign: 'center', fontWeight: 500 }}>
+                    {exDifference > 0 && "Mijoz qo'shimcha to'lashi kerak:"}
+                    {exDifference < 0 && "Do'kon mijozga qaytarishi kerak:"}
+                    {exDifference === 0 && "Farq yo'q (Nol). To'lov turini tanlang:"}
+                  </div>
+
+                  {exDifference > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1.5rem' }}>
+                      <button className={`btn ${selectedPayment === 'naqd' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setSelectedPayment('naqd')} style={{ width: '100%', justifyContent: 'center' }}>
+                        <Banknote size={16} /> Mijoz naqd to'laydi
+                      </button>
+                      <button className={`btn ${selectedPayment === 'karta' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setSelectedPayment('karta')} style={{ width: '100%', justifyContent: 'center' }}>
+                        <CreditCard size={16} /> Karta orqali to'laydi
+                      </button>
+                      <button 
+                        className={`btn ${selectedPayment === 'nasiya' ? 'btn-primary' : 'btn-outline'}`} 
+                        disabled={!selectedSale?.customerId}
+                        onClick={() => setSelectedPayment('nasiya')} 
+                        style={{ width: '100%', justifyContent: 'center', ...(selectedPayment === 'nasiya' ? {backgroundColor: '#F59E0B', borderColor: '#F59E0B'} : {}) }}
+                      >
+                        <User size={16} /> Mijoz qarziga qo'shish
+                      </button>
+                    </div>
+                  )}
+
+                  {exDifference <= 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1.5rem' }}>
+                      <button className={`btn ${selectedPayment === 'naqd_qaytarildi' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setSelectedPayment('naqd_qaytarildi')} style={{ width: '100%', justifyContent: 'center', ...(selectedPayment === 'naqd_qaytarildi' ? {backgroundColor: '#E11D48', borderColor: '#E11D48'} : {}) }}>
+                        <Banknote size={16} /> Naqd (Kassadan) qaytarish
+                      </button>
+                      <button 
+                        className={`btn ${selectedPayment === 'balansga_qoshildi' ? 'btn-primary' : 'btn-outline'}`} 
+                        disabled={!selectedSale?.customerId}
+                        onClick={() => setSelectedPayment('balansga_qoshildi')} 
+                        style={{ width: '100%', justifyContent: 'center', ...(selectedPayment === 'balansga_qoshildi' ? {backgroundColor: 'var(--success)', borderColor: 'var(--success)'} : {}) }}
+                      >
+                        <User size={16} /> Mijoz balansiga (Store Credit) qo'shish
+                      </button>
+                      {!selectedSale?.customerId && (
+                        <div style={{ fontSize: '0.75rem', color: '#E11D48', textAlign: 'center' }}>Balansga qo'shish uchun xaridor biriktirilgan bo'lishi shart</div>
+                      )}
+                    </div>
+                  )}
+                  
+                  <button 
+                    className="btn btn-primary" 
+                    disabled={isProcessing || (returningItems.length===0 && cart.length===0) || !selectedPayment} 
+                    onClick={processExchange} 
+                    style={{ width: '100%', justifyContent: 'center', padding: '1rem', fontSize: '1rem' }}
+                  >
+                    Almashtirishni Tasdiqlash
+                  </button>
+                </>
               )}
             </div>
           </div>
