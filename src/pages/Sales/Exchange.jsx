@@ -40,7 +40,8 @@ const Exchange = () => {
   const [sales, setSales] = useState([]);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [saleSearch, setSaleSearch] = useState('');
+  const [productSearch, setProductSearch] = useState('');
   
   const [selectedSale, setSelectedSale] = useState(null);
   const [returningItems, setReturningItems] = useState([]);
@@ -73,20 +74,30 @@ const Exchange = () => {
     };
   }, [storeId]);
 
-  const filteredProducts = products.filter(p => 
-    p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    (p.barcode && p.barcode.includes(searchTerm))
-  );
+  const filteredProducts = products.filter(p => {
+    const q = productSearch.toLowerCase();
+    return p.name.toLowerCase().includes(q) || 
+           (p.barcode && p.barcode.includes(q)) ||
+           (p.sellPrice && p.sellPrice.toString().includes(q));
+  }).slice(0, 100);
 
-  const filteredSales = sales.filter(s => 
-    s.saleNumber?.includes(searchTerm) || 
-    s.customerName?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredSales = sales.filter(s => {
+    const q = saleSearch.toLowerCase();
+    return s.saleNumber?.toLowerCase().includes(q) || 
+           s.customerName?.toLowerCase().includes(q) ||
+           (s.finalTotal && s.finalTotal.toString().includes(q));
+  }).slice(0, 50);
 
   const handleSelectSale = (sale) => {
     setSelectedSale(sale);
     setReturningItems([]);
     setCart([]);
+    setProductSearch('');
+  };
+
+  const handleReturnAll = () => {
+    if (!selectedSale || !selectedSale.items) return;
+    setReturningItems(selectedSale.items.map(item => ({...item})));
   };
 
   const handleReturnItem = (item) => {
@@ -276,10 +287,10 @@ const Exchange = () => {
             <div style={{ overflowY: 'auto', flex: 1, paddingRight: '0.5rem' }}>
               <input 
                 type="text" 
-                placeholder="Chek raqami yoki mijoz qidirish..." 
+                placeholder="Chek raqami, mijoz yoki summa qidirish..." 
                 className="input-field" 
-                value={searchTerm} 
-                onChange={e => setSearchTerm(e.target.value)}
+                value={saleSearch} 
+                onChange={e => setSaleSearch(e.target.value)}
                 style={{ marginBottom: '1rem' }}
               />
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
@@ -317,8 +328,18 @@ const Exchange = () => {
                 </button>
               </div>
               
-              <div style={{ fontWeight: 600, marginTop: '0.5rem' }}>Sotilgan mahsulotlar (Qaytarish uchun bosing):</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.5rem' }}>
+                <div style={{ fontWeight: 600 }}>Sotilgan mahsulotlar (Qaytarish uchun bosing):</div>
+                <button 
+                  className="btn btn-outline" 
+                  onClick={handleReturnAll}
+                  style={{ padding: '0.25rem 0.75rem', fontSize: '0.75rem', height: 'auto' }}
+                >
+                  Barchasini qaytarish
+                </button>
+              </div>
+              
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', overflowY: 'auto', maxHeight: '150px', paddingRight: '0.5rem', paddingBottom: '0.5rem' }}>
                 {selectedSale.items?.map((item, idx) => {
                   const returningQty = returningItems.find(r => r.productId === item.productId)?.qty || 0;
                   const availableQty = item.qty - returningQty;
@@ -356,10 +377,10 @@ const Exchange = () => {
             </h2>
             <input 
               type="text" 
-              placeholder="Katalogdan tovar qidirish..." 
+              placeholder="Katalogdan tovar narxi, nomi yoki shtrix-kodi..." 
               className="input-field" 
-              value={searchTerm} 
-              onChange={e => setSearchTerm(e.target.value)}
+              value={productSearch} 
+              onChange={e => setProductSearch(e.target.value)}
               style={{ marginBottom: '1rem' }}
             />
             
@@ -371,7 +392,7 @@ const Exchange = () => {
                   style={{ padding: '0.75rem', backgroundColor: '#fff', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', cursor: 'pointer', flex: '1 1 calc(33% - 0.5rem)', minWidth: '140px', position: 'relative' }}
                 >
                   <div style={{ fontWeight: 600, fontSize: '0.875rem', marginBottom: '0.25rem' }}>
-                    <HighlightText text={p.name} search={searchTerm} />
+                    <HighlightText text={p.name} search={productSearch} />
                   </div>
                   <div style={{ color: 'var(--primary)', fontWeight: 700, fontSize: '1rem' }}>
                     <CurrencyDisplay amount={p.sellPrice} isSell />
@@ -387,17 +408,18 @@ const Exchange = () => {
       </div>
 
       {/* Right side: Calculation Panel */}
-      <div className="glass-panel flex-col" style={{ width: '400px', padding: '1.5rem', overflowY: 'auto', borderLeft: '4px solid var(--primary)' }}>
-        <h2 className="h2" style={{ margin: 0, marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+      <div className="glass-panel flex-col" style={{ width: '400px', padding: '1.5rem', overflow: 'hidden', borderLeft: '4px solid var(--primary)', display: 'flex', flexDirection: 'column' }}>
+        <h2 className="h2" style={{ margin: 0, marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
           <Calculator size={22} color="var(--primary)" /> 
           Hisob-kitob
         </h2>
         
-        {/* Returning Items */}
-        <div style={{ marginBottom: '1.5rem' }}>
-          <div style={{ fontWeight: 600, color: '#E11D48', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <ArrowRightLeft size={16} /> Qaytarilayotgan tovarlar
-          </div>
+        <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1.5rem', paddingRight: '0.5rem' }}>
+          {/* Returning Items */}
+          <div>
+            <div style={{ fontWeight: 600, color: '#E11D48', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <ArrowRightLeft size={16} /> Qaytarilayotgan tovarlar
+            </div>
           {returningItems.length === 0 ? (
             <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Tanlanmagan</div>
           ) : (
@@ -415,14 +437,14 @@ const Exchange = () => {
                 Jami qaytarilmoqda: -<CurrencyDisplay amount={totalReturnAmount} />
               </div>
             </div>
-          )}
-        </div>
-
-        {/* New Items */}
-        <div style={{ marginBottom: '1.5rem' }}>
-          <div style={{ fontWeight: 600, color: 'var(--success)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <ShoppingBag size={16} /> Yangi tovarlar
+            )}
           </div>
+
+          {/* New Items */}
+          <div>
+            <div style={{ fontWeight: 600, color: 'var(--success)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <ShoppingBag size={16} /> Yangi tovarlar
+            </div>
           {cart.length === 0 ? (
             <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Tanlanmagan</div>
           ) : (
@@ -441,10 +463,11 @@ const Exchange = () => {
               </div>
             </div>
           )}
+          </div>
         </div>
 
         {/* Difference and Payment */}
-        <div style={{ marginTop: 'auto', backgroundColor: '#F8FAFC', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+        <div style={{ flexShrink: 0, marginTop: '1rem', backgroundColor: '#F8FAFC', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem', fontSize: '1.125rem' }}>
             <span style={{ fontWeight: 600 }}>Yakuniy farq:</span>
             <span style={{ fontWeight: 700, color: difference > 0 ? 'var(--primary)' : (difference < 0 ? '#E11D48' : 'var(--text-main)') }}>
