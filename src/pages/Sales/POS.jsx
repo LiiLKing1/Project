@@ -53,9 +53,14 @@ const ProductCard = ({ p, search, addToCart, cartQty = 0 }) => {
   const [showError, setShowError] = React.useState(false);
   const timerRef = React.useRef(null);
   const resetTimerRef = React.useRef(null);
+  
+  const cartQtyRef = React.useRef(cartQty);
+  React.useEffect(() => {
+    cartQtyRef.current = cartQty;
+  }, [cartQty]);
 
   const triggerAdd = () => {
-    if (p.stock <= 0 || cartQty >= p.stock) {
+    if (p.stock <= 0 || cartQtyRef.current >= p.stock) {
       addToCart(p);
       setShowError(true);
       if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
@@ -121,7 +126,7 @@ const ProductCard = ({ p, search, addToCart, cartQty = 0 }) => {
           <AnimatePresence>
             {addedCount > 0 && !showError && (
               <motion.div
-                key="added"
+                key={addedCount}
                 initial={{ opacity: 0, y: 10, scale: 0.5 }}
                 animate={{ opacity: 1, y: -45, scale: 2 }}
                 exit={{ opacity: 0, y: -60, scale: 0.8 }}
