@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import Drawer from '../../components/Drawer';
 import { User, Phone, Calendar, CreditCard, ShoppingBag, Clock, FileText } from 'lucide-react';
 import { db } from '../../firebase';
-import { collection, query, where, getDocs, orderBy } from '../../services/firebaseMock';
+import { collection, query, where, getDocs, orderBy, runTransaction, doc, serverTimestamp } from '../../services/firebaseMock';
 import CurrencyDisplay from '../../components/CurrencyDisplay';
+import { useToast } from '../../context/ToastContext';
 import { useSettings } from '../../context/SettingsContext';
 import { useRoles } from '../../context/RolesContext';
 
@@ -11,6 +12,8 @@ const CustomerProfileDrawer = ({ isOpen, onClose, customer }) => {
   const [activeTab, setActiveTab] = useState('umumiy');
   const [salesHistory, setSalesHistory] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const { addToast } = useToast();
   const { settings } = useSettings();
   const { userProfile } = useRoles();
   const storeId = userProfile?.storeOwnerId;
@@ -33,6 +36,54 @@ const CustomerProfileDrawer = ({ isOpen, onClose, customer }) => {
       console.error(error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleWriteOff = async () => {
+    if (!customer.storeCredit || customer.storeCredit <= 0) return;
+    
+    if (window.confirm(`${customer.fullName}ning ${customer.storeCredit} so'm balansini bekor qilasizmi? Bu qaytarib bo'lmaydigan operatsiya.`)) {
+      setIsProcessing(true);
+      try {
+        await runTransaction(db, async (transaction) => {
+          const custRef = doc(db, `users/${storeId}/customers`, customer.id);
+          const custSnap = await transaction.get(custRef);
+          if (!custSnap.exists()) throw new Error("Mijoz topilmadi");
+          
+          const currentCredit = custSnap.data().storeCredit || 0;
+          if (currentCredit <= 0) throw new Error("Balans yo'q");
+
+          // Set credit to 0
+          transaction.update(custRef, { storeCredit: 0 });
+
+          // Add to expenses
+          const expenseRef = doc(collection(db, `users/${storeId}/expenses`));
+          transaction.set(expenseRef, {
+            category: 'boshqa',
+            note: `Mijoz (${customer.fullName}) balansi hisobdan chiqarildi`,
+            amount: currentCredit,
+            date: new Date().toISOString().split('T')[0],
+            createdBy: userProfile?.name || 'Admin'
+          });
+
+          // Log write-off in customerCredits
+          const creditRef = doc(collection(db, `users/${storeId}/customerCredits`));
+          transaction.set(creditRef, {
+            customerId: customer.id,
+            amount: -currentCredit,
+            type: 'writeoff',
+            note: 'Balans hisobdan chiqarildi (Zarar)',
+            createdAt: serverTimestamp()
+          });
+        });
+        
+        addToast('Balans bekor qilindi', 'success');
+        onClose(); // Close drawer after write-off to refresh data
+      } catch (e) {
+        addToast(e.message, 'error');
+      } finally {
+        setIsProcessing(false);
+      }
     }
   };
 
@@ -84,6 +135,24 @@ const CustomerProfileDrawer = ({ isOpen, onClose, customer }) => {
              <div style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#4A90E2', marginTop: '0.5rem' }}><CurrencyDisplay amount={customer.bonusBalance} /></div>
              {customer.bonusPercent > 0 && <div style={{ fontSize: '0.75rem', color: '#64748B', marginTop: '4px' }}>Har bir xariddan {customer.bonusPercent}% bonus</div>}
           </div>
+
+          {(customer.storeCredit > 0) && (
+            <div style={{ padding: '1rem', border: '1px solid #FCA5A5', backgroundColor: '#FEF2F2', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+               <div>
+                 <div style={{ color: '#E11D48', fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600 }}>Do'kon balansi (Store Credit)</div>
+                 <div style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#E11D48', marginTop: '0.25rem' }}>+<CurrencyDisplay amount={customer.storeCredit} /></div>
+                 <div style={{ fontSize: '0.75rem', color: '#E11D48', marginTop: '4px' }}>Mijoz haqi / qaytim qoldig'i</div>
+               </div>
+               <button 
+                 className="btn btn-outline" 
+                 disabled={isProcessing}
+                 onClick={handleWriteOff} 
+                 style={{ borderColor: '#E11D48', color: '#E11D48', fontSize: '0.75rem', padding: '0.25rem 0.75rem', height: 'auto' }}
+               >
+                 Balansni bekor qilish
+               </button>
+            </div>
+          )}
 
           {(customer.birthDate || customer.gender) && (
             <div style={{ padding: '1rem', border: '1px solid #E2E8F0', borderRadius: '12px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>

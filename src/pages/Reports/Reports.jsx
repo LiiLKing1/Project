@@ -38,6 +38,8 @@ const CollapsibleProducts = ({ items }) => {
 
 const Reports = () => {
   const [salesData, setSalesData] = useState([]);
+  const [returnsData, setReturnsData] = useState([]);
+  const [exchangesData, setExchangesData] = useState([]);
   const [shiftsData, setShiftsData] = useState([]);
   const [activeTab, setActiveTab] = useState('sales');
   const [customers, setCustomers] = useState([]);
@@ -76,7 +78,15 @@ const Reports = () => {
       setCustomers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
 
-    return () => { unsub(); unsubCustomers(); unsubShifts(); };
+    const unsubReturns = onSnapshot(query(collection(db, `users/${storeId}/returns`), orderBy('createdAt', 'desc')), (snapshot) => {
+      setReturnsData(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+
+    const unsubExchanges = onSnapshot(query(collection(db, `users/${storeId}/exchanges`), orderBy('createdAt', 'desc')), (snapshot) => {
+      setExchangesData(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+
+    return () => { unsub(); unsubCustomers(); unsubShifts(); unsubReturns(); unsubExchanges(); };
   }, [storeId]);
 
   const formatMoney = (v) => new Intl.NumberFormat('uz-UZ').format(v || 0) + ' UZS';
@@ -135,12 +145,28 @@ const Reports = () => {
           savdo: 0
         });
       }
+      let resultExReturn = 0;
+      let resultExNew = 0;
+
       filteredSales.forEach(sale => {
         if(!sale.createdAt) return;
         const saleDate = new Date(sale.createdAt).toDateString();
         const dayData = result.find(r => r.dateStr === saleDate);
+        if (dayData) dayData.savdo += sale.finalTotal || 0;
+      });
+      returnsData.forEach(ret => {
+        if(!ret.createdAt) return;
+        const retDate = new Date(ret.createdAt).toDateString();
+        const dayData = result.find(r => r.dateStr === retDate);
+        if (dayData) dayData.savdo -= ret.refundAmount || 0;
+      });
+      exchangesData.forEach(exc => {
+        if(!exc.createdAt) return;
+        const excDate = new Date(exc.createdAt).toDateString();
+        const dayData = result.find(r => r.dateStr === excDate);
         if (dayData) {
-          dayData.savdo += sale.finalTotal || 0;
+          dayData.savdo -= exc.totalReturnAmount || 0;
+          dayData.savdo += exc.totalNewAmount || 0;
         }
       });
       return result;
@@ -167,6 +193,21 @@ const Reports = () => {
         if (!map[ymd]) map[ymd] = 0;
         map[ymd] += sale.finalTotal || 0;
       });
+      returnsData.forEach(ret => {
+        if(!ret.createdAt) return;
+        const d = new Date(ret.createdAt);
+        const ymd = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+        if (map[ymd] !== undefined) map[ymd] -= ret.refundAmount || 0;
+      });
+      exchangesData.forEach(exc => {
+        if(!exc.createdAt) return;
+        const d = new Date(exc.createdAt);
+        const ymd = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+        if (map[ymd] !== undefined) {
+          map[ymd] -= exc.totalReturnAmount || 0;
+          map[ymd] += exc.totalNewAmount || 0;
+        }
+      });
 
       const result = [];
       let currD = new Date(startD);
@@ -184,11 +225,46 @@ const Reports = () => {
 
   const chartData = getChartData();
 
-  const totalRevenue = filteredSales.reduce((acc, curr) => acc + (curr.finalTotal || 0), 0);
+  // Filter returns and exchanges by current date range
+  const filteredReturns = returnsData.filter(ret => {
+    let matchDate = true;
+    if (startDate || endDate) {
+      const d = new Date(ret.createdAt);
+      if (startDate) matchDate = matchDate && d >= new Date(startDate);
+      if (endDate) {
+        const endD = new Date(endDate);
+        endD.setHours(23, 59, 59, 999);
+        matchDate = matchDate && d <= endD;
+      }
+    }
+    return matchDate;
+  });
+
+  const filteredExchanges = exchangesData.filter(exc => {
+    let matchDate = true;
+    if (startDate || endDate) {
+      const d = new Date(exc.createdAt);
+      if (startDate) matchDate = matchDate && d >= new Date(startDate);
+      if (endDate) {
+        const endD = new Date(endDate);
+        endD.setHours(23, 59, 59, 999);
+        matchDate = matchDate && d <= endD;
+      }
+    }
+    return matchDate;
+  });
+
+  const grossRevenue = filteredSales.reduce((acc, curr) => acc + (curr.finalTotal || 0), 0);
+  const returnsTotal = filteredReturns.reduce((acc, curr) => acc + (curr.refundAmount || 0), 0);
+  const exchangesReturnTotal = filteredExchanges.reduce((acc, curr) => acc + (curr.totalReturnAmount || 0), 0);
+  const exchangesNewTotal = filteredExchanges.reduce((acc, curr) => acc + (curr.totalNewAmount || 0), 0);
+  
+  const totalRevenue = grossRevenue - returnsTotal - exchangesReturnTotal + exchangesNewTotal;
+  
   const totalProfit = filteredSales.reduce((acc, curr) => {
     const cost = curr.items?.reduce((c, item) => c + (item.costPrice * item.qty), 0) || 0;
     return acc + ((curr.finalTotal || 0) - cost);
-  }, 0);
+  }, 0) - returnsTotal; // Very basic profit calculation approximation
 
   const handleReturnSale = async (saleToProcess = selectedSale) => {
     if (!saleToProcess || !storeId) return false;
@@ -471,6 +547,7 @@ const Reports = () => {
                   <td style={{ fontWeight: 500 }}>
                     {sale.saleNumber}
                     {sale.status === 'fully_returned' && <span style={{display: 'inline-block', marginLeft: '8px', padding: '2px 6px', fontSize: '10px', background: '#FCE8E8', color: '#EF4B4B', borderRadius: '4px'}}>Qaytarilgan</span>}
+                    {sale.status === 'partially_returned' && <span style={{display: 'inline-block', marginLeft: '8px', padding: '2px 6px', fontSize: '10px', background: '#FEF3C7', color: '#F59E0B', borderRadius: '4px'}}>Qisman qaytgan</span>}
                   </td>
                   <td>
                     {sale.customerId 
