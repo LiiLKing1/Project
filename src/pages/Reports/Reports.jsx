@@ -13,6 +13,29 @@ import CurrencyDisplay from '../../components/CurrencyDisplay';
 import { Eye, Edit2 } from 'lucide-react';
 import DateRangePicker from '../../components/DateRangePicker';
 
+const CollapsibleProducts = ({ items }) => {
+  const [expanded, setExpanded] = useState(false);
+  if (!items || items.length === 0) return null;
+  const visibleItems = expanded ? items : items.slice(0, 2);
+  const hasMore = items.length > 2;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+      {visibleItems.map((item, idx) => (
+        <span key={idx} style={{ fontSize: '0.875rem' }}>{item.name} <span style={{ color: '#8A9BB5', fontWeight: 600 }}>x{item.qty}</span></span>
+      ))}
+      {hasMore && (
+        <button 
+          onClick={() => setExpanded(!expanded)} 
+          style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '0.8rem', cursor: 'pointer', textAlign: 'left', padding: '0.25rem 0', fontWeight: 600, width: 'max-content' }}
+        >
+          {expanded ? 'Kamroq ko\'rsatish' : `Yana ${items.length - 2} ta...`}
+        </button>
+      )}
+    </div>
+  );
+};
+
 const Reports = () => {
   const [salesData, setSalesData] = useState([]);
   const [shiftsData, setShiftsData] = useState([]);
@@ -23,6 +46,7 @@ const Reports = () => {
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isHardDeleteModalOpen, setIsHardDeleteModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const getTodayStr = () => {
     const d = new Date();
@@ -254,6 +278,73 @@ const Reports = () => {
     }
   };
 
+  const handleHardDeleteSale = async (saleToProcess = selectedSale) => {
+    if (!saleToProcess || !storeId) return false;
+    setIsDeleting(true);
+    try {
+      if (saleToProcess.status !== 'fully_returned') {
+        const debtAmount = saleToProcess.paymentBreakdown?.find(p => p.method === 'debt')?.amount || 0;
+        let debtDocsToUpdate = [];
+        if (debtAmount > 0 && saleToProcess.customerId) {
+          const debtsQuery = query(collection(db, `users/${storeId}/customerDebts`), where('relatedSaleId', '==', saleToProcess.id));
+          const debtsSnap = await getDocs(debtsQuery);
+          debtDocsToUpdate = debtsSnap.docs.map(d => d.ref);
+        }
+
+        await runTransaction(db, async (transaction) => {
+          let productRefs = [];
+          let productSnaps = [];
+          if (saleToProcess.items && saleToProcess.items.length > 0) {
+            productRefs = saleToProcess.items.map(item => ({ ref: doc(db, `users/${storeId}/products`, item.productId), qty: item.qty }));
+            productSnaps = await Promise.all(productRefs.map(p => transaction.get(p.ref)));
+          }
+
+          let custRef = null;
+          let custSnap = null;
+          if (saleToProcess.customerId) {
+            custRef = doc(db, `users/${storeId}/customers`, saleToProcess.customerId);
+            custSnap = await transaction.get(custRef);
+          }
+
+          for (let i = 0; i < productSnaps.length; i++) {
+            const snap = productSnaps[i];
+            const pData = productRefs[i];
+            if (snap.exists()) {
+              transaction.update(pData.ref, { stock: snap.data().stock + pData.qty });
+            }
+          }
+
+          if (custSnap && custSnap.exists()) {
+            const currentCust = custSnap.data();
+            const updates = {};
+            if (currentCust.totalPurchases !== undefined) updates.totalPurchases = Math.max(0, currentCust.totalPurchases - saleToProcess.finalTotal);
+            if (currentCust.visits !== undefined) updates.visits = Math.max(0, currentCust.visits - 1);
+            if (debtAmount > 0 && currentCust.currentDebt !== undefined) updates.currentDebt = Math.max(0, currentCust.currentDebt - debtAmount);
+            if (Object.keys(updates).length > 0) transaction.update(custRef, updates);
+          }
+
+          debtDocsToUpdate.forEach(ref => {
+            transaction.delete(ref);
+          });
+          
+          const saleRef = doc(db, `users/${storeId}/sales`, saleToProcess.id);
+          transaction.delete(saleRef);
+        });
+      } else {
+         await runTransaction(db, async (transaction) => {
+             const saleRef = doc(db, `users/${storeId}/sales`, saleToProcess.id);
+             transaction.delete(saleRef);
+         });
+      }
+      return true;
+    } catch (error) {
+      addToast(error.message, 'error');
+      return false;
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const confirmDelete = async () => {
     const success = await handleReturnSale(selectedSale);
     if (success) {
@@ -388,11 +479,7 @@ const Reports = () => {
                     }
                   </td>
                   <td>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                      {sale.items?.map((item, idx) => (
-                        <span key={idx} style={{ fontSize: '0.875rem' }}>{item.name} <span style={{ color: '#8A9BB5', fontWeight: 600 }}>x{item.qty}</span></span>
-                      ))}
-                    </div>
+                    <CollapsibleProducts items={sale.items} />
                   </td>
                   <td>
                     <span style={{ padding: '0.25rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem', backgroundColor: '#F1F5F9', fontWeight: 600, color: '#334155' }}>
@@ -434,6 +521,17 @@ const Reports = () => {
                             title="Qaytarish"
                           >
                             <RotateCcw size={14} />
+                          </button>
+                          <button 
+                            className="action-btn delete" 
+                            onClick={() => {
+                              setSelectedSale(sale);
+                              setIsHardDeleteModalOpen(true);
+                            }}
+                            title="Butunlay o'chirish"
+                            style={{ backgroundColor: '#FFF1F2', color: '#E11D48', borderColor: '#FFE4E6' }}
+                          >
+                            <Trash2 size={14} />
                           </button>
                         </>
                       )}
@@ -521,6 +619,34 @@ const Reports = () => {
               <button className="btn btn-ghost" disabled={isDeleting} onClick={() => setIsDeleteModalOpen(false)}>Yopish</button>
               <button className="btn btn-primary" style={{ backgroundColor: 'var(--danger)' }} disabled={isDeleting} onClick={confirmDelete}>
                 {isDeleting ? 'Bajarilmoqda...' : 'Qaytarish (Tasdiqlash)'}
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      <Modal isOpen={isHardDeleteModalOpen} onClose={() => !isDeleting && setIsHardDeleteModalOpen(false)} title="Sotuvni butunlay o'chirish">
+        {selectedSale && (
+          <div className="flex-col" style={{ gap: '1.5rem' }}>
+            <div style={{ padding: '1rem', backgroundColor: 'var(--danger-light)', color: 'var(--danger)', borderRadius: 'var(--radius-md)' }}>
+              <strong>Diqqat!</strong> Siz ushbu sotuvni (Chek: {selectedSale.saleNumber}) <strong>butunlay o'chirib tashlamoqchisiz</strong>. 
+              <br/><br/>
+              Agar bu xatolik bilan kiritilgan bo'lsa va omborga tovarlarni qaytarish kerak bo'lsa, bu amal tovarlarni ham qaytaradi va barcha ma'lumotlarni o'chirib tashlaydi (hech qanday iz qolmaydi).
+              <br/><br/>
+              Haqiqatan ham o'chirasizmi? Ushbu amalni ortga qaytarib bo'lmaydi!
+            </div>
+            
+            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+              <button className="btn btn-ghost" disabled={isDeleting} onClick={() => setIsHardDeleteModalOpen(false)}>Bekor qilish</button>
+              <button className="btn btn-primary" style={{ backgroundColor: 'var(--danger)' }} disabled={isDeleting} onClick={async () => {
+                const success = await handleHardDeleteSale(selectedSale);
+                if (success) {
+                  addToast('Sotuv butunlay o\'chirildi', 'success');
+                  setIsHardDeleteModalOpen(false);
+                  setSelectedSale(null);
+                }
+              }}>
+                {isDeleting ? 'O\'chirilmoqda...' : 'O\'chirish'}
               </button>
             </div>
           </div>
