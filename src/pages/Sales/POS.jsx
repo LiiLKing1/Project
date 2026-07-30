@@ -887,27 +887,7 @@ const POS = () => {
     }
   };
 
-  // Add the modal component to POS render output
-        setCouponError('Kupon topilmadi');
-        setIsApplyingCoupon(false);
-        return;
-      }
-      const c = { id: snap.docs[0].id, ...snap.docs[0].data() };
-      if (!c.isActive) {
-        setCouponError('Kupon faol emas');
-      } else if (c.expiresAt && new Date(c.expiresAt) < new Date()) {
-        setCouponError('Kupon muddati o\'tgan');
-      } else if (c.usageLimit && c.usedCount >= c.usageLimit) {
-        setCouponError('Kupon ishlatish limiti tugagan');
-      } else {
-        setAppliedCoupon(c);
-        addToast('Kupon qo\'llanildi', 'success');
-      }
-    } catch (e) {
-      setCouponError(e.message);
-    }
-    setIsApplyingCoupon(false);
-  };
+
 
   useEffect(() => {
     const topbar = document.querySelector('.topbar');
