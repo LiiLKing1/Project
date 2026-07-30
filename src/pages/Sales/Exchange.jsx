@@ -33,7 +33,8 @@ const HighlightText = ({ text, search }) => {
 };
 
 const Exchange = () => {
-  const { userProfile, storeId } = useRoles();
+  const { userProfile } = useRoles();
+  const storeId = userProfile?.storeOwnerId;
   const { addToast } = useToast();
   
   const [sales, setSales] = useState([]);
