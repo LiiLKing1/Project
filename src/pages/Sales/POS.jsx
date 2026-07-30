@@ -48,13 +48,20 @@ const HighlightText = ({ text, search }) => {
 };
 
 
-const ProductCard = ({ p, search, addToCart }) => {
+const ProductCard = ({ p, search, addToCart, cartQty = 0 }) => {
   const [addedCount, setAddedCount] = React.useState(0);
+  const [showError, setShowError] = React.useState(false);
   const timerRef = React.useRef(null);
   const resetTimerRef = React.useRef(null);
 
   const triggerAdd = () => {
-    if (p.stock <= 0) return;
+    if (p.stock <= 0 || cartQty >= p.stock) {
+      addToCart(p);
+      setShowError(true);
+      if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
+      resetTimerRef.current = setTimeout(() => setShowError(false), 500);
+      return;
+    }
     addToCart(p);
     setAddedCount(c => c + 1);
     
@@ -98,7 +105,9 @@ const ProductCard = ({ p, search, addToCart }) => {
         // Prevent context menu (long press on mobile triggers this usually)
         if (e.pointerType === 'touch') e.preventDefault();
       }}
-      whileTap={{ scale: p.stock > 0 ? 0.94 : 1, backgroundColor: p.stock > 0 ? '#EAF4FC' : '' }} 
+      whileTap={{ scale: (p.stock > 0 && cartQty < p.stock) ? 0.94 : 1, backgroundColor: (p.stock > 0 && cartQty < p.stock) ? '#EAF4FC' : '' }} 
+      animate={showError ? { x: [-5, 5, -5, 5, 0], backgroundColor: '#FEE2E2' } : {}}
+      transition={showError ? { duration: 0.4 } : {}}
       style={{ padding: '1rem', cursor: p.stock > 0 ? 'pointer' : 'not-allowed', opacity: p.stock > 0 ? 1 : 0.5, transition: 'background-color 0.2s', userSelect: 'none', WebkitUserSelect: 'none', position: 'relative' }}
     >
       <div style={{ fontWeight: '600', marginBottom: '0.5rem', fontSize: '1rem' }}><HighlightText text={p.name} search={search} /></div>
@@ -110,9 +119,9 @@ const ProductCard = ({ p, search, addToCart }) => {
             Qoldiq: <AnimatedNumber value={p.stock} />
           </span>
           <AnimatePresence>
-            {addedCount > 0 && (
+            {addedCount > 0 && !showError && (
               <motion.div
-                key={addedCount}
+                key="added"
                 initial={{ opacity: 0, y: 10, scale: 0.5 }}
                 animate={{ opacity: 1, y: -45, scale: 2 }}
                 exit={{ opacity: 0, y: -60, scale: 0.8 }}
@@ -129,6 +138,27 @@ const ProductCard = ({ p, search, addToCart }) => {
                 }}
               >
                 +{addedCount}
+              </motion.div>
+            )}
+            {showError && (
+              <motion.div
+                key="error"
+                initial={{ opacity: 0, y: 10, scale: 0.5 }}
+                animate={{ opacity: 1, y: -45, scale: 2 }}
+                exit={{ opacity: 0, y: -60, scale: 0.8 }}
+                transition={{ duration: 0.4 }}
+                style={{
+                  position: 'absolute',
+                  top: '-25px',
+                  right: '10px',
+                  color: '#EF4444',
+                  fontWeight: '900',
+                  fontSize: '2rem',
+                  pointerEvents: 'none',
+                  textShadow: '0 2px 5px rgba(239, 68, 68, 0.3)'
+                }}
+              >
+                ⚠️
               </motion.div>
             )}
           </AnimatePresence>
@@ -798,6 +828,66 @@ const POS = () => {
     try {
       const snap = await getDocs(query(collection(db, `users/${storeId}/coupons`), where('code', '==', couponCode.trim().toUpperCase())));
       if (snap.empty) {
+        setCouponError('Kupon topilmadi yoki muddati o\'tgan');
+        setAppliedCoupon(null);
+        return;
+      }
+      
+      const c = snap.docs[0].data();
+      c.id = snap.docs[0].id;
+      
+      if (c.status !== 'active') {
+        setCouponError('Kupon faol emas');
+        setAppliedCoupon(null);
+        return;
+      }
+      
+      if (c.usageLimit && c.usedCount >= c.usageLimit) {
+        setCouponError('Kupon ishlatish limiti tugagan');
+        setAppliedCoupon(null);
+        return;
+      }
+      
+      setAppliedCoupon(c);
+      setCouponError('');
+      addToast('Kupon muvaffaqiyatli qo\'llanildi', 'success');
+    } catch(e) {
+      setCouponError('Kuponni tekshirishda xatolik');
+    } finally {
+      setIsApplyingCoupon(false);
+    }
+  };
+
+  const handleAddCustomer = async (e) => {
+    e.preventDefault();
+    if (!newCustomerForm.name.trim()) {
+      addToast('Mijoz ismini kiriting', 'error');
+      return;
+    }
+    
+    try {
+      const docRef = await addDoc(collection(db, `users/${storeId}/customers`), {
+        fullName: newCustomerForm.name,
+        phone: newCustomerForm.phone,
+        currentDebt: Number(newCustomerForm.debt) || 0,
+        totalPurchases: 0,
+        visits: 0,
+        status: 'active',
+        bonusPercent: 0,
+        bonusBalance: 0,
+        createdAt: new Date().toISOString()
+      });
+      const newCust = { id: docRef.id, fullName: newCustomerForm.name, phone: newCustomerForm.phone };
+      setSelectedCustomer(newCust);
+      setNewCustomerForm({ name: '', phone: '', debt: 0 });
+      setIsNewCustomerModalOpen(false);
+      addToast('Mijoz muvaffaqiyatli qo\'shildi', 'success');
+    } catch (error) {
+      addToast('Xatolik yuz berdi: ' + error.message, 'error');
+    }
+  };
+
+  // Add the modal component to POS render output
         setCouponError('Kupon topilmadi');
         setIsApplyingCoupon(false);
         return;
@@ -927,7 +1017,7 @@ const POS = () => {
 
           <div className="pos-products-grid" onScroll={handleGridScroll} style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1rem', overflowY: 'auto', paddingRight: '1rem', paddingBottom: '2rem' }}>
             {filteredProducts.slice(0, visibleCount).map(p => (
-              <ProductCard key={p.id} p={p} search={search} addToCart={addToCart} />
+              <ProductCard key={p.id} p={p} search={search} addToCart={addToCart} cartQty={cart.find(i => i.id === p.id)?.qty || 0} />
             ))}
           </div>
       </motion.div>
@@ -1599,6 +1689,36 @@ const POS = () => {
           </div>
         )}
       </Modal>
+
+      {/* New Customer Modal */}
+      <Modal isOpen={isNewCustomerModalOpen} onClose={() => setIsNewCustomerModalOpen(false)} title="Yangi Mijoz">
+        <form onSubmit={handleAddCustomer} className="flex-col" style={{ gap: '1rem' }}>
+          <FormInput 
+            label="Ism-familiyasi (majburiy)" 
+            value={newCustomerForm.name} 
+            onChange={(e) => setNewCustomerForm({ ...newCustomerForm, name: e.target.value })} 
+            required 
+            autoFocus 
+          />
+          <FormInput 
+            label="Telefon raqami" 
+            type="tel"
+            value={newCustomerForm.phone} 
+            onChange={(e) => setNewCustomerForm({ ...newCustomerForm, phone: e.target.value })} 
+          />
+          <FormInput 
+            label="Boshlang'ich qarzi (ixtiyoriy)" 
+            type="number" 
+            value={newCustomerForm.debt} 
+            onChange={(e) => setNewCustomerForm({ ...newCustomerForm, debt: e.target.value })} 
+          />
+          <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+            <button type="button" className="btn btn-outline" style={{ flex: 1 }} onClick={() => setIsNewCustomerModalOpen(false)}>Bekor qilish</button>
+            <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>Qo'shish</button>
+          </div>
+        </form>
+      </Modal>
+
       {/* Shift Close Modal */}
       <Modal isOpen={isCloseShiftModalOpen} onClose={() => setIsCloseShiftModalOpen(false)} title="Smenani Yopish">
         <div className="flex-col" style={{ gap: '1.5rem' }}>
