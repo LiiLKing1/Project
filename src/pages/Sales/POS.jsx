@@ -51,8 +51,9 @@ const HighlightText = ({ text, search }) => {
 const ProductCard = ({ p, search, addToCart, cartQty = 0 }) => {
   const [addedCount, setAddedCount] = React.useState(0);
   const [showError, setShowError] = React.useState(false);
-  const timerRef = React.useRef(null);
-  const resetTimerRef = React.useRef(null);
+  const holdIntervalRef = React.useRef(null);
+  const addedTimerRef = React.useRef(null);
+  const errorTimerRef = React.useRef(null);
   
   const cartQtyRef = React.useRef(cartQty);
   React.useEffect(() => {
@@ -63,15 +64,17 @@ const ProductCard = ({ p, search, addToCart, cartQty = 0 }) => {
     if (p.stock <= 0 || cartQtyRef.current >= p.stock) {
       addToCart(p);
       setShowError(true);
-      if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
-      resetTimerRef.current = setTimeout(() => setShowError(false), 500);
+      setAddedCount(0);
+      if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
+      errorTimerRef.current = setTimeout(() => setShowError(false), 500);
       return;
     }
     addToCart(p);
     setAddedCount(c => c + 1);
+    setShowError(false);
     
-    if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
-    resetTimerRef.current = setTimeout(() => {
+    if (addedTimerRef.current) clearTimeout(addedTimerRef.current);
+    addedTimerRef.current = setTimeout(() => {
       setAddedCount(0);
     }, 1500);
   };
@@ -79,23 +82,24 @@ const ProductCard = ({ p, search, addToCart, cartQty = 0 }) => {
   const handlePointerDown = (e) => {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     triggerAdd();
-    timerRef.current = setInterval(() => {
+    holdIntervalRef.current = setInterval(() => {
       triggerAdd();
-    }, 700);
+    }, 500);
   };
 
   const stopHold = () => {
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
+    if (holdIntervalRef.current) {
+      clearInterval(holdIntervalRef.current);
+      holdIntervalRef.current = null;
     }
   };
 
   // Cleanup timers on unmount
   React.useEffect(() => {
     return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-      if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
+      if (holdIntervalRef.current) clearInterval(holdIntervalRef.current);
+      if (addedTimerRef.current) clearTimeout(addedTimerRef.current);
+      if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
     };
   }, []);
 
