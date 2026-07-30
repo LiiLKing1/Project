@@ -25,7 +25,7 @@ const Sidebar = ({ isOpen, closeSidebar }) => {
   const allMenuItems = [
     { path: '/', name: t('dashboard'), icon: <LayoutDashboard size={20} />, permKey: 'dashboard', exact: true },
     { path: '/products', name: t('products'), icon: <Tag size={20} />, permKey: 'products', isFlyout: true, flyoutKey: 'products' },
-    { path: '/sales', name: t('sales'), icon: <ShoppingCart size={20} />, permKey: 'sales' },
+    { path: '/sales', name: t('sales'), icon: <ShoppingCart size={20} />, permKey: 'sales', isFlyout: true, flyoutKey: 'sales' },
     { path: '/customers', name: t('customers'), icon: <Users size={20} />, permKey: 'customers', isFlyout: true, flyoutKey: 'customers' },
     { path: '/partners', name: 'Hamkorlar', icon: <Handshake size={20} />, permKey: 'customers', isFlyout: true, flyoutKey: 'partners' },
     { path: '/marketing', name: t('marketing'), icon: <Megaphone size={20} />, permKey: 'marketing' },
@@ -45,6 +45,13 @@ const Sidebar = ({ isOpen, closeSidebar }) => {
   }
 
   const flyoutMenus = {
+    sales: {
+      title: 'Sotuvlar bo\'limi',
+      items: [
+        { path: '/sales', name: 'Kassa (POS)', desc: 'Yangi sotuvlarni amalga oshirish' },
+        { path: '/sales/exchange', name: 'Almashtirish va Qaytarish', desc: 'Sotilgan tovarlarni qaytarish yoki almashtirish' }
+      ]
+    },
     customers: {
       title: 'Mijozlar bo\'limi',
       items: [

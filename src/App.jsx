@@ -7,6 +7,7 @@ import TitleBar from './components/TitleBar';
 
 import Dashboard from './pages/Dashboard/Dashboard';
 import POS from './pages/Sales/POS';
+import Exchange from './pages/Sales/Exchange';
 import Catalog from './pages/Products/Catalog';
 import Inventory from './pages/Products/Inventory';
 import StockUpdate from './pages/Products/StockUpdate';
@@ -68,6 +69,7 @@ function App() {
 
           {/* Sales / Sotuvlar (POS) */}
           <Route path="sales" element={<PermissionRoute permKey="sales"><POS /></PermissionRoute>} />
+          <Route path="sales/exchange" element={<PermissionRoute permKey="sales"><Exchange /></PermissionRoute>} />
 
           {/* Customers / Mijozlar */}
           <Route path="customers" element={<PermissionRoute permKey="customers"><Customers /></PermissionRoute>} />
