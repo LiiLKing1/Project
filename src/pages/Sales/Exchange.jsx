@@ -114,6 +114,20 @@ const Exchange = () => {
     });
   };
 
+  const handleReturnAllOfItem = (item) => {
+    const returningQty = returningItems.find(r => r.productId === item.productId)?.qty || 0;
+    const availableQty = item.qty - returningQty;
+    if (availableQty <= 0) return;
+    
+    setReturningItems(prev => {
+      const existing = prev.find(p => p.productId === item.productId);
+      if (existing) {
+        return prev.map(p => p.productId === item.productId ? { ...p, qty: p.qty + availableQty } : p);
+      }
+      return [...prev, { ...item, qty: availableQty }];
+    });
+  };
+
   const handleRemoveReturn = (item) => {
     setReturningItems(prev => {
       const existing = prev.find(p => p.productId === item.productId);
@@ -339,7 +353,7 @@ const Exchange = () => {
                 </button>
               </div>
               
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', overflowY: 'auto', maxHeight: '150px', paddingRight: '0.5rem', paddingBottom: '0.5rem' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', paddingBottom: '0.5rem' }}>
                 {selectedSale.items?.map((item, idx) => {
                   const returningQty = returningItems.find(r => r.productId === item.productId)?.qty || 0;
                   const availableQty = item.qty - returningQty;
@@ -355,6 +369,17 @@ const Exchange = () => {
                         <span>Sotilgan: <b style={{color: 'var(--primary)'}}>{item.qty}</b></span>
                         <CurrencyDisplay amount={item.sellPrice} />
                       </div>
+                      
+                      {availableQty > 1 && (
+                        <button 
+                          className="btn btn-outline" 
+                          onClick={(e) => { e.stopPropagation(); handleReturnAllOfItem(item); }}
+                          style={{ width: '100%', marginTop: '0.5rem', padding: '0.25rem', fontSize: '0.75rem', height: 'auto', display: 'flex', justifyContent: 'center' }}
+                        >
+                          Barchasini qaytarish
+                        </button>
+                      )}
+
                       {returningQty > 0 && (
                         <div style={{ marginTop: '0.5rem', padding: '0.25rem', backgroundColor: '#FEE2E2', color: '#E11D48', borderRadius: '4px', fontSize: '0.75rem', textAlign: 'center', fontWeight: 600 }}>
                           {returningQty} ta qaytarilmoqda
@@ -408,13 +433,18 @@ const Exchange = () => {
       </div>
 
       {/* Right side: Calculation Panel */}
-      <div className="glass-panel flex-col" style={{ width: '400px', padding: '1.5rem', overflow: 'hidden', borderLeft: '4px solid var(--primary)', display: 'flex', flexDirection: 'column' }}>
-        <h2 className="h2" style={{ margin: 0, marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
-          <Calculator size={22} color="var(--primary)" /> 
-          Hisob-kitob
-        </h2>
+      <div className="glass-panel flex-col" style={{ width: '400px', overflow: 'hidden', borderLeft: '4px solid var(--primary)', display: 'flex', flexDirection: 'column' }}>
         
-        <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1.5rem', paddingRight: '0.5rem' }}>
+        {/* Header */}
+        <div style={{ padding: '1.5rem 1.5rem 0 1.5rem', flexShrink: 0 }}>
+          <h2 className="h2" style={{ margin: 0, marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Calculator size={22} color="var(--primary)" /> 
+            Hisob-kitob
+          </h2>
+        </div>
+        
+        {/* Scrollable Body */}
+        <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1.5rem', padding: '0 1.5rem' }}>
           {/* Returning Items */}
           <div>
             <div style={{ fontWeight: 600, color: '#E11D48', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -466,8 +496,8 @@ const Exchange = () => {
           </div>
         </div>
 
-        {/* Difference and Payment */}
-        <div style={{ flexShrink: 0, marginTop: '1rem', backgroundColor: '#F8FAFC', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+        {/* Fixed Footer (Difference and Payment) */}
+        <div style={{ flexShrink: 0, backgroundColor: '#F8FAFC', padding: '1.5rem', borderTop: '1px solid var(--border-color)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem', fontSize: '1.125rem' }}>
             <span style={{ fontWeight: 600 }}>Yakuniy farq:</span>
             <span style={{ fontWeight: 700, color: difference > 0 ? 'var(--primary)' : (difference < 0 ? '#E11D48' : 'var(--text-main)') }}>
@@ -542,7 +572,7 @@ const Exchange = () => {
               onClick={() => handleProcessExchange('even')}
               style={{ width: '100%', justifyContent: 'center' }}
             >
-              Almashtirishni Tasdiqlash
+              {returningItems.length > 0 && cart.length === 0 ? "Qaytarib olishni tasdiqlash" : "Almashtirishni tasdiqlash"}
             </button>
           )}
         </div>
