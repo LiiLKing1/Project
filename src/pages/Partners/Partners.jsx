@@ -4,7 +4,7 @@ import { Search, Plus, Edit, Trash2, Phone, MapPin, Calendar, Clock, CheckCircle
 import CustomSelect from '../../components/CustomSelect';
 import { db } from '../../firebase';
 import { collection, onSnapshot, query, orderBy, doc, writeBatch, increment } from '../../services/firebaseMock';
-import { saveDoc, editDoc, softDeleteDoc, generateDiff } from '../../utils/firebaseUtils';
+import { saveDoc, editDoc, softDeleteDoc, generateDiff, putDoc } from '../../utils/firebaseUtils';
 import { useToast } from '../../context/ToastContext';
 import { useRoles } from '../../context/RolesContext';
 import { useSettings } from '../../context/SettingsContext';
@@ -77,21 +77,24 @@ const Partners = () => {
     
     try {
       const payload = { ...partnerForm };
+      setIsPartnerModalOpen(false); // Optimistic close
       
       if (editingId) {
         const original = partners.find(p => p.id === editingId);
         const diffStr = generateDiff(original, payload);
         const auditData = { storeId, userProfile, resource: 'partners', details: `${payload.companyName} (${diffStr})` };
-        await editDoc(doc(db, `users/${storeId}/partners`, editingId), payload, auditData);
-        addToast('Hamkor yangilandi', 'success');
+        editDoc(doc(db, `users/${storeId}/partners`, editingId), payload, auditData)
+          .then(() => addToast('Hamkor yangilandi', 'success'))
+          .catch(err => addToast(err.message, 'error'));
       } else {
         payload.currentPayable = 0;
         payload.status = 'active';
         const auditData = { storeId, userProfile, resource: 'partners', details: payload.companyName };
-        await saveDoc(collection(db, `users/${storeId}/partners`), payload, auditData);
-        addToast('Hamkor qo\'shildi', 'success');
+        const newPartnerRef = doc(collection(db, `users/${storeId}/partners`));
+        putDoc(newPartnerRef, payload, auditData)
+          .then(() => addToast('Hamkor qo\'shildi', 'success'))
+          .catch(err => addToast(err.message, 'error'));
       }
-      setIsPartnerModalOpen(false);
     } catch (err) {
       addToast(err.message, 'error');
     }

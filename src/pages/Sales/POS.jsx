@@ -55,13 +55,18 @@ const ProductCard = ({ p, search, addToCart, cartQty = 0 }) => {
   const addedTimerRef = React.useRef(null);
   const errorTimerRef = React.useRef(null);
   
+  const longPressedRef = React.useRef(false);
+  const startPosRef = React.useRef({ x: 0, y: 0 });
+  
+  const displayStock = Math.max(0, p.stock - cartQty);
+
   const cartQtyRef = React.useRef(cartQty);
   React.useEffect(() => {
     cartQtyRef.current = cartQty;
   }, [cartQty]);
 
   const triggerAdd = () => {
-    if (p.stock <= 0 || cartQtyRef.current >= p.stock) {
+    if (displayStock <= 0) {
       addToCart(p);
       setShowError(true);
       setAddedCount(0);
@@ -81,23 +86,44 @@ const ProductCard = ({ p, search, addToCart, cartQty = 0 }) => {
 
   const handlePointerDown = (e) => {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
-    triggerAdd();
-    holdIntervalRef.current = setInterval(() => {
+    longPressedRef.current = false;
+    startPosRef.current = { x: e.clientX, y: e.clientY };
+    
+    holdIntervalRef.current = setTimeout(() => {
+      longPressedRef.current = true;
       triggerAdd();
-    }, 500);
+      holdIntervalRef.current = setInterval(() => {
+        triggerAdd();
+      }, 150);
+    }, 400);
+  };
+
+  const handlePointerMove = (e) => {
+    const dx = Math.abs(e.clientX - startPosRef.current.x);
+    const dy = Math.abs(e.clientY - startPosRef.current.y);
+    if (dx > 10 || dy > 10) {
+      stopHold();
+    }
   };
 
   const stopHold = () => {
     if (holdIntervalRef.current) {
+      clearTimeout(holdIntervalRef.current);
       clearInterval(holdIntervalRef.current);
       holdIntervalRef.current = null;
+    }
+  };
+
+  const handleClick = (e) => {
+    if (!longPressedRef.current) {
+      triggerAdd();
     }
   };
 
   // Cleanup timers on unmount
   React.useEffect(() => {
     return () => {
-      if (holdIntervalRef.current) clearInterval(holdIntervalRef.current);
+      stopHold();
       if (addedTimerRef.current) clearTimeout(addedTimerRef.current);
       if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
     };
@@ -107,25 +133,27 @@ const ProductCard = ({ p, search, addToCart, cartQty = 0 }) => {
     <motion.div 
       className="glass-panel" 
       onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
       onPointerUp={stopHold}
       onPointerLeave={stopHold}
       onPointerCancel={stopHold}
+      onClick={handleClick}
       onContextMenu={(e) => {
         // Prevent context menu (long press on mobile triggers this usually)
         if (e.pointerType === 'touch') e.preventDefault();
       }}
-      whileTap={{ scale: (p.stock > 0 && cartQty < p.stock) ? 0.94 : 1, backgroundColor: (p.stock > 0 && cartQty < p.stock) ? '#EAF4FC' : '' }} 
+      whileTap={{ scale: (displayStock > 0) ? 0.94 : 1, backgroundColor: (displayStock > 0) ? '#EAF4FC' : '' }} 
       animate={showError ? { x: [-5, 5, -5, 5, 0], backgroundColor: '#FEE2E2' } : {}}
       transition={showError ? { duration: 0.4 } : {}}
-      style={{ padding: '1rem', cursor: p.stock > 0 ? 'pointer' : 'not-allowed', opacity: p.stock > 0 ? 1 : 0.5, transition: 'background-color 0.2s', userSelect: 'none', WebkitUserSelect: 'none', position: 'relative' }}
+      style={{ height: 'max-content', padding: '1rem', cursor: displayStock > 0 ? 'pointer' : 'not-allowed', opacity: displayStock > 0 ? 1 : 0.5, transition: 'background-color 0.2s', userSelect: 'none', WebkitUserSelect: 'none', position: 'relative' }}
     >
       <div style={{ fontWeight: '600', marginBottom: '0.5rem', fontSize: '1rem' }}><HighlightText text={p.name} search={search} /></div>
       <div style={{ color: 'var(--primary)', fontWeight: '700', fontSize: '1.125rem' }}><CurrencyDisplay amount={p.sellPrice} isSell /></div>
       <div className="flex-between" style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.5rem', position: 'relative' }}>
         <span><HighlightText text={p.barcode} search={search} /></span>
         <div style={{ position: 'relative' }}>
-          <span style={{ fontWeight: 600, color: p.stock <= p.minStock ? 'var(--danger)' : 'var(--success)', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
-            Qoldiq: <AnimatedNumber value={p.stock} />
+          <span style={{ fontWeight: 600, color: displayStock <= p.minStock ? 'var(--danger)' : 'var(--success)', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+            Qoldiq: <AnimatedNumber value={displayStock} />
           </span>
           <AnimatePresence>
             {addedCount > 0 && !showError && (
@@ -1004,7 +1032,7 @@ const POS = () => {
             </div>
           </div>
 
-          <div className="pos-products-grid" onScroll={handleGridScroll} style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1rem', overflowY: 'auto', paddingRight: '1rem', paddingBottom: '2rem' }}>
+          <div className="pos-products-grid" onScroll={handleGridScroll} style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1rem', overflowY: 'auto', paddingRight: '1rem', paddingBottom: '2rem', alignContent: 'start', alignItems: 'start' }}>
             {filteredProducts.slice(0, visibleCount).map(p => (
               <ProductCard key={p.id} p={p} search={search} addToCart={addToCart} cartQty={cart.find(i => i.id === p.id)?.qty || 0} />
             ))}

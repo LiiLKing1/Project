@@ -5,7 +5,7 @@ import CustomSelect from '../../components/CustomSelect';
 import { db } from '../../firebase';
 import { collection, onSnapshot, doc, query, orderBy, writeBatch } from '../../services/firebaseMock';
 import * as XLSX from 'xlsx';
-import { saveDoc, editDoc, softDeleteDoc, generateDiff } from '../../utils/firebaseUtils';
+import { saveDoc, editDoc, softDeleteDoc, generateDiff, putDoc } from '../../utils/firebaseUtils';
 import { useToast } from '../../context/ToastContext';
 import { useRoles } from '../../context/RolesContext';
 import { useSettings } from '../../context/SettingsContext';
@@ -80,6 +80,7 @@ const Catalog = () => {
   const navigate = useNavigate();
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [partners, setPartners] = useState([]);
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [loading, setLoading] = useState(false);
@@ -101,6 +102,9 @@ const Catalog = () => {
   const [isCatModalOpen, setIsCatModalOpen] = useState(false);
   const [isSavingCat, setIsSavingCat] = useState(false);
   const [newCatName, setNewCatName] = useState('');
+  const [isPartnerInlineOpen, setIsPartnerInlineOpen] = useState(false);
+  const [isSavingPartner, setIsSavingPartner] = useState(false);
+  const [newPartnerName, setNewPartnerName] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [formData, setFormData] = useState({
     name: '', barcode: '', categoryId: '', unit: 'dona', costPrice: '', sellPrice: '', stock: '', minStock: '', supplier: '', supplierPrice: ''
@@ -153,17 +157,48 @@ const Catalog = () => {
     try {
       const auditData = { storeId, userProfile, resource: 'categories', details: newCatName.trim() };
       const newCat = { name: newCatName.trim(), createdAt: new Date().toISOString() };
-      const docRef = await saveDoc(collection(db, `users/${storeId}/categories`), newCat, auditData);
-      if (docRef && docRef.id) {
-        setFormData({...formData, categoryId: docRef.id});
-        addToast("Kategoriya qo'shildi", "success");
-      }
+      const newCatRef = doc(collection(db, `users/${storeId}/categories`));
+      
+      setFormData(prev => ({...prev, categoryId: newCatRef.id}));
       setIsCatModalOpen(false);
       setNewCatName('');
+      
+      putDoc(newCatRef, newCat, auditData)
+        .then(() => addToast("Kategoriya qo'shildi", "success"))
+        .catch(err => addToast(err.message, "error"))
+        .finally(() => setIsSavingCat(false));
     } catch (err) {
       addToast(err.message, "error");
-    } finally {
       setIsSavingCat(false);
+    }
+  };
+
+  const handleAddPartnerInline = () => {
+    if (!newPartnerName.trim()) {
+      addToast("Hamkor nomini kiriting", "error");
+      return;
+    }
+    
+    if (!storeId || isSavingPartner) return;
+
+    setIsSavingPartner(true);
+    try {
+      const newPartner = { companyName: newPartnerName.trim(), contactPerson: 'Noma\'lum', phone: '', currentPayable: 0, status: 'active', createdAt: new Date().toISOString() };
+      const newPartnerRef = doc(collection(db, `users/${storeId}/partners`));
+      
+      setFormData(prev => ({...prev, supplier: newPartnerName.trim()}));
+      setIsPartnerInlineOpen(false);
+      setNewPartnerName('');
+      
+      import('../../utils/firebaseUtils').then(({ putDoc }) => {
+        putDoc(newPartnerRef, newPartner)
+          .then(() => addToast("Hamkor qo'shildi", "success"))
+          .catch(err => addToast(err.message, "error"))
+          .finally(() => setIsSavingPartner(false));
+      });
+    } catch (err) {
+      addToast(err.message, "error");
+      setIsSavingPartner(false);
     }
   };
 
@@ -183,9 +218,14 @@ const Catalog = () => {
       setCategories(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
 
+    const unsubPartners = onSnapshot(query(collection(db, `users/${storeId}/partners`), orderBy('createdAt', 'desc')), (snapshot) => {
+      setPartners(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+
     return () => {
       unsubProducts();
       unsubCategories();
+      unsubPartners();
     };
   }, [addToast, storeId]);
 
@@ -274,20 +314,24 @@ const Catalog = () => {
     }
 
     try {
+      setIsModalOpen(false); // Optimistic close
+
       if (editingId) {
         const originalProduct = products.find(p => p.id === editingId);
         const diffStr = generateDiff(originalProduct, payload);
         const auditDetails = diffStr ? `${formData.name} (O'zgarishlar: ${diffStr})` : formData.name;
         const auditData = { storeId, userProfile, resource: 'products', details: auditDetails };
         
-        await editDoc(doc(db, `users/${storeId}/products`, editingId), payload, auditData);
-        addToast('Mahsulot muvaffaqiyatli yangilandi', 'success');
+        editDoc(doc(db, `users/${storeId}/products`, editingId), payload, auditData)
+           .then(() => addToast('Mahsulot muvaffaqiyatli yangilandi', 'success'))
+           .catch(error => addToast(error.message, 'error'));
       } else {
         const auditData = { storeId, userProfile, resource: 'products', details: formData.name };
-        await saveDoc(collection(db, `users/${storeId}/products`), payload, auditData);
-        addToast('Mahsulot muvaffaqiyatli qo\'shildi', 'success');
+        const newProdRef = doc(collection(db, `users/${storeId}/products`));
+        putDoc(newProdRef, payload, auditData)
+           .then(() => addToast('Mahsulot muvaffaqiyatli qo\'shildi', 'success'))
+           .catch(error => addToast(error.message, 'error'));
       }
-      setIsModalOpen(false);
     } catch (error) {
       addToast(error.message, 'error');
     }
@@ -467,8 +511,8 @@ const Catalog = () => {
           <button className="btn btn-outline" style={{ display:'flex', alignItems:'center', gap:'0.4rem' }} onClick={() => setIsTransferOpen(true)}>
             <FileSpreadsheet size={18}/> Stok ko'chirish
           </button>
-          <button className="btn btn-outline" style={{ display:'flex', alignItems:'center', gap:'0.4rem', color: selectedForPrint.length > 0 ? '#4A90E2' : '#8A9BB5', borderColor: selectedForPrint.length > 0 ? '#4A90E2' : '#DCE8F5' }} onClick={() => { if(selectedForPrint.length > 0) setIsPrintModalOpen(true); else addToast("Shtrix-kod chop etish uchun mahsulotlarni tanlang", "warning"); }}>
-            <Printer size={18}/> Chop etish ({selectedForPrint.length})
+          <button className="btn btn-outline" style={{ display:'flex', alignItems:'center', gap:'0.4rem', color: selectedForPrint.length > 0 ? '#4A90E2' : '#8A9BB5', borderColor: selectedForPrint.length > 0 ? '#4A90E2' : '#DCE8F5' }} onClick={() => setIsPrintModalOpen(true)}>
+            <Printer size={18}/> Chop etish
           </button>
           <button onClick={() => openModal()} style={{ display:'flex', alignItems:'center', gap:'0.4rem', padding:'0.6rem 1.3rem', borderRadius:'12px', border:'none', cursor:'pointer', background:'linear-gradient(135deg,#4A90E2,#7BCEEB)', color:'#fff', fontWeight:700, fontSize:'0.875rem', boxShadow:'0 4px 14px -4px #4A90E255' }}>
             <Plus size={18}/> Yangi mahsulot
@@ -688,7 +732,7 @@ const Catalog = () => {
 
       
       <Modal isOpen={isPrintModalOpen} onClose={() => setIsPrintModalOpen(false)} title="Shtrix-kod yorliqlari">
-         <PrintLabels products={selectedForPrint} onClose={() => setIsPrintModalOpen(false)} />
+         <PrintLabels allProducts={products} initialSelected={selectedForPrint} onClose={() => setIsPrintModalOpen(false)} />
       </Modal>
 
       <Drawer isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingId ? 'Mahsulotni tahrirlash' : 'Yangi mahsulot'}>
@@ -793,13 +837,98 @@ const Catalog = () => {
         )}
 
         <div className="form-grid-2">
-          <FormInput label="Yetkazib beruvchi" value={formData.supplier} onChange={e => setFormData({...formData, supplier: e.target.value})} placeholder="Masalan: Ali aka" />
-          <FormInput label="Yetkazib berish narxi" type="number" value={formData.supplierPrice} onChange={e => setFormData({...formData, supplierPrice: e.target.value})} placeholder="10000" />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <label style={{ fontSize: '0.875rem', fontWeight: 600, color: '#1A2538' }}>Yetkazib beruvchi</label>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <CustomSelect 
+                value={formData.supplier} 
+                onChange={v => setFormData({...formData, supplier: v})}
+                options={[
+                  {value: '', label: 'Tanlang yoki qidiring...'},
+                  ...partners.filter(p => p.status !== 'archived').map(p => ({value: p.companyName, label: p.companyName}))
+                ]}
+                style={{ flex: 1, borderRadius: 'var(--radius-md)' }}
+              />
+              <button 
+                type="button"
+                title="Yangi hamkor qo'shish"
+                onClick={() => setIsPartnerInlineOpen(!isPartnerInlineOpen)}
+                style={{
+                  width: 44, height: 44, flexShrink: 0, borderRadius: '12px', border: 'none',
+                  background: isPartnerInlineOpen ? '#4A90E2' : '#D1E8F5',
+                  color: isPartnerInlineOpen ? '#fff' : '#4A90E2',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer', transition: 'all 0.2s'
+                }}
+              >
+                <Plus size={18} style={{ transform: isPartnerInlineOpen ? 'rotate(45deg)' : 'none', transition: 'transform 0.2s' }} />
+              </button>
+            </div>
+            <AnimatePresence>
+              {isPartnerInlineOpen && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0, marginTop: 0 }}
+                  animate={{ opacity: 1, height: 'auto', marginTop: '4px' }}
+                  exit={{ opacity: 0, height: 0, marginTop: 0 }}
+                  transition={{ duration: 0.25, ease: 'easeInOut' }}
+                  style={{ overflow: 'hidden' }}
+                >
+                  <div style={{
+                    border: '2px solid #4A90E2', borderRadius: '16px',
+                    background: 'linear-gradient(135deg, #F0F7FF 0%, #E8F4FD 100%)',
+                    padding: '16px',
+                    display: 'flex', flexDirection: 'column', gap: '12px',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#4A90E2' }} />
+                      <span style={{ fontSize: '13px', fontWeight: 700, color: '#4A90E2' }}>Yangi hamkor qo'shish</span>
+                    </div>
+                    <input
+                      type="text"
+                      value={newPartnerName}
+                      onChange={e => setNewPartnerName(e.target.value)}
+                      placeholder="Masalan: Ali aka"
+                      autoFocus
+                      onKeyDown={e => { if (e.key === 'Enter') handleAddPartnerInline(); }}
+                      style={{
+                        width: '100%', padding: '10px 14px',
+                        border: '1.5px solid #B8D9F5', borderRadius: '10px',
+                        fontSize: '14px', outline: 'none', background: '#fff',
+                        color: '#1A2538', fontFamily: 'inherit',
+                        boxSizing: 'border-box',
+                      }}
+                      onFocus={e => e.target.style.borderColor = '#4A90E2'}
+                      onBlur={e => e.target.style.borderColor = '#B8D9F5'}
+                    />
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button
+                        onClick={() => { setIsPartnerInlineOpen(false); setNewPartnerName(''); }}
+                        style={{ flex: 1, padding: '9px', borderRadius: '10px', border: '1.5px solid #B8D9F5', background: '#fff', color: '#8A9BB5', fontWeight: 600, fontSize: '13px', cursor: 'pointer' }}
+                      >Bekor</button>
+                      <button
+                        onClick={handleAddPartnerInline}
+                        disabled={isSavingPartner}
+                        style={{ flex: 2, padding: '9px', borderRadius: '10px', border: 'none', background: 'linear-gradient(135deg, #4A90E2, #7BCEEB)', color: '#fff', fontWeight: 700, fontSize: '13px', cursor: 'pointer', boxShadow: '0 4px 12px -4px #4A90E255' }}
+                      >{isSavingPartner ? 'Saqlanmoqda...' : '+ Saqlash'}</button>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <FormInput label="Yetkazib berish narxi" type="number" value={formData.supplierPrice} onChange={e => setFormData({...formData, supplierPrice: e.target.value})} placeholder="10000" />
+            <span style={{ fontSize: '11px', color: '#8A9BB5', marginTop: '-0.3rem' }}>*Tegilmasa oldingi narx bilan qoladi</span>
+          </div>
         </div>
 
         <div className="form-grid-2">
           {!editingId ? (
-             <FormInput label="Boshlang'ich qoldiq" type="number" value={formData.stock} onChange={e => setFormData({...formData, stock: e.target.value})} />
+             <FormInput label="Boshlang'ich qoldiq" type="number" value={formData.stock} onChange={e => {
+               const val = e.target.value;
+               const minVal = val ? (Number(val) > 15 ? 5 : 1) : formData.minStock;
+               setFormData({...formData, stock: val, minStock: minVal});
+             }} />
           ) : (
              <FormInput label="Qoldiq (Faqat ma'lumot uchun)" type="number" value={formData.stock} disabled />
           )}
