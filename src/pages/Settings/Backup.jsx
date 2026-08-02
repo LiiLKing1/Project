@@ -69,27 +69,148 @@ const Backup = () => {
     URL.revokeObjectURL(url);
   };
 
-  const downloadExcel = (data, filename) => {
-    const wb = XLSX.utils.book_new();
+  const downloadExcel = async (data, filename) => {
+    const ExcelJS = (await import('exceljs')).default;
+    const wb = new ExcelJS.Workbook();
+    wb.creator = 'Savdogar Tizimi';
+    wb.created = new Date();
+
+    const headerFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4F7DFB' } };
+    const headerFont = { color: { argb: 'FFFFFFFF' }, bold: true, name: 'Arial' };
+    const borderAll = {
+      top: { style: 'thin' }, left: { style: 'thin' },
+      bottom: { style: 'thin' }, right: { style: 'thin' }
+    };
     
-    for (const colName of Object.keys(data)) {
-      const colData = data[colName];
-      if (colData && colData.length > 0) {
-        const flatData = colData.map(item => {
-          const flat = { ...item };
-          Object.keys(flat).forEach(key => {
-            if (typeof flat[key] === 'object' && flat[key] !== null) {
-              flat[key] = JSON.stringify(flat[key]);
-            }
-          });
-          return flat;
+    const addSheet = (name, title, desc, columns, rows, hasTotal = false) => {
+      const ws = wb.addWorksheet(name, { views: [{ state: 'frozen', xSplit: 0, ySplit: 4 }] });
+      
+      ws.mergeCells('A1:C1');
+      ws.getCell('A1').value = title;
+      ws.getCell('A1').font = { size: 16, bold: true, name: 'Arial' };
+      
+      ws.mergeCells('A2:F2');
+      ws.getCell('A2').value = desc;
+      ws.getCell('A2').font = { size: 11, italic: true, name: 'Arial', color: { argb: 'FF666666' } };
+      
+      ws.addRow([]);
+
+      const headerRow = ws.addRow(columns.map(c => c.header));
+      headerRow.eachCell((cell, colNumber) => {
+        cell.fill = headerFill;
+        cell.font = headerFont;
+        cell.border = borderAll;
+        cell.alignment = { vertical: 'middle', horizontal: 'center' };
+        
+        const col = ws.getColumn(colNumber);
+        col.width = Math.max(15, columns[colNumber - 1].header.length + 5);
+      });
+
+      rows.forEach((rowData, idx) => {
+        const row = ws.addRow(columns.map(c => rowData[c.key] ?? ''));
+        row.eachCell(cell => {
+          cell.border = borderAll;
+          cell.font = { name: 'Arial' };
+          cell.alignment = { vertical: 'middle' };
         });
-        const ws = XLSX.utils.json_to_sheet(flatData);
-        XLSX.utils.book_append_sheet(wb, ws, colName.substring(0, 31));
+      });
+
+      if (hasTotal && rows.length > 0) {
+         const totalRow = ws.addRow([]);
+         totalRow.getCell(1).value = "Jami:";
+         totalRow.getCell(1).font = { bold: true };
+         
+         totalRow.getCell(2).value = { formula: `COUNTA(A5:A${rows.length + 4})` };
+         
+         totalRow.getCell(3).value = "Ombor qiymati:";
+         totalRow.getCell(3).font = { bold: true };
+         totalRow.getCell(4).value = { formula: `SUMPRODUCT(E5:E${rows.length + 4}, I5:I${rows.length + 4})` };
       }
+    };
+
+    const formatDate = (isoString) => {
+      if (!isoString) return '-';
+      try {
+        const d = new Date(isoString);
+        return d.toLocaleString('ru-RU', { timeZone: 'Asia/Tashkent', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).replace(',', '');
+      } catch (e) { return isoString; }
+    };
+
+    const catMap = {};
+    if (data.categories) data.categories.forEach(c => catMap[c.id] = c.name);
+    const supMap = {};
+    if (data.suppliers) data.suppliers.forEach(s => supMap[s.id] = s.companyName || s.fullName);
+
+    if (data.products) {
+       const cols = [
+         { header: 'Mahsulot nomi', key: 'name' },
+         { header: 'Shtrix-kod', key: 'barcode' },
+         { header: 'Kategoriya', key: 'category' },
+         { header: 'Birlik', key: 'unit' },
+         { header: 'Tannarx (so\'m)', key: 'cost' },
+         { header: 'Sotuv narxi (so\'m)', key: 'sell' },
+         { header: 'Yetkazib beruvchi', key: 'supplier' },
+         { header: 'Yetkazib beruvchi narxi (so\'m)', key: 'suppPrice' },
+         { header: 'Qoldiq', key: 'stock' },
+         { header: 'Minimal qoldiq', key: 'minStock' },
+         { header: 'Holati', key: 'status' },
+         { header: 'Qo\'shilgan sana', key: 'date' },
+       ];
+       const rows = data.products.map(p => {
+          let totalStock = 0;
+          if (p.stockByWarehouse) Object.values(p.stockByWarehouse).forEach(v => totalStock += Number(v));
+          return {
+            name: p.name, barcode: p.barcode, category: catMap[p.categoryId] || 'Noma\'lum',
+            unit: p.unit || 'dona', cost: Number(p.costPrice) || 0, sell: Number(p.sellPrice) || 0,
+            supplier: supMap[p.supplierId] || p.supplier || '', suppPrice: Number(p.supplierPrice) || 0,
+            stock: totalStock, minStock: Number(p.minStock) || 0, status: p.status === 'active' ? 'Faol' : 'Arxivlangan',
+            date: formatDate(p.createdAt)
+          };
+       });
+       addSheet('Mahsulotlar', '📦 Mahsulotlar', 'Savdogar tizimidan olingan zaxira nusxa — barcha mahsulotlar ro\'yxati', cols, rows, true);
     }
 
-    XLSX.writeFile(wb, filename);
+    if (data.suppliers) {
+       const cols = [
+         { header: 'F.I.Sh', key: 'name' }, { header: 'Kompaniya nomi', key: 'company' },
+         { header: 'Telefon', key: 'phone' }, { header: 'Manzil', key: 'address' },
+         { header: 'Holati', key: 'status' }, { header: 'Qo\'shilgan sana', key: 'date' },
+       ];
+       const rows = data.suppliers.map(s => ({
+         name: s.fullName, company: s.companyName, phone: s.phone, address: s.address, 
+         status: s.status === 'active' ? 'Faol' : 'Arxivlangan', date: formatDate(s.createdAt)
+       }));
+       addSheet('Yetkazib beruvchilar', '🚚 Yetkazib beruvchilar', 'Savdogar tizimiga ulangan barcha ta\'minotchilar', cols, rows);
+    }
+    
+    if (data.categories) {
+       const cols = [ { header: 'Nomi', key: 'name' }, { header: 'Qo\'shilgan sana', key: 'date' } ];
+       const rows = data.categories.map(c => ({ name: c.name, date: formatDate(c.createdAt) }));
+       addSheet('Kategoriyalar', '🏷️ Kategoriyalar', 'Mahsulot kategoriyalari ro\'yxati', cols, rows);
+    }
+    
+    if (data.auditLogs) {
+       const cols = [
+         { header: 'Sana', key: 'date' }, { header: 'Xodim', key: 'user' }, { header: 'Roli', key: 'role' },
+         { header: 'Amal', key: 'action' }, { header: 'Bo\'lim', key: 'resource' }, { header: 'Tafsilot', key: 'details' }
+       ];
+       const roleMap = { admin: 'Administrator', cashier: 'Kassir', manager: 'Menejer' };
+       const actionMap = { CREATE: 'Qo\'shildi', UPDATE: 'Yangilandi', DELETE: 'O\'chirildi', LOGIN: 'Tizimga kirdi' };
+       const rows = data.auditLogs.map(a => ({
+         date: formatDate(a.timestamp), user: a.userName, role: roleMap[a.userRole] || a.userRole,
+         action: actionMap[a.action] || a.action, resource: a.resource, details: a.details
+       }));
+       addSheet('Amallar tarixi', '🕒 Amallar tarixi', 'Tizimda bajarilgan barcha amallar jurnali (audit log)', cols, rows);
+    }
+
+    const buffer = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const handleBackup = async (type) => {
@@ -109,7 +230,7 @@ const Backup = () => {
       if (type === 'json') {
         downloadJSON(data, `backup_${storeId}_${dateStr}.json`);
       } else if (type === 'excel') {
-        downloadExcel(data, `backup_${storeId}_${dateStr}.xlsx`);
+        await downloadExcel(data, `backup_${storeId}_${dateStr}.xlsx`);
       }
       
       addToast('Zaxira muvaffaqiyatli saqlandi', 'success');

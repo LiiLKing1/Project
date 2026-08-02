@@ -14,7 +14,7 @@ const ProductImporter = ({ isOpen, onClose }) => {
   const [isImporting, setIsImporting] = useState(false);
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
-  const [partners, setPartners] = useState([]);
+  const [suppliers, setSuppliers] = useState([]);
   const [importHistory, setImportHistory] = useState([]);
 
   const { userProfile } = useRoles();
@@ -33,8 +33,8 @@ const ProductImporter = ({ isOpen, onClose }) => {
           const catSnap = await getDocs(collection(db, `users/${storeId}/categories`));
           setCategories(catSnap.docs.map(d => ({ id: d.id, ...d.data() })));
           
-          const partSnap = await getDocs(collection(db, `users/${storeId}/partners`));
-          setPartners(partSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+          const supSnap = await getDocs(collection(db, `users/${storeId}/suppliers`));
+          setSuppliers(supSnap.docs.map(d => ({ id: d.id, ...d.data() })));
           
           const historySnap = await getDocs(query(collection(db, `users/${storeId}/importHistory`)));
           const historyData = historySnap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
@@ -50,11 +50,55 @@ const ProductImporter = ({ isOpen, onClose }) => {
     }
   }, [isOpen, storeId]);
 
-  const downloadTemplate = () => {
-    const ws = XLSX.utils.aoa_to_sheet([['Shtrix-kod', 'Nomi', 'Kategoriya', 'O\'lchov birligi', 'Tannarx', 'Sotish narxi', 'Qoldiq', 'Minimal qoldiq']]);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Shablon");
-    XLSX.writeFile(wb, `shablon_mahsulotlar.xlsx`);
+  const downloadTemplate = async () => {
+    const ExcelJS = (await import('exceljs')).default;
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('Shablon', { views: [{ state: 'frozen', xSplit: 0, ySplit: 4 }] });
+
+    ws.mergeCells('A1:D1');
+    ws.getCell('A1').value = "📦 Savdogar — Mahsulot yuklash shabloni";
+    ws.getCell('A1').font = { size: 14, bold: true, name: 'Arial', color: { argb: 'FF000000' } };
+    
+    ws.mergeCells('A2:H2');
+    ws.getCell('A2').value = "Quyidagi jadvalni to'ldirib, Mahsulotlar bo'limidagi \"Excel'dan yuklash\" tugmasi orqali yuklang.";
+    
+    ws.mergeCells('A3:H3');
+    ws.getCell('A3').value = "⚠️ * belgili ustunlar majburiy. Pastdagi sariq rangli qator — bu namuna, uni o'chirib, o'z ma'lumotlaringiz kiriting.";
+    ws.getCell('A3').font = { italic: true, color: { argb: 'FF666666' } };
+
+    const headers = [
+      'Mahsulot nomi*', 'Tannarx (so\'m)*', 'Sotuv narxi (so\'m)*', 
+      'Yetkazib beruvchi', 'Yetkazib beruvchi narxi (so\'m)', 
+      'Kategoriya*', 'Birlik*', 'Qoldiq*', 'Shtrix-kod'
+    ];
+    
+    const headerRow = ws.addRow(headers);
+    headerRow.eachCell((cell, colNumber) => {
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4F7DFB' } };
+      cell.font = { color: { argb: 'FFFFFFFF' }, bold: true };
+      cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+      const col = ws.getColumn(colNumber);
+      col.width = Math.max(15, headers[colNumber - 1].length + 5);
+    });
+
+    const sampleRow = ws.addRow([
+      'Olma sharbati 1L', 10000, 15000, 'Meva sharbatlari MChJ', 10000, 
+      'Ichimliklar', 'dona', 150, '4780001234567'
+    ]);
+    sampleRow.eachCell(cell => {
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF2CC' } };
+    });
+
+    ws.getColumn(9).numFmt = '@'; // Force text format for barcode
+
+    const buffer = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `shablon_mahsulotlar.xlsx`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const handleFileUpload = (e) => {
@@ -67,7 +111,14 @@ const ProductImporter = ({ isOpen, onClose }) => {
       const wb = XLSX.read(bstr, { type: 'binary' });
       const wsname = wb.SheetNames[0];
       const ws = wb.Sheets[wsname];
-      const data = XLSX.utils.sheet_to_json(ws);
+      const rawData = XLSX.utils.sheet_to_json(ws, { header: 1 });
+      let headerRowIdx = 0;
+      for (let i = 0; i < Math.min(20, rawData.length); i++) {
+         if (rawData[i] && rawData[i].some(v => String(v).toLowerCase().includes('mahsulot nomi'))) {
+            headerRowIdx = i; break;
+         }
+      }
+      const data = XLSX.utils.sheet_to_json(ws, { range: headerRowIdx, defval: '' });
       
       let newCount = 0;
       let updateCount = 0;
@@ -144,7 +195,8 @@ const ProductImporter = ({ isOpen, onClose }) => {
     setIsImporting(true);
     
     try {
-      const batch = writeBatch(db);
+      let batch = writeBatch(db);
+      let opCount = 0;
       const validRows = importData.filter(d => d.status !== 'error');
       
       const categoryMap = {};
@@ -157,8 +209,23 @@ const ProductImporter = ({ isOpen, onClose }) => {
         if (!catId) {
           const newCatRef = doc(collection(db, `users/${storeId}/categories`));
           batch.set(newCatRef, { name: parsed.categoryName, createdAt: new Date().toISOString() });
+          opCount++;
           catId = newCatRef.id;
           categoryMap[parsed.categoryName.toLowerCase().trim()] = catId;
+        }
+
+        let supplierId = '';
+        if (parsed.supplier) {
+           let supplier = suppliers.find(s => (s.companyName || '').toLowerCase() === parsed.supplier.toLowerCase().trim() || (s.fullName || '').toLowerCase() === parsed.supplier.toLowerCase().trim());
+           if (supplier) {
+              supplierId = supplier.id;
+           } else {
+              const newSupRef = doc(collection(db, `users/${storeId}/suppliers`));
+              batch.set(newSupRef, { companyName: parsed.supplier.trim(), fullName: parsed.supplier.trim(), status: 'active', createdAt: new Date().toISOString() });
+              opCount++;
+              supplierId = newSupRef.id;
+              suppliers.push({ id: supplierId, companyName: parsed.supplier.trim(), fullName: parsed.supplier.trim() });
+           }
         }
 
         let barcode = parsed.barcode;
@@ -175,6 +242,7 @@ const ProductImporter = ({ isOpen, onClose }) => {
           sellPrice: parsed.sellPrice,
           minStock: parsed.minStock,
           supplier: parsed.supplier,
+          supplierId: supplierId,
           status: 'active'
         };
         
@@ -186,6 +254,7 @@ const ProductImporter = ({ isOpen, onClose }) => {
                [`stockByWarehouse.${selectedWarehouseId}`]: parsed.stock,
                updatedAt: new Date().toISOString()
             });
+            opCount++;
           }
         } else {
           const newProdRef = doc(collection(db, `users/${storeId}/products`));
@@ -194,6 +263,13 @@ const ProductImporter = ({ isOpen, onClose }) => {
              stockByWarehouse: { [selectedWarehouseId]: parsed.stock },
              createdAt: new Date().toISOString()
           });
+          opCount++;
+        }
+        
+        if (opCount >= 490) {
+           await batch.commit();
+           batch = writeBatch(db);
+           opCount = 0;
         }
       }
       
@@ -203,8 +279,11 @@ const ProductImporter = ({ isOpen, onClose }) => {
         userName: userProfile?.name || 'Kassir',
         stats: importStats
       });
+      opCount++;
       
-      await batch.commit();
+      if (opCount > 0) {
+        await batch.commit();
+      }
       addToast(`${validRows.length} ta mahsulot muvaffaqiyatli import qilindi!`, 'success');
       
       if (importStats.error > 0) {

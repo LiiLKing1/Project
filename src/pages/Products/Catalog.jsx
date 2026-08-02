@@ -80,7 +80,7 @@ const Catalog = () => {
   const navigate = useNavigate();
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
-  const [partners, setPartners] = useState([]);
+  const [suppliers, setSuppliers] = useState([]);
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [loading, setLoading] = useState(false);
@@ -183,8 +183,8 @@ const Catalog = () => {
 
     setIsSavingPartner(true);
     try {
-      const newPartner = { companyName: newPartnerName.trim(), contactPerson: 'Noma\'lum', phone: '', currentPayable: 0, status: 'active', createdAt: new Date().toISOString() };
-      const newPartnerRef = doc(collection(db, `users/${storeId}/partners`));
+      const newPartner = { companyName: newPartnerName.trim(), fullName: newPartnerName.trim(), phone: '', status: 'active', createdAt: new Date().toISOString() };
+      const newPartnerRef = doc(collection(db, `users/${storeId}/suppliers`));
       
       setFormData(prev => ({...prev, supplier: newPartnerName.trim()}));
       setIsPartnerInlineOpen(false);
@@ -218,14 +218,14 @@ const Catalog = () => {
       setCategories(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
 
-    const unsubPartners = onSnapshot(collection(db, `users/${storeId}/partners`), (snapshot) => {
-      setPartners(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)));
+    const unsubSuppliers = onSnapshot(collection(db, `users/${storeId}/suppliers`), (snapshot) => {
+      setSuppliers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)));
     });
 
     return () => {
       unsubProducts();
       unsubCategories();
-      unsubPartners();
+      unsubSuppliers();
     };
   }, [addToast, storeId]);
 
@@ -846,7 +846,7 @@ const Catalog = () => {
                 onChange={v => setFormData({...formData, supplier: v})}
                 options={[
                   {value: '', label: 'Tanlang yoki qidiring...'},
-                  ...partners.filter(p => p.status !== 'archived').map(p => ({value: p.companyName, label: p.companyName}))
+                  ...suppliers.filter(p => p.status !== 'archived').map(p => ({value: p.companyName || p.fullName, label: p.companyName || p.fullName}))
                 ]}
                 style={{ flex: 1, borderRadius: 'var(--radius-md)' }}
               />
