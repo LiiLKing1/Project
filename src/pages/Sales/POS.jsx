@@ -373,7 +373,17 @@ const POS = () => {
     });
 
     const unsubCustomers = onSnapshot(query(collection(db, `users/${storeId}/customers`), orderBy('createdAt', 'desc')), (snapshot) => {
-      setCustomers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      const allCust = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const uniqueCust = [];
+      const seen = new Set();
+      for (const c of allCust) {
+        const lowerName = (c.fullName || '').toLowerCase();
+        if (!seen.has(lowerName)) {
+          seen.add(lowerName);
+          uniqueCust.push(c);
+        }
+      }
+      setCustomers(uniqueCust);
     });
     
     // Listen for open shift
