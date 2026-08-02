@@ -38,6 +38,18 @@ const Suppliers = () => {
       addToast('Ism va telefon raqam kiritilishi shart', 'warning');
       return;
     }
+    
+    const isDuplicate = suppliers.some(s => 
+      s.id !== editingId && (
+        (s.fullName && s.fullName.toLowerCase() === formData.fullName.trim().toLowerCase()) ||
+        (s.companyName && formData.companyName && s.companyName.toLowerCase() === formData.companyName.trim().toLowerCase())
+      )
+    );
+    
+    if (isDuplicate) {
+      addToast('Bunday ismli yoki kompaniyali yetkazib beruvchi allaqachon mavjud!', 'warning');
+      return;
+    }
     if (!storeId) return;
 
     const payload = {

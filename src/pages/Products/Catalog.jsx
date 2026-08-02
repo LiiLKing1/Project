@@ -179,6 +179,11 @@ const Catalog = () => {
       return;
     }
     
+    if (suppliers.some(s => (s.companyName || '').toLowerCase() === newPartnerName.toLowerCase().trim() || (s.fullName || '').toLowerCase() === newPartnerName.toLowerCase().trim())) {
+      addToast("Bu yetkazib beruvchi/hamkor allaqachon mavjud!", "warning");
+      return;
+    }
+    
     if (!storeId || isSavingPartner) return;
 
     setIsSavingPartner(true);

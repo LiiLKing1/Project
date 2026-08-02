@@ -898,8 +898,13 @@ const POS = () => {
 
   const handleAddCustomer = async (e) => {
     e.preventDefault();
-    if (!newCustomerForm.name.trim()) {
+    const cleanName = newCustomerForm.name.trim();
+    if (!cleanName) {
       addToast('Mijoz ismini kiriting', 'error');
+      return;
+    }
+    if (customers.some(c => (c.fullName || '').toLowerCase() === cleanName.toLowerCase())) {
+      addToast('Bunday ismli mijoz allaqachon mavjud!', 'warning');
       return;
     }
     

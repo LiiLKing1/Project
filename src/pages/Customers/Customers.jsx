@@ -60,7 +60,15 @@ const Customers = () => {
 
   const validate = async () => {
     const errors = {};
-    if (!formData.fullName.trim() || formData.fullName.length < 3) errors.fullName = 'F.I.O kamida 3 ta belgi bo\'lishi kerak';
+    const cleanName = formData.fullName.trim();
+    if (!cleanName || cleanName.length < 3) {
+      errors.fullName = 'F.I.O kamida 3 ta belgi bo\'lishi kerak';
+    } else {
+      const isDuplicateName = customers.some(c => (c.fullName || '').toLowerCase() === cleanName.toLowerCase() && c.id !== editingId);
+      if (isDuplicateName) {
+        errors.fullName = 'Bunday ismli mijoz allaqachon mavjud!';
+      }
+    }
     
     // Phone validation
     const phoneRegex = /^\+998[0-9]{9}$/;
@@ -235,6 +243,7 @@ const Customers = () => {
             <div>Jami xarid</div>
             <div>Bonus</div>
             <div>Qarz</div>
+            <div>Sana</div>
             <div style={{ textAlign: 'right' }}>Amallar</div>
           </div>
 
@@ -271,6 +280,11 @@ const Customers = () => {
                   ? <span style={{ color: '#EF4B4B' }}><CurrencyDisplay amount={c.currentDebt} /></span>
                   : <span className="badge badge-green" style={{ fontSize: 11 }}>Qarzsiz</span>
                 }
+              </div>
+
+              {/* Date */}
+              <div className="cust-col-date">
+                {c.createdAt ? new Date(c.createdAt).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—'}
               </div>
 
               {/* 6. Actions */}

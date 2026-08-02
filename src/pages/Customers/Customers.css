@@ -7,7 +7,7 @@
 
 .customers-table-header {
   display: grid;
-  grid-template-columns: 2fr 130px 1.2fr 1fr 1fr 90px;
+  grid-template-columns: 2fr 130px 1.2fr 1fr 1fr 100px 90px;
   gap: 1rem;
   padding: 12px 20px;
   background: #F8FAFC;
@@ -21,7 +21,7 @@
 
 .customers-table-row {
   display: grid;
-  grid-template-columns: 2fr 130px 1.2fr 1fr 1fr 90px;
+  grid-template-columns: 2fr 130px 1.2fr 1fr 1fr 100px 90px;
   gap: 1rem;
   align-items: center;
   padding: 14px 20px;
@@ -81,6 +81,7 @@
     grid-template-areas:
       "name    debt"
       "phone   bonus"
+      "date    actions"
       "purch   actions";
     grid-template-columns: 1fr auto;
     row-gap: 8px;
@@ -107,6 +108,12 @@
   .cust-col-phone {
     grid-area: phone;
     font-size: 12px;
+  }
+
+  .cust-col-date {
+    grid-area: date;
+    font-size: 11px;
+    color: #94A3B8;
   }
 
   .cust-col-bonus {

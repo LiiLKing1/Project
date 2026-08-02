@@ -75,6 +75,16 @@ const Partners = () => {
       return;
     }
     
+    const isDuplicate = partners.some(p => 
+      p.id !== editingId && 
+      (p.companyName && p.companyName.toLowerCase() === partnerForm.companyName.trim().toLowerCase())
+    );
+    
+    if (isDuplicate) {
+      addToast('Bunday nomli hamkor allaqachon mavjud!', 'warning');
+      return;
+    }
+    
     try {
       const payload = { ...partnerForm };
       setIsPartnerModalOpen(false); // Optimistic close
