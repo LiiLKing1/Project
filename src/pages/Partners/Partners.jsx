@@ -57,12 +57,12 @@ const Partners = () => {
   useEffect(() => {
     if (!storeId) return;
 
-    const unsubPartners = onSnapshot(query(collection(db, `users/${storeId}/partners`), orderBy('createdAt', 'desc')), (snapshot) => {
-      setPartners(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    const unsubPartners = onSnapshot(collection(db, `users/${storeId}/partners`), (snapshot) => {
+      setPartners(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)));
     });
 
-    const unsubProducts = onSnapshot(query(collection(db, `users/${storeId}/products`), orderBy('createdAt', 'desc')), (snapshot) => {
-      setProducts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    const unsubProducts = onSnapshot(collection(db, `users/${storeId}/products`), (snapshot) => {
+      setProducts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)));
     });
 
     return () => { unsubPartners(); unsubProducts(); };
@@ -89,6 +89,7 @@ const Partners = () => {
       } else {
         payload.currentPayable = 0;
         payload.status = 'active';
+        payload.createdAt = new Date().toISOString();
         const auditData = { storeId, userProfile, resource: 'partners', details: payload.companyName };
         const newPartnerRef = doc(collection(db, `users/${storeId}/partners`));
         putDoc(newPartnerRef, payload, auditData)

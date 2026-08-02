@@ -205,8 +205,8 @@ const Catalog = () => {
   useEffect(() => {
     if (!storeId) return;
 
-    const unsubProducts = onSnapshot(query(collection(db, `users/${storeId}/products`), orderBy('createdAt', 'desc')), (snapshot) => {
-      const prods = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const unsubProducts = onSnapshot(collection(db, `users/${storeId}/products`), (snapshot) => {
+      const prods = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
       setProducts(prods);
       setLoading(false);
     }, (error) => {
@@ -218,8 +218,8 @@ const Catalog = () => {
       setCategories(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
 
-    const unsubPartners = onSnapshot(query(collection(db, `users/${storeId}/partners`), orderBy('createdAt', 'desc')), (snapshot) => {
-      setPartners(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    const unsubPartners = onSnapshot(collection(db, `users/${storeId}/partners`), (snapshot) => {
+      setPartners(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)));
     });
 
     return () => {
@@ -326,6 +326,7 @@ const Catalog = () => {
            .then(() => addToast('Mahsulot muvaffaqiyatli yangilandi', 'success'))
            .catch(error => addToast(error.message, 'error'));
       } else {
+        payload.createdAt = new Date().toISOString();
         const auditData = { storeId, userProfile, resource: 'products', details: formData.name };
         const newProdRef = doc(collection(db, `users/${storeId}/products`));
         putDoc(newProdRef, payload, auditData)
