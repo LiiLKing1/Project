@@ -263,8 +263,7 @@ const Partners = () => {
           const prodRef = doc(db, `users/${storeId}/products`, item.id);
           batch.update(prodRef, {
             [`stockByWarehouse.${selectedWarehouseId}`]: increment(Number(item.qty)),
-            costPrice: Number(item.costPrice),
-            sellPrice: Number(item.sellPrice)
+            costPrice: Number(item.costPrice)
           });
         }
         
@@ -346,15 +345,15 @@ const Partners = () => {
       {/* Header */}
       <div className="page-header">
         <div>
-          <h1 className="page-title">Hamkorlar</h1>
-          <p className="page-subtitle">{totalPartners} ta hamkor ro'yxatda</p>
+          <h1 className="page-title">Yetkazib beruvchilar</h1>
+          <p className="page-subtitle">{totalPartners} ta yetkazib beruvchi ro'yxatda</p>
         </div>
         <div style={{ display: 'flex', gap: '12px' }}>
           <button className="btn btn-outline" onClick={() => openDeliveryDrawer()}>
             <PackagePlus size={18} /> Yetkazma qabul qilish
           </button>
           <button className="btn btn-primary" onClick={() => openPartnerModal()}>
-            <Plus size={18} /> Yangi hamkor
+            <Plus size={18} /> Yangi yetkazib beruvchi
           </button>
         </div>
       </div>
@@ -362,17 +361,17 @@ const Partners = () => {
       {/* Stats */}
       <div className="stat-row">
         <div className="stat-card">
-          <span className="stat-card-label">Jami hamkorlar</span>
+          <span className="stat-card-label">Jami yetkazib beruvchilar</span>
           <span className="stat-card-value blue">{totalPartners}</span>
           <span className="stat-card-sub">Faol ro'yxat</span>
         </div>
         <div className="stat-card">
           <span className="stat-card-label">Sizning qarzingiz (Jami)</span>
           <span className="stat-card-value red"><CurrencyDisplay amount={totalPayable} /></span>
-          <span className="stat-card-sub">Barcha hamkorlarga</span>
+          <span className="stat-card-sub">Barcha yetkazib beruvchilarga</span>
         </div>
         <div className="stat-card">
-          <span className="stat-card-label">Qarz hamkorlar soni</span>
+          <span className="stat-card-label">Qarzdor yetkazib beruvchilar</span>
           <span className="stat-card-value amber">{partnersWithDebt}</span>
           <span className="stat-card-sub">To'lanmagan qarzlar</span>
         </div>
@@ -407,7 +406,7 @@ const Partners = () => {
               {filteredPartners.length === 0 ? (
                 <tr>
                   <td colSpan="5" style={{ textAlign: 'center', padding: '3rem', color: '#8A9BB5' }}>
-                    Hamkorlar topilmadi
+                    Yetkazib beruvchilar topilmadi
                   </td>
                 </tr>
               ) : filteredPartners.map(p => (
@@ -438,7 +437,7 @@ const Partners = () => {
       </div>
 
       {/* Partner Form Drawer */}
-      <Drawer position="right" isOpen={isPartnerModalOpen} onClose={() => setIsPartnerModalOpen(false)} title={editingId ? 'Hamkorni tahrirlash' : 'Yangi hamkor'}>
+      <Drawer position="right" isOpen={isPartnerModalOpen} onClose={() => setIsPartnerModalOpen(false)} title={editingId ? 'Yetkazib beruvchini tahrirlash' : 'Yangi yetkazib beruvchi'}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           <FormInput label="Kompaniya nomi *" value={partnerForm.companyName} onChange={e => setPartnerForm({...partnerForm, companyName: e.target.value})} required />
           <FormInput label="Mas'ul shaxs (F.I.O) *" value={partnerForm.contactPerson} onChange={e => setPartnerForm({...partnerForm, contactPerson: e.target.value})} required />

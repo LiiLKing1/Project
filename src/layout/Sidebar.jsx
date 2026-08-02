@@ -27,7 +27,7 @@ const Sidebar = ({ isOpen, closeSidebar }) => {
     { path: '/products', name: t('products'), icon: <Tag size={20} />, permKey: 'products', isFlyout: true, flyoutKey: 'products' },
     { path: '/sales', name: t('sales'), icon: <ShoppingCart size={20} />, permKey: 'sales', isFlyout: true, flyoutKey: 'sales' },
     { path: '/customers', name: t('customers'), icon: <Users size={20} />, permKey: 'customers', isFlyout: true, flyoutKey: 'customers' },
-    { path: '/partners', name: 'Hamkorlar', icon: <Handshake size={20} />, permKey: 'customers', isFlyout: true, flyoutKey: 'partners' },
+    { path: '/partners', name: 'Yetkazib beruvchilar', icon: <Handshake size={20} />, permKey: 'customers', isFlyout: true, flyoutKey: 'partners' },
     { path: '/marketing', name: t('marketing'), icon: <Megaphone size={20} />, permKey: 'marketing' },
     { path: '/reports', name: t('reports'), icon: <BarChart3 size={20} />, permKey: 'reports' },
     { path: '/finance', name: t('finance'), icon: <Wallet size={20} />, permKey: 'finance' },
@@ -60,10 +60,10 @@ const Sidebar = ({ isOpen, closeSidebar }) => {
       ]
     },
     partners: {
-      title: 'Hamkorlar bo\'limi',
+      title: 'Yetkazib beruvchilar bo\'limi',
       items: [
-        { path: '/partners', name: 'Hamkorlar', desc: 'Hamkor kompaniyalar ro\'yxati' },
-        { path: '/partners/debts', name: 'Hamkor qarzlari', desc: 'Kreditorlik qarzlar' }
+        { path: '/partners', name: 'Yetkazib beruvchilar', desc: 'Yetkazib beruvchilar ro\'yxati' },
+        { path: '/partners/debts', name: 'Yetkazib beruvchi qarzlari', desc: 'Kreditorlik qarzlar' }
       ]
     },
     products: {
@@ -75,8 +75,7 @@ const Sidebar = ({ isOpen, closeSidebar }) => {
         { path: '/products/inventory', name: 'Inventarizatsiya', desc: 'Ombor nazorati' },
         { path: '/products/transfer', name: 'Transfer', desc: 'Omborlararo ko\'chirish' },
         { path: '/products/revaluation', name: 'Qayta baholash', desc: 'Ommaviy narx o\'zgartirish' },
-        { path: '/products/write-off', name: 'Hisobdan chiqarish', desc: 'Spisaniya qilish' },
-        { path: '/orders/suppliers', name: 'Yetkazib beruvchilar', desc: 'Ta\'minotchilar ro\'yxati' }
+        { path: '/products/write-off', name: 'Hisobdan chiqarish', desc: 'Spisaniya qilish' }
       ]
     },
     management: {
