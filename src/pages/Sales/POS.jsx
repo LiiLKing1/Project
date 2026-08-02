@@ -66,12 +66,14 @@ const ProductCard = ({ p, search, addToCart, cartQty = 0 }) => {
   }, [cartQty]);
 
   const triggerAdd = () => {
-    if (displayStock <= 0) {
+    const currentStock = Math.max(0, p.stock - cartQtyRef.current);
+    if (currentStock <= 0) {
       addToCart(p);
       setShowError(true);
       setAddedCount(0);
       if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
       errorTimerRef.current = setTimeout(() => setShowError(false), 500);
+      stopHold();
       return;
     }
     addToCart(p);
@@ -84,15 +86,46 @@ const ProductCard = ({ p, search, addToCart, cartQty = 0 }) => {
     }, 1500);
   };
 
-  const handleClick = (e) => {
-    triggerAdd();
+  const handlePointerDown = (e) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    longPressedRef.current = false;
+    startPosRef.current = { x: e.clientX, y: e.clientY };
+    
+    holdIntervalRef.current = setTimeout(() => {
+      longPressedRef.current = true;
+      triggerAdd();
+      holdIntervalRef.current = setInterval(() => {
+        triggerAdd();
+      }, 300);
+    }, 400);
   };
 
+  const handlePointerMove = (e) => {
+    const dx = Math.abs(e.clientX - startPosRef.current.x);
+    const dy = Math.abs(e.clientY - startPosRef.current.y);
+    if (dx > 10 || dy > 10) {
+      stopHold();
+    }
+  };
 
+  const stopHold = () => {
+    if (holdIntervalRef.current) {
+      clearTimeout(holdIntervalRef.current);
+      clearInterval(holdIntervalRef.current);
+      holdIntervalRef.current = null;
+    }
+  };
+
+  const handleClick = (e) => {
+    if (!longPressedRef.current) {
+      triggerAdd();
+    }
+  };
 
   // Cleanup timers on unmount
   React.useEffect(() => {
     return () => {
+      stopHold();
       if (addedTimerRef.current) clearTimeout(addedTimerRef.current);
       if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
     };
@@ -101,6 +134,11 @@ const ProductCard = ({ p, search, addToCart, cartQty = 0 }) => {
   return (
     <motion.div 
       className="glass-panel" 
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={stopHold}
+      onPointerLeave={stopHold}
+      onPointerCancel={stopHold}
       onClick={handleClick}
       onContextMenu={(e) => {
         if (e.pointerType === 'touch') e.preventDefault();
