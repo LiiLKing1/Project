@@ -14,8 +14,8 @@ const ProtectedRoute = ({ children }) => {
 
   // Faqat asosiy admin va xodimlarga admin panelga kirishga ruxsat
   if (
-    currentUser.email !== 'LiiLKing@savdogar.uz' && 
-    !currentUser.email.endsWith('@pos.com')
+    currentUser.email?.toLowerCase() !== 'liilking@savdogar.uz' && 
+    !currentUser.email?.toLowerCase().endsWith('@pos.com')
   ) {
     return <Navigate to="/landing" replace />;
   }
