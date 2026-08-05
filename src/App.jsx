@@ -41,12 +41,25 @@ import VerifyEmail from './pages/Auth/VerifyEmail';
 import VerifyAction from './pages/Auth/VerifyAction';
 import ReceiptView from './pages/Public/ReceiptView';
 import Landing from './pages/Landing/Landing';
-
+import AboutUs from './pages/Public/AboutUs';
+import Features from './pages/Public/Features';
+import Pricing from './pages/Public/Pricing';
+import Contact from './pages/Public/Contact';
+import ManageProducts from './pages/OnlineStore/ManageProducts';
+import Attributes from './pages/OnlineStore/Attributes';
+import Comments from './pages/OnlineStore/Comments';
+import StoreProfile from './pages/OnlineStore/StoreProfile';
+import PublicStore from './pages/PublicStore/PublicStore';
+import ProductDetail from './pages/PublicStore/ProductDetail';
 function App() {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/landing" element={<Landing />} />
+        <Route path="/about" element={<AboutUs />} />
+        <Route path="/features" element={<Features />} />
+        <Route path="/pricing" element={<Pricing />} />
+        <Route path="/contact" element={<Contact />} />
         <Route path="/login" element={<Login />} />
         <Route path="/link-account" element={<LinkAccount />} />
         <Route path="/onboarding" element={<Onboarding />} />
@@ -56,8 +69,16 @@ function App() {
         <Route path="/receipt/:storeId/:saleId" element={<ReceiptView />} />
         <Route path="/catalog" element={<Navigate to="/products" replace />} />
         
+        {/* Public Store Routes */}
+        <Route path="/store/:slug" element={<PublicStore />} />
+        <Route path="/store/:slug/p/:productId" element={<ProductDetail />} />
+
         <Route path="/" element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
           <Route index element={<Dashboard />} />
+          <Route path="online-store/products" element={<PermissionRoute permKey="onlineStore"><ManageProducts /></PermissionRoute>} />
+          <Route path="online-store/attributes" element={<PermissionRoute permKey="onlineStore"><Attributes /></PermissionRoute>} />
+          <Route path="online-store/comments" element={<PermissionRoute permKey="onlineStore"><Comments /></PermissionRoute>} />
+          <Route path="online-store/profile" element={<PermissionRoute permKey="onlineStore"><StoreProfile /></PermissionRoute>} />
 
           {/* Products / Mahsulotlar */}
           <Route path="products" element={<PermissionRoute permKey="products"><Catalog /></PermissionRoute>} />

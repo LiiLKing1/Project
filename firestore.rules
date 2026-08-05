@@ -22,6 +22,11 @@ service cloud.firestore {
       return isStoreOwner(storeId) || isEmployee(storeId);
     }
 
+    function isPlatformAdmin() {
+      return request.auth != null && exists(/databases/$(database)/documents/platformAdmins/$(request.auth.uid));
+    }
+
+
     // Role tekshiruvlari
     function isAdmin(storeId) {
       return isStoreOwner(storeId) || (isEmployee(storeId) && getEmployeeRole(storeId) == 'admin');
@@ -35,38 +40,60 @@ service cloud.firestore {
       return isEmployee(storeId) && getEmployeeRole(storeId) == 'cashier';
     }
 
+    match /platformAdmins/{adminId} {
+      allow read, write: if isPlatformAdmin();
+    }
+    
+    match /onlineStoreApplications/{applicationId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update, delete: if isPlatformAdmin();
+    }
+
     // Barcha ma'lumotlar storeId ostida bo'ladi
     match /users/{storeId} {
       
+      function isOnlineStoreEnabled() {
+        let storeData = get(/databases/$(database)/documents/users/$(storeId)).data;
+        return storeData.subscriptionPlan == 'premium' && isSubscriptionActive();
+      }
+      
+      function isSubscriptionActive() {
+        let storeData = get(/databases/$(database)/documents/users/$(storeId)).data;
+        return !("subscriptionEnd" in storeData) || request.time <= timestamp(storeData.subscriptionEnd);
+      }
+      
       // Store hujjati - faqat admin yoki manager
-      allow read: if hasAccess(storeId);
-      allow write: if isAdmin(storeId);
+      allow read: if hasAccess(storeId) || resource.data.subscriptionPlan == 'premium';
+      allow write: if (isAdmin(storeId) && isSubscriptionActive()) || isPlatformAdmin();
 
       // Employees (Xodimlar) - kassir ko'ra olmaydi, admin qo'shadi, manager ko'rishi mumkin
       match /employees/{employeeId} {
         allow read: if isAdmin(storeId) || isManager(storeId) || request.auth.uid == employeeId;
-        allow write: if isAdmin(storeId);
+        allow write: if isAdmin(storeId) && isSubscriptionActive();
       }
 
       // Products (Mahsulotlar) - barcha o'qiydi, admin/manager yozadi
       match /products/{productId} {
-        allow read: if hasAccess(storeId);
+        allow read: if hasAccess(storeId) || (isOnlineStoreEnabled() && resource.data.isOnlineVisible == true);
         // Kassirlar sotuv paytida qoldiqni o'zgartirishi kerak (update)
-        allow create: if isAdmin(storeId) || isManager(storeId);
-        allow delete: if isAdmin(storeId);
-        allow update: if hasAccess(storeId); 
+        allow create: if (isAdmin(storeId) || isManager(storeId)) && isSubscriptionActive();
+        allow delete: if isAdmin(storeId) && isSubscriptionActive();
+        allow update: if hasAccess(storeId) && isSubscriptionActive(); 
       }
       
       // Customers (Mijozlar) - kassir mijoz qo'sha oladi va sotuvda update qiladi
       match /customers/{customerId} {
-        allow read, create, update: if hasAccess(storeId);
-        allow delete: if isAdmin(storeId);
+        allow read: if hasAccess(storeId);
+        allow create, update: if hasAccess(storeId) && isSubscriptionActive();
+        allow delete: if isAdmin(storeId) && isSubscriptionActive();
       }
       
       // Sales (Sotuvlar) - hamma ko'radi, hamma qo'shadi, o'chirish/taxrirlash faqat admin
       match /sales/{saleId} {
-        allow read, create: if hasAccess(storeId);
-        allow update, delete: if isAdmin(storeId);
+        allow read: if hasAccess(storeId);
+        allow create: if hasAccess(storeId) && isSubscriptionActive();
+        allow update, delete: if isAdmin(storeId) && isSubscriptionActive();
       }
       
       // Audit Logs
@@ -77,8 +104,26 @@ service cloud.firestore {
 
       // Categories
       match /categories/{categoryId} {
-        allow read, create, update: if hasAccess(storeId);
-        allow delete: if isAdmin(storeId);
+        allow read: if hasAccess(storeId);
+        allow create, update: if hasAccess(storeId) && isSubscriptionActive();
+        allow delete: if isAdmin(storeId) && isSubscriptionActive();
+      }
+      
+      // Yangi modullar qoidalari: Onlayn do'kon qo'shimchalari
+      match /sellerProfile/{docId} {
+        allow read: if hasAccess(storeId) || isOnlineStoreEnabled();
+        allow write: if isAdmin(storeId) && isSubscriptionActive();
+      }
+      
+      match /attributeTemplates/{templateId} {
+        allow read: if hasAccess(storeId) || isOnlineStoreEnabled();
+        allow write: if (isAdmin(storeId) || isManager(storeId)) && isSubscriptionActive();
+      }
+      
+      match /productComments/{commentId} {
+        allow read: if hasAccess(storeId) || (isOnlineStoreEnabled() && resource.data.isHidden != true);
+        allow create: if isOnlineStoreEnabled();
+        allow update, delete: if (isAdmin(storeId) || isManager(storeId)) && isSubscriptionActive();
       }
       
       // Yangi modullar qoidalari
@@ -86,21 +131,23 @@ service cloud.firestore {
       // Customer Debts (Mijoz qarzlari)
       match /customerDebts/{debtId} {
         // Kassir qarz qo'sha oladi, yopa oladi (update), lekin qarzni o'chira (bekor qila) olmaydi
-        allow read, create: if hasAccess(storeId);
+        allow read: if hasAccess(storeId);
+        allow create: if hasAccess(storeId) && isSubscriptionActive();
         
         // Update: Kassir statusni "paid" qila oladi, lekin "cancelled" qilolmasligi kerak
         // Lekin buni qoidalarda qat'iy tekshirish murakkab bo'lsa, UI'dan to'silgani maqul
-        allow update: if hasAccess(storeId) && (
+        allow update: if hasAccess(storeId) && isSubscriptionActive() && (
           // Agar cashier bo'lsa, status="cancelled" qilishga ruxsat yo'q
           !(isCashier(storeId) && request.resource.data.status == 'cancelled')
         );
         
-        allow delete: if isAdmin(storeId);
+        allow delete: if isAdmin(storeId) && isSubscriptionActive();
         
         // Payments subcollection
         match /payments/{paymentId} {
-          allow read, create: if hasAccess(storeId);
-          allow update, delete: if isAdmin(storeId);
+          allow read: if hasAccess(storeId);
+          allow create: if hasAccess(storeId) && isSubscriptionActive();
+          allow update, delete: if isAdmin(storeId) && isSubscriptionActive();
         }
       }
       
@@ -108,17 +155,18 @@ service cloud.firestore {
       match /suppliers/{supplierId} {
         allow read: if hasAccess(storeId);
         // Kassir ham yangi yetkazib beruvchi qo'sha olishi mumkin (buyurtma berish uchun)
-        allow create: if hasAccess(storeId);
-        allow update: if isAdmin(storeId) || isManager(storeId);
-        allow delete: if isAdmin(storeId);
+        allow create: if hasAccess(storeId) && isSubscriptionActive();
+        allow update: if (isAdmin(storeId) || isManager(storeId)) && isSubscriptionActive();
+        allow delete: if isAdmin(storeId) && isSubscriptionActive();
       }
       
       // Purchase Orders (Buyurtmalar)
       match /purchaseOrders/{orderId} {
-        allow read, create: if hasAccess(storeId);
+        allow read: if hasAccess(storeId);
+        allow create: if hasAccess(storeId) && isSubscriptionActive();
         // Qabul qilish (update) hamma uchun yopiq emas, lekin o'chirish faqat admin
-        allow update: if hasAccess(storeId);
-        allow delete: if isAdmin(storeId);
+        allow update: if hasAccess(storeId) && isSubscriptionActive();
+        allow delete: if isAdmin(storeId) && isSubscriptionActive();
       }
       
       // Settings (Sozlamalar, Loyalty va h.k.)
@@ -126,7 +174,7 @@ service cloud.firestore {
         // Hamma o'qiy oladi (masalan, sotuvda bonus hisoblash uchun kerak)
         allow read: if hasAccess(storeId);
         // Faqat admin va manager tahrirlay oladi
-        allow write: if isAdmin(storeId) || isManager(storeId);
+        allow write: if (isAdmin(storeId) || isManager(storeId)) && isSubscriptionActive();
       }
     }
   }

@@ -11,7 +11,7 @@ import {
   ResponsiveContainer, AreaChart, Area, Cell
 } from 'recharts';
 import { db } from '../../firebase';
-import { collection, onSnapshot, query, orderBy } from '../../services/firebaseMock';
+import { collection, onSnapshot, query, orderBy, where, limit } from '../../services/firebaseMock';
 import { useRoles } from '../../context/RolesContext';
 import { formatCurrency, formatCompact } from '../../utils/formatters';
 import { useNavigate } from 'react-router-dom';
@@ -49,8 +49,7 @@ const Dashboard = () => {
   const [loading, setLoading]     = useState(true);
   const [timeFilter, setTimeFilter] = useState('bugun');
   
-
-  const { userProfile }         = useRoles();
+  const { userProfile, isSubscriptionActive, isPremium } = useRoles();
   const { settings }            = useSettings();
   const { selectedWarehouseId } = useWarehouse();
   const storeId  = userProfile?.storeOwnerId;
@@ -73,6 +72,7 @@ const Dashboard = () => {
       setDebts(s.docs.map(d => ({ id: d.id, ...d.data() })))))
     U.push(onSnapshot(query(collection(db, `users/${storeId}/purchaseOrders`), orderBy('createdAt','desc')), s =>
       setOrders(s.docs.map(d => ({ id: d.id, ...d.data() })))))
+      
     return () => U.forEach(u => u());
   }, [storeId]);
 
@@ -250,6 +250,53 @@ const Dashboard = () => {
     },
   ];
 
+  // Subscription Banner render helper
+  const renderSubscriptionBanner = () => {
+    const active = isSubscriptionActive();
+    const premium = isPremium();
+    
+    if (!active) {
+      return (
+        <div className="db-hero-banner" style={{ background: 'linear-gradient(135deg, #EF4444 0%, #DC2626 100%)', marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <h2 className="db-hero-greeting" style={{ color: 'white' }}>❌ Obunangiz yakunlangan!</h2>
+            <p className="db-hero-sub" style={{ color: 'rgba(255,255,255,0.8)' }}>Tizim faqat o'qish rejimida ishlamoqda. Iltimos, to'lovni amalga oshiring.</p>
+          </div>
+        </div>
+      );
+    }
+    
+    if (premium) {
+      return (
+        <div className="db-hero-banner" style={{ background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)', marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <h2 className="db-hero-greeting" style={{ color: 'white' }}>✅ Premium obunangiz faol!</h2>
+            <p className="db-hero-sub" style={{ color: 'rgba(255,255,255,0.8)' }}>
+              Sizda Onlayn do'kon va barcha imkoniyatlar mavjud. 
+              {userProfile?.subscriptionEnd ? ` (Muddat: ${new Date(userProfile.subscriptionEnd).toLocaleDateString()})` : ''}
+            </p>
+          </div>
+          <button className="db-hero-badge-btn" style={{ background: 'white', color: '#059669', border: 'none', fontWeight: 600, padding: '0.75rem 1.25rem' }} onClick={() => navigate('/online-store/products')}>
+            Onlayn do'konni boshqarish <ArrowUpRight size={16} />
+          </button>
+        </div>
+      );
+    }
+    
+    // Basic active
+    return (
+      <div className="db-hero-banner" style={{ background: 'linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%)', marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <h2 className="db-hero-greeting" style={{ color: 'white' }}>🔹 Basic obunangiz faol</h2>
+          <p className="db-hero-sub" style={{ color: 'rgba(255,255,255,0.8)' }}>
+            Onlayn do'kon funksiyalaridan foydalanish uchun Premium tarifiga o'ting.
+            {userProfile?.subscriptionEnd ? ` (Muddat: ${new Date(userProfile.subscriptionEnd).toLocaleDateString()})` : ''}
+          </p>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="dashboard-wrapper">
 
@@ -287,6 +334,9 @@ const Dashboard = () => {
           </button>
         </div>
       )}
+
+      {/* ══ SUBSCRIPTION BANNER ══ */}
+      {renderSubscriptionBanner()}
 
       {/* ══ HERO VIOLET BANNER ══ */}
       <div className="db-hero-banner">

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
-import { LayoutDashboard, ShoppingCart, Tag, Users, Settings, ShieldCheck, Megaphone, BarChart3, Wallet, PackageOpen, Handshake, LogOut, Sun, Moon } from 'lucide-react';
+import { LayoutDashboard, ShoppingCart, Tag, Users, Settings, ShieldCheck, Megaphone, BarChart3, Wallet, PackageOpen, Handshake, LogOut, Sun, Moon, ShoppingBag } from 'lucide-react';
 import { useRoles } from '../context/RolesContext';
 import { APP_NAME } from '../config/appConfig';
 import { useAuth } from '../context/AuthContext';
@@ -12,7 +12,7 @@ import { useTranslation } from '../hooks/useTranslation';
 import './layout.css';
 
 const Sidebar = ({ isOpen, closeSidebar }) => {
-  const { hasPermission, loadingRoles, userProfile } = useRoles();
+  const { hasPermission, loadingRoles, userProfile, isPremium } = useRoles();
   const { logout } = useAuth();
   const { settings, updateSettings } = useSettings();
   const { confirm } = useConfirm();
@@ -24,6 +24,7 @@ const Sidebar = ({ isOpen, closeSidebar }) => {
 
   const allMenuItems = [
     { path: '/', name: t('dashboard'), icon: <LayoutDashboard size={20} />, permKey: 'dashboard', exact: true },
+    { path: '/online-store', name: '🛍️ Onlayn Do\'kon', icon: <ShoppingBag size={20} />, permKey: 'onlineStore', isFlyout: true, flyoutKey: 'onlineStore' },
     { path: '/products', name: t('products'), icon: <Tag size={20} />, permKey: 'products', isFlyout: true, flyoutKey: 'products' },
     { path: '/sales', name: t('sales'), icon: <ShoppingCart size={20} />, permKey: 'sales', isFlyout: true, flyoutKey: 'sales' },
     { path: '/customers', name: t('customers'), icon: <Users size={20} />, permKey: 'customers', isFlyout: true, flyoutKey: 'customers' },
@@ -37,6 +38,7 @@ const Sidebar = ({ isOpen, closeSidebar }) => {
 
   const visibleItems = allMenuItems.filter(item => {
     if (item.permKey === 'settings') return hasPermission('settings') || hasPermission('importExport');
+    if (item.permKey === 'onlineStore') return isPremium();
     return hasPermission(item.permKey);
   });
 
@@ -45,6 +47,15 @@ const Sidebar = ({ isOpen, closeSidebar }) => {
   }
 
   const flyoutMenus = {
+    onlineStore: {
+      title: 'Onlayn Do\'kon',
+      items: [
+        { path: '/online-store/products', name: 'Mahsulotlar (Onlayn)', desc: 'Onlayn sotiladigan tovarlar va variantlar' },
+        { path: '/online-store/attributes', name: 'Atributlar', desc: 'Rang, hajm kabi xususiyatlar shablonlari' },
+        { path: '/online-store/comments', name: 'Mijozlar sharhlari', desc: 'Fikr-mulohazalar moderatsiyasi' },
+        { path: '/online-store/profile', name: 'Do\'kon profili', desc: 'Logo, manzil, ijtimoiy tarmoqlar' }
+      ]
+    },
     sales: {
       title: 'Sotuvlar bo\'limi',
       items: [

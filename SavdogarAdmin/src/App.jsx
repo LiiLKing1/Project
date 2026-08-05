@@ -4,7 +4,7 @@ import { collection, query, onSnapshot, doc, updateDoc, setDoc } from 'firebase/
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from 'firebase/auth';
 import { initializeApp } from 'firebase/app';
 import { motion } from 'framer-motion';
-import { UserPlus, UserCheck, UserX, LogOut, CheckCircle, Clock, XCircle, Search } from 'lucide-react';
+import { UserPlus, UserCheck, UserX, LogOut, CheckCircle, Clock, XCircle, Search, ShoppingBag } from 'lucide-react';
 import './index.css';
 
 const auth = getAuth();
@@ -17,6 +17,13 @@ function App() {
   const [search, setSearch] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showSubModal, setShowSubModal] = useState(false);
+  const [selectedUserForSub, setSelectedUserForSub] = useState(null);
+  const [subFormData, setSubFormData] = useState({
+    subscriptionPlan: 'basic',
+    subscriptionStart: '',
+    subscriptionEnd: ''
+  });
   
   // New user form
   const [newEmail, setNewEmail] = useState('');
@@ -42,9 +49,7 @@ function App() {
       setUsersList(docs);
     });
     
-    // Barcha foydalanuvchilar (pending va active) Firebase'dan olinadi
-    
-    return () => unsub();
+    return () => { unsub(); };
   }, [user]);
 
   const handleLogin = async (e) => {
@@ -93,9 +98,13 @@ function App() {
         email: newEmail,
         displayName: newName,
         role: 'owner',
-        status: 'active', // Admin created users are active immediately
-        emailVerified: true, // Manually verified by Admin
-        createdAt: new Date().toISOString()
+        status: 'active',
+        emailVerified: true,
+        createdAt: new Date().toISOString(),
+        subscriptionPlan: 'basic',
+        subscriptionStart: new Date().toISOString(),
+        // 7 kunlik bepul sinov muddati
+        subscriptionEnd: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
       });
       await signOut(secondaryAuth);
       
@@ -125,6 +134,34 @@ function App() {
     } catch (err) {
       alert("Xatolik: " + err.message);
     }
+  };
+
+  const openSubModal = (u) => {
+    setSelectedUserForSub(u);
+    setSubFormData({
+      subscriptionPlan: u.subscriptionPlan || 'basic',
+      subscriptionStart: u.subscriptionStart ? u.subscriptionStart.substring(0, 10) : new Date().toISOString().substring(0, 10),
+      subscriptionEnd: u.subscriptionEnd ? u.subscriptionEnd.substring(0, 10) : new Date().toISOString().substring(0, 10)
+    });
+    setShowSubModal(true);
+  };
+
+  const handleUpdateSubscription = async (e) => {
+    e.preventDefault();
+    if (!selectedUserForSub) return;
+    setIsLoading(true);
+    try {
+      await updateDoc(doc(db, 'users', selectedUserForSub.id), {
+        subscriptionPlan: subFormData.subscriptionPlan,
+        subscriptionStart: new Date(subFormData.subscriptionStart).toISOString(),
+        subscriptionEnd: new Date(subFormData.subscriptionEnd).toISOString()
+      });
+      setShowSubModal(false);
+      alert("Obuna muvaffaqiyatli yangilandi!");
+    } catch(err) {
+      alert("Xato: " + err.message);
+    }
+    setIsLoading(false);
   };
 
   if (!user) {
@@ -178,7 +215,13 @@ function App() {
       </header>
       
       <main className="main-content">
-        <div className="toolbar">
+        <div style={{ display: 'flex', gap: '1rem', borderBottom: '1px solid #E5E7EB', marginBottom: '1.5rem' }}>
+          <button 
+            style={{ padding: '0.75rem 1rem', background: 'none', border: 'none', borderBottom: '2px solid #8052ff', color: '#8052ff', fontWeight: 600, cursor: 'pointer' }}>
+            Mijozlar (Platforma)
+          </button>
+        </div>
+            <div className="toolbar">
           <div className="search-box">
             <Search size={18} color="#6b7280" />
             <input 
@@ -199,7 +242,8 @@ function App() {
               <tr>
                 <th>Biznes / Mijoz Nomi</th>
                 <th>Email</th>
-                <th>Ro'yxatdan o'tgan sana</th>
+                <th>Obuna Turi</th>
+                <th>Tugash sanasi</th>
                 <th>Status</th>
                 <th style={{textAlign: 'right'}}>Amallar</th>
               </tr>
@@ -212,7 +256,12 @@ function App() {
                 <tr key={u.id}>
                   <td className="font-medium">{u.displayName || 'Noma\'lum'}</td>
                   <td className="text-gray">{u.email}</td>
-                  <td className="text-gray">{new Date(u.createdAt).toLocaleDateString()}</td>
+                  <td className="text-gray" style={{ textTransform: 'capitalize' }}>
+                    {u.subscriptionPlan === 'premium' ? <span style={{color: '#8052ff', fontWeight: 600}}>Premium</span> : 'Basic'}
+                  </td>
+                  <td className="text-gray">
+                    {u.subscriptionEnd ? new Date(u.subscriptionEnd).toLocaleDateString() : '-'}
+                  </td>
                   <td>
                     <span className={`status-badge status-${u.status || 'active'}`}>
                       {u.status === 'pending' && <Clock size={14} />}
@@ -224,9 +273,12 @@ function App() {
                   <td className="actions-cell">
                     {u.status !== 'active' && (
                       <button className="btn-action approve" onClick={() => changeStatus(u, 'active')} title="Tasdiqlash/Faollashtirish">
-                        <UserCheck size={16} /> Faollashtirish
+                        <UserCheck size={16} /> Faol.
                       </button>
                     )}
+                    <button className="btn-action" style={{backgroundColor: '#EEF2FF', color: '#4F46E5'}} onClick={() => openSubModal(u)} title="Obuna sozlamalari">
+                      <Clock size={16} /> Obuna
+                    </button>
                     {u.status !== 'blocked' && !u.fileId && (
                       <button className="btn-action block" onClick={() => changeStatus(u, 'blocked')} title="Bloklash (To'lov qilinmagan)">
                         <UserX size={16} /> Bloklash
@@ -268,6 +320,54 @@ function App() {
               <div className="modal-actions">
                 <button type="button" className="btn-secondary" onClick={() => setShowAddModal(false)}>Bekor qilish</button>
                 <button type="submit" className="btn-primary" disabled={isLoading}>{isLoading ? 'Yaratilmoqda...' : 'Yaratish'}</button>
+              </div>
+            </form>
+          </motion.div>
+        </div>
+      )}
+
+      {showSubModal && (
+        <div className="modal-overlay">
+          <motion.div 
+            initial={{opacity: 0, y: 20}}
+            animate={{opacity: 1, y: 0}}
+            className="modal-content"
+          >
+            <h2>Obuna Sozlamalari</h2>
+            <p>{selectedUserForSub?.displayName} uchun tarif va muddatni tanlang.</p>
+            <form onSubmit={handleUpdateSubscription} className="modal-form">
+              <div className="input-group">
+                <label>Tarif Rejasi</label>
+                <select 
+                  value={subFormData.subscriptionPlan} 
+                  onChange={e => setSubFormData({...subFormData, subscriptionPlan: e.target.value})}
+                  required
+                >
+                  <option value="basic">Basic (150,000 so'm) - Ochiq do'konsiz</option>
+                  <option value="premium">Premium (250,000 so'm) - Onlayn Do'kon bilan</option>
+                </select>
+              </div>
+              <div className="input-group">
+                <label>Boshlanish sanasi</label>
+                <input 
+                  type="date" 
+                  value={subFormData.subscriptionStart} 
+                  onChange={e => setSubFormData({...subFormData, subscriptionStart: e.target.value})} 
+                  required 
+                />
+              </div>
+              <div className="input-group">
+                <label>Tugash sanasi</label>
+                <input 
+                  type="date" 
+                  value={subFormData.subscriptionEnd} 
+                  onChange={e => setSubFormData({...subFormData, subscriptionEnd: e.target.value})} 
+                  required 
+                />
+              </div>
+              <div className="modal-actions">
+                <button type="button" className="btn-secondary" onClick={() => setShowSubModal(false)}>Bekor qilish</button>
+                <button type="submit" className="btn-primary" disabled={isLoading}>{isLoading ? 'Saqlanmoqda...' : 'Saqlash'}</button>
               </div>
             </form>
           </motion.div>

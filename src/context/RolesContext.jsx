@@ -64,8 +64,12 @@ export const RolesProvider = ({ children }) => {
         const ownerDocRef = doc(db, `users/${storeOwnerId}`);
         const ownerDocSnap = await getDoc(ownerDocRef);
         if (ownerDocSnap.exists()) {
-          profileData.status = ownerDocSnap.data().status || 'pending'; // Default to pending if missing
-          profileData.emailVerified = ownerDocSnap.data().emailVerified || currentUser.emailVerified;
+          const ownerData = ownerDocSnap.data();
+          profileData.status = ownerData.status || 'pending';
+          profileData.emailVerified = ownerData.emailVerified || currentUser.emailVerified;
+          profileData.subscriptionPlan = ownerData.subscriptionPlan || 'basic';
+          profileData.subscriptionStart = ownerData.subscriptionStart || null;
+          profileData.subscriptionEnd = ownerData.subscriptionEnd || null;
         } else {
           // If root doc doesn't exist, they are definitely pending and we should create it
           profileData.status = 'pending';
@@ -143,6 +147,9 @@ export const RolesProvider = ({ children }) => {
           storeOwnerId: currentUser.uid,
           status: status,
           emailVerified: ownerDocSnap.exists() ? ownerDocSnap.data().emailVerified : (currentUser.emailVerified || false),
+          subscriptionPlan: ownerDocSnap.exists() ? (ownerDocSnap.data().subscriptionPlan || 'basic') : 'basic',
+          subscriptionStart: ownerDocSnap.exists() ? (ownerDocSnap.data().subscriptionStart || null) : null,
+          subscriptionEnd: ownerDocSnap.exists() ? (ownerDocSnap.data().subscriptionEnd || null) : null,
           createdAt: new Date().toISOString()
         };
         
@@ -172,7 +179,12 @@ export const RolesProvider = ({ children }) => {
       return false;
     }
     
-    const normalizedRole = (userProfile.role || (userProfile.storeOwnerId ? 'kassir' : 'admin')).toLowerCase();
+    let normalizedRole = (userProfile.role || (userProfile.storeOwnerId ? 'kassir' : 'admin')).toLowerCase();
+    if (normalizedRole === 'owner') {
+      normalizedRole = 'admin';
+    }
+    
+    if (permKey === 'onlineStore') return isPremium();
     
     // Asosiy admin egasi uchun barcha ruxsatlar ochiq
     if (normalizedRole === 'admin' && !userProfile.storeOwnerId) return true;
@@ -192,8 +204,18 @@ export const RolesProvider = ({ children }) => {
     return DEFAULT_ROLES[normalizedRole]?.permissions?.[permKey] === true;
   };
 
+  const isSubscriptionActive = () => {
+    if (!userProfile) return true;
+    if (!userProfile.subscriptionEnd) return true; // assuming active if no end date
+    return new Date() <= new Date(userProfile.subscriptionEnd);
+  };
+
+  const isPremium = () => {
+    return userProfile?.subscriptionPlan === 'premium' && isSubscriptionActive();
+  };
+
   return (
-    <RolesContext.Provider value={{ userProfile, roles, loadingRoles, hasPermission, hasOnboarded }}>
+    <RolesContext.Provider value={{ userProfile, roles, loadingRoles, hasPermission, hasOnboarded, isSubscriptionActive, isPremium }}>
       {children}
     </RolesContext.Provider>
   );
