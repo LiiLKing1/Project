@@ -55,6 +55,9 @@ const PublicStore = () => {
     const unsub = onSnapshot(q, (snapshot) => {
       setProducts(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
       setLoading(false);
+    }, (error) => {
+      console.error("Products snapshot error in PublicStore:", error);
+      setLoading(false);
     });
     return () => unsub();
   }, [storeId]);

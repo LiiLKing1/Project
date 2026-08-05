@@ -47,12 +47,17 @@ const ManageProducts = () => {
     const unsubProds = onSnapshot(qProds, (snapshot) => {
       setProducts(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
       setLoading(false);
+    }, (error) => {
+      console.error("Products snapshot error:", error);
+      setLoading(false);
     });
 
     // Attribute Templates
     const qTmpls = query(collection(db, `users/${storeId}/attributeTemplates`));
     const unsubTmpls = onSnapshot(qTmpls, (snapshot) => {
       setTemplates(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, (error) => {
+      console.error("Templates snapshot error:", error);
     });
 
     return () => {

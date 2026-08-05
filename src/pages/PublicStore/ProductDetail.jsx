@@ -82,6 +82,8 @@ const ProductDetail = () => {
       // Filter out hidden comments
       const docs = snapshot.docs.map(d => ({ id: d.id, ...d.data() })).filter(c => !c.isHidden);
       setComments(docs);
+    }, (error) => {
+      console.error("Comments snapshot error:", error);
     });
     return () => unsub();
   }, [storeId, productId]);
