@@ -45,21 +45,8 @@ const Login = () => {
           return;
         }
 
-        // If it's an owner and email is not verified, check Firestore as Admin might have verified them
-        if (!currentUser.emailVerified && !currentUser.email.endsWith('@pos.com')) {
-          try {
-            const userDoc = await getDoc(doc(db, "users", currentUser.uid));
-            if (userDoc.exists() && userDoc.data().emailVerified === true) {
-              navigate(redirectPath);
-            } else {
-              navigate('/verify-email');
-            }
-          } catch (error) {
-            navigate('/verify-email');
-          }
-        } else {
-          navigate(redirectPath);
-        }
+        // Agar email orqali tasdiqlashni olib tashlagan bo'lsangiz:
+        navigate(redirectPath);
       }
     };
     checkVerification();
@@ -133,9 +120,8 @@ const Login = () => {
           // Firebase'ga 'pending' status bilan yozamiz (Admin tasdiqlashi uchun)
           await setDoc(doc(db, "users", userCredential.user.uid), pendingData);
           
-          await sendEmailVerification(userCredential.user);
-          addToast("Muvaffaqiyatli ro'yxatdan o'tdingiz. Emailingizga tasdiqlash xati yuborildi. Iltimos pochtangizni tekshiring", "success");
-          navigate('/verify-email');
+          addToast("Muvaffaqiyatli ro'yxatdan o'tdingiz.", "success");
+          navigate(redirectPath);
           return; // Stop execution to prevent navigating to redirectPath
         } else {
           await login(email, password);

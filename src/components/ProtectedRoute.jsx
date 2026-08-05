@@ -30,9 +30,7 @@ const ProtectedRoute = ({ children }) => {
     );
   }
 
-  if (userProfile?.role === 'owner' && currentUser && !currentUser.emailVerified && !userProfile?.emailVerified) {
-    return <Navigate to="/verify-email" replace />;
-  }
+
 
   if (!hasOnboarded && userProfile?.status !== 'pending') {
     return <Navigate to="/onboarding" replace />;
