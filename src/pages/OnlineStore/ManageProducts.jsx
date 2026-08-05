@@ -3,7 +3,7 @@ import { db } from '../../firebase';
 import { collection, onSnapshot, query, orderBy, doc, updateDoc } from '../../services/firebaseMock';
 import { useRoles } from '../../context/RolesContext';
 import TitleBar from '../../components/TitleBar';
-import { Tag, Edit2, Search, Eye, EyeOff, Save, Plus, X, Image as ImageIcon } from 'lucide-react';
+import { Tag, Edit2, Search, Eye, EyeOff, Save, Plus, X, Image as ImageIcon, Trash2 } from 'lucide-react';
 import { formatCurrency } from '../../utils/formatters';
 
 const ManageProducts = () => {
