@@ -23,7 +23,7 @@ const Login = () => {
   const [resetEmail, setResetEmail] = useState('');
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
   
-  const { loginWithGoogle, login, signup, currentUser } = useAuth();
+  const { loginWithGoogle, login, signup, currentUser, logout } = useAuth();
   const { addToast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
@@ -35,6 +35,16 @@ const Login = () => {
   React.useEffect(() => {
     const checkVerification = async () => {
       if (currentUser) {
+        // Agar foydalanuvchi admin yoki xodim bo'lmasa, uni avtomat tizimdan chiqaramiz (logout)
+        // aks holda u /landing va /login orasida qotib qoladi.
+        if (
+          currentUser.email?.toLowerCase() !== 'liilking@savdogar.uz' &&
+          !currentUser.email?.toLowerCase().endsWith('@pos.com')
+        ) {
+          if (logout) await logout();
+          return;
+        }
+
         // If it's an owner and email is not verified, check Firestore as Admin might have verified them
         if (!currentUser.emailVerified && !currentUser.email.endsWith('@pos.com')) {
           try {
