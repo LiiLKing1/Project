@@ -142,7 +142,7 @@ const PublicStore = () => {
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '1.5rem' }}>
             {filteredProducts.map(p => (
-              <div key={p.id} onClick={() => navigate(`/store/${slug}/p/${p.id}`)} style={{ background: 'white', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', cursor: 'pointer', transition: 'transform 0.2s', ':hover': { transform: 'translateY(-4px)' } }}>
+              <div key={p.id} onClick={() => navigate(`/store/${slug}/p/${p.id}`, { state: { product: p, storeId, storeProfile } })} style={{ background: 'white', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', cursor: 'pointer', transition: 'transform 0.2s', ':hover': { transform: 'translateY(-4px)' } }}>
                 <div style={{ width: '100%', aspectRatio: '1/1', background: '#F3F4F6', position: 'relative' }}>
                   {p.onlineImages && p.onlineImages[0] ? (
                     <img src={p.onlineImages[0]} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import { db } from '../../firebase';
 import { collection, query, where, getDocs, doc, getDoc, onSnapshot, orderBy, addDoc, serverTimestamp } from '../../services/firebaseMock';
 import { ArrowLeft, ShoppingBag, Star, Info, MessageSquare, Send, X } from 'lucide-react';
@@ -8,15 +8,20 @@ import { formatCurrency } from '../../utils/formatters';
 const ProductDetail = () => {
   const { slug, productId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const preloadedState = location.state;
   
-  const [storeId, setStoreId] = useState(null);
-  const [storeProfile, setStoreProfile] = useState(null);
-  const [product, setProduct] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [storeId, setStoreId] = useState(preloadedState?.storeId || null);
+  const [storeProfile, setStoreProfile] = useState(preloadedState?.storeProfile || null);
+  const [product, setProduct] = useState(preloadedState?.product || null);
+  const [loading, setLoading] = useState(!preloadedState?.product);
   const [error, setError] = useState('');
   
   const [activeImage, setActiveImage] = useState(0);
-  const [selectedVariant, setSelectedVariant] = useState(null);
+  const [selectedVariant, setSelectedVariant] = useState(() => {
+    if (preloadedState?.product?.variants?.length > 0) return preloadedState.product.variants[0];
+    return null;
+  });
   
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState('');
@@ -27,23 +32,25 @@ const ProductDetail = () => {
   useEffect(() => {
     const fetchStoreAndProduct = async () => {
       try {
-        // Fetch Store
-        const usersQ = query(collection(db, 'users'), where('storeSlug', '==', slug), where('subscriptionPlan', '==', 'premium'));
-        const usersSnap = await getDocs(usersQ);
-        if (usersSnap.empty) {
-          setError("Do'kon topilmadi.");
-          setLoading(false); return;
+        // Agar state orqali kelmagan bo'lsa, foydalanuvchini izlaymiz
+        let sId = storeId;
+        if (!sId) {
+          const usersQ = query(collection(db, 'users'), where('storeSlug', '==', slug), where('subscriptionPlan', '==', 'premium'));
+          const usersSnap = await getDocs(usersQ);
+          if (usersSnap.empty) {
+            setError("Do'kon topilmadi.");
+            setLoading(false); return;
+          }
+          sId = usersSnap.docs[0].id;
+          setStoreId(sId);
+          
+          const profileQ = query(collection(db, `users/${sId}/sellerProfile`));
+          const profileSnap = await getDocs(profileQ);
+          if (!profileSnap.empty) setStoreProfile(profileSnap.docs[0].data());
+          else setStoreProfile({ displayName: usersSnap.docs[0].data().displayName });
         }
-        const sId = usersSnap.docs[0].id;
-        setStoreId(sId);
-        
-        // Fetch Profile for Header
-        const profileQ = query(collection(db, `users/${sId}/sellerProfile`));
-        const profileSnap = await getDocs(profileQ);
-        if (!profileSnap.empty) setStoreProfile(profileSnap.docs[0].data());
-        else setStoreProfile({ displayName: usersSnap.docs[0].data().displayName });
 
-        // Fetch Product
+        // Mahsulotni fonda yangilaymiz (yangi narx yoki qoldiq bo'lsa)
         const pDoc = await getDoc(doc(db, `users/${sId}/products`, productId));
         if (!pDoc.exists() || !pDoc.data().isOnlineVisible) {
           setError("Mahsulot topilmadi yoki sotuvdan olingan.");
@@ -52,7 +59,8 @@ const ProductDetail = () => {
         
         const pData = { id: pDoc.id, ...pDoc.data() };
         setProduct(pData);
-        if (pData.variants && pData.variants.length > 0) {
+        // Agar oldin variant tanlanmagan bo'lsa, birinchisini tanlaymiz
+        if (!selectedVariant && pData.variants && pData.variants.length > 0) {
           setSelectedVariant(pData.variants[0]);
         }
         
