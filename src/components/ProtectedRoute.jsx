@@ -12,6 +12,14 @@ const ProtectedRoute = ({ children }) => {
     return <Navigate to={isElectron ? "/login" : "/landing"} replace />;
   }
 
+  // Faqat asosiy admin va xodimlarga admin panelga kirishga ruxsat
+  if (
+    currentUser.email !== 'LiiLKing@savdogar.uz' && 
+    !currentUser.email.endsWith('@pos.com')
+  ) {
+    return <Navigate to="/landing" replace />;
+  }
+
   if (loadingRoles) {
     return (
       <div className="flex-center" style={{ height: '100vh', flexDirection: 'column', gap: '1rem' }}>
